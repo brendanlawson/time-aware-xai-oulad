@@ -1,0 +1,43 @@
+# Conda environment for the project.
+# Usage:
+#   conda env create -f environment.yml
+#   conda activate dsp
+#
+# This path installs the heavy binary packages from conda-forge (prebuilt,
+# no compiler needed) and leaves only the pure-Python / XAI packages to pip.
+name: dsp
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+
+  # Core scientific stack (conda-forge binaries)
+  - numpy>=1.26,<2.0
+  - pandas>=2.2,<2.3
+  - scipy>=1.13,<1.14
+  - pyarrow>=16.0
+
+  # Machine learning
+  - scikit-learn>=1.5,<1.6
+  - xgboost>=2.0,<2.1
+  - lightgbm>=4.3,<4.4
+  - imbalanced-learn>=0.12,<0.13
+
+  # Visualisation
+  - matplotlib>=3.9,<3.10
+  - seaborn>=0.13,<0.14
+  - missingno>=0.5
+
+  # Experiment harness & notebooks
+  - optuna>=3.6,<3.7
+  - joblib>=1.4
+  - jupyter>=1.0
+  - pytest>=8.2
+
+  # Packages best installed via pip
+  - pip:
+      - tensorflow>=2.16,<2.17
+      - shap>=0.45,<0.46
+      - lime>=0.2,<0.3
+      - streamlit>=1.35
