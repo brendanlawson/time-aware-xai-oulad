@@ -1,0 +1,44 @@
+# ---- Data (never commit raw or intermediate datasets) ----
+data/raw/
+data/interim/
+data/checkpoints/
+*.parquet
+*.pkl
+!data/.gitkeep
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+.python-version
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# ---- Testing & coverage ----
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ---- Tooling caches ----
+.mypy_cache/
+.ruff_cache/
+
+# ---- IDE / OS ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---- Secrets ----
+.env
+*.local
