@@ -28,5 +28,9 @@ joblib==1.4.2
 jupyter==1.0.0
 pytest==8.2.2
 
+# Git workflow tools
+pre-commit==3.7.1
+nbstripout==0.7.1
+
 # Optional dashboard
 streamlit==1.35.0
