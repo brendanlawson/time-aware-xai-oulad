@@ -1,7 +1,7 @@
 # DSP391m – Group 1
 ## Report 3 – Task 3 | Data Collection, Cleaning & Analysis
-### Step 30 — Data Source, License & Ethical Considerations
-*Section by An – Documentation Lead*
+### Data Source, License & Ethical Considerations
+
 
 ---
 
@@ -138,4 +138,4 @@ Beyond the minimum legal requirements, this project commits to the following res
 
 ---
 
-*DSP391m – Group 1 – Step 30 – An (Documentation Lead)*
+*DSP391m – Group 1*
