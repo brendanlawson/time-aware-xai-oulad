@@ -65,6 +65,16 @@ def main():
             all_passed = False
 
     # Ghi xuất tệp Manifest
+    # Nếu file manifest đã tồn tại và là read-only, cần mở quyền ghi trước
+    if os.path.exists(MANIFEST_PATH):       
+        try:
+            with open(MANIFEST_PATH, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(manifest_lines))
+        except PermissionError as e:
+            print(f"LỖI: Không thể ghi manifest tại {MANIFEST_PATH}: {e}")
+            all_passed = False
+        return
+    
     with open(MANIFEST_PATH, 'w', encoding='utf-8') as f:
         f.write('\n'.join(manifest_lines))
     

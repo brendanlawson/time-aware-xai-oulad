@@ -1,36 +1,37 @@
 # Core scientific stack
-numpy==1.26.4
-pandas==2.2.2
-scipy==1.13.1
-pyarrow==16.1.0          # parquet I/O
+numpy>=1.23.0,<2.0.0
+pandas>=2.2.2
+scipy>=1.13.1
+pyarrow>=16.1.0          # parquet I/O
 
 # Machine learning
-scikit-learn==1.5.0
-xgboost==2.0.3
-lightgbm==4.3.0
-imbalanced-learn==0.12.3 # SMOTE, ADASYN
-tensorflow==2.16.1       # ANN
+scikit-learn>=1.5.0
+xgboost>=2.0.3
+lightgbm>=4.3.0
+imbalanced-learn>=0.12.3 # SMOTE, ADASYN
+tensorflow>=2.16.1       # ANN
 
 # Explainable AI
-shap==0.45.1
-lime==0.2.0.1
+shap>=0.45.1
+lime>=0.2.0.1
 
 # Visualisation
-matplotlib==3.9.0
-seaborn==0.13.2
-missingno==0.5.2
+matplotlib>=3.9.0
+seaborn>=0.13.2
+missingno>=0.5.2
 
 # Experiment harness & reproducibility
-optuna==3.6.1
-joblib==1.4.2
+optuna>=3.6.1
+joblib>=1.4.2
 
 # Notebooks & testing
-jupyter==1.0.0
-pytest==8.2.2
+jupyter>=1.0.0
+nbconvert>=7.0.0
+pytest>=8.2.2
 
 # Git workflow tools
 pre-commit==3.7.1
 nbstripout==0.7.1
 
 # Optional dashboard
-streamlit==1.35.0
+streamlit>=1.35.0
