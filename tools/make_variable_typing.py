@@ -271,6 +271,24 @@ ROWS = [
         "Derived",
     ),
     (
+        "date_unregistration",
+        "Temporal",
+        "Numeric (continuous)",
+        "Định lượng (liên tục)",
+        "",
+        "Not a feature (Withdrawn analysis)",
+        "Original",
+    ),
+    (
+        "module_presentation_length",
+        "Temporal",
+        "Numeric (discrete)",
+        "Định lượng (rời rạc)",
+        "",
+        "Checkpoint-day conversion",
+        "Original",
+    ),
+    (
         "final_result",
         "Target (raw)",
         "Nominal (raw)",
@@ -317,6 +335,7 @@ group_fill = {
     "Demographic": "E8F0FB",
     "Engagement": "FDEBE7",
     "Performance": "EAF3EA",
+    "Temporal": "F3EDF7",
     "Target": "FFF6DD",
     "Target (raw)": "FFF6DD",
 }

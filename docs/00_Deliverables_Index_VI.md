@@ -34,8 +34,8 @@ Tài liệu được cung cấp ở cả định dạng Markdown (`.md`) và Wor
 | 26 | Sơn | Định nghĩa biến mục tiêu + căn cứ | `docs/01_TargetVariable_Definition_{EN,VI}.md/.docx` |
 | 27 | Sơn | Phân phối lớp & mất cân bằng | `src/eda/eda.py`, `reports/figures/dist_class_distribution.png` |
 | 28 | Sơn | Thống kê mô tả | `src/eda/eda.py`, `reports/eda_descriptive_stats.csv` |
-| 29 | An | Từ điển dữ liệu | `docs/DataDictionary.md`, `docs/DataDictionary.xlsx` |
-| 30 | An | Nguồn / giấy phép / đạo đức | `docs/DataSource_License_Ethics.md/.docx` |
+| 29 | An | Từ điển dữ liệu (bao phủ 100%) | `docs/DataDictionary_{EN,VI}.md/.docx` (đầy đủ, cả 33 cột), `docs/DataDictionary.md`, `docs/DataDictionary.xlsx`, `docs/variable_typing.xlsx` |
+| 30 | An | Nguồn / giấy phép / đạo đức | `docs/DataSource_License_Ethics.md/.docx` (EN), `docs/DataSource_License_Ethics_VI.md/.docx` (VI) |
 | 31 | An | Khả năng tái lập | `docs/10_Reproducibility_{EN,VI}.md/.docx`, `README.md`, `requirements.txt` |
 | 32 | An | Tổng hợp Chương 4 (EDA) | `reports/Report2_DataTasks_{EN,VI}` §4 |
 | 33 | An | Bản thảo Báo cáo 2 (Ch 3–4) | `reports/Report2_DataTasks_{EN,VI}.md/.docx` |

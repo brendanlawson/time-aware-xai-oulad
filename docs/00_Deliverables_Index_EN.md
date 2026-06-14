@@ -34,8 +34,8 @@ Documents are provided as both Markdown (`.md`) and Word (`.docx`), each in Engl
 | 26 | Son | Target definition + evidence | `docs/01_TargetVariable_Definition_{EN,VI}.md/.docx` |
 | 27 | Son | Class distribution & imbalance | `src/eda/eda.py`, `reports/figures/dist_class_distribution.png` |
 | 28 | Son | Descriptive statistics | `src/eda/eda.py`, `reports/eda_descriptive_stats.csv` |
-| 29 | An | Data dictionary | `docs/DataDictionary.md`, `docs/DataDictionary.xlsx` |
-| 30 | An | Source / licence / ethics | `docs/DataSource_License_Ethics.md/.docx` |
+| 29 | An | Data dictionary (100% coverage) | `docs/DataDictionary_{EN,VI}.md/.docx` (complete, all 33 columns), `docs/DataDictionary.md`, `docs/DataDictionary.xlsx`, `docs/variable_typing.xlsx` |
+| 30 | An | Source / licence / ethics | `docs/DataSource_License_Ethics.md/.docx` (EN), `docs/DataSource_License_Ethics_VI.md/.docx` (VI) |
 | 31 | An | Reproducibility | `docs/10_Reproducibility_{EN,VI}.md/.docx`, `README.md`, `requirements.txt` |
 | 32 | An | Chapter 4 (EDA) synthesis | `reports/Report2_DataTasks_{EN,VI}` §4 |
 | 33 | An | Report 2 draft (Ch 3–4) | `reports/Report2_DataTasks_{EN,VI}.md/.docx` |
