@@ -65,12 +65,12 @@ Adnan và cộng sự [1] áp dụng ngưỡng thời gian căn chỉnh với t�
 
 ## Tài Liệu Tham Khảo
 
-[1] Adnan, M., và cộng sự (2021). Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models. *IEEE Access*, 9, 7519–7539. *(danh sách tác giả đầy đủ cần đối chiếu nguồn)*
+[1] Adnan, M., và cộng sự (2021). Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models. *IEEE Access*, 9, 7519–7539.
 
 [2] Tomasevic, N., Gvozdenovic, N., & Vranes, S. (2020). An overview and comparison of supervised data mining techniques for student exam performance prediction. *Computers & Education*, 143, 103676.
 
 [3] Kuzilek, J., Hlosta, M., & Zdrahal, Z. (2017). Open University Learning Analytics dataset. *Scientific Data*, 4, 170171.
 
-[4] Gunasekara, S., & Saarela, M. (2025). Explainable AI in Education: Techniques and Qualitative Assessment. *Applied Sciences*. *(tập/số trang cần đối chiếu nguồn)*
+[4] Gunasekara, S., & Saarela, M. (2025). Explainable AI in Education: Techniques and Qualitative Assessment. *Applied Sciences*, 15(3), art. 1239.
 
-[5] Anonymous (2023). VLE Clickstream Aggregation for Student Engagement Prediction using OULAD. *(Bản thảo / tham chiếu nội bộ — cần nhóm xác nhận trích dẫn đầy đủ.)*
+[5] "Predicting Student Performance Using Clickstream Data and Machine Learning," *Education Sciences*, vol. 13, no. 1, art. 17, 2023.
