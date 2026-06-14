@@ -29,6 +29,25 @@ The consolidated draft that synthesises all of the above is `reports/Report2_Dat
 | Tests | `tests/test_leakage.py` (16 tests) |
 | Generators | `tools/` (docx, notebooks, data dictionary, variable typing, sequence diagram) |
 
+## Train / test data
+
+The split is defined **once** at the student level — a fixed **20% test set** keyed on `id_student` (stratified by `at_risk`, seed 42) — and reused identically across `master_raw` and all six checkpoints, so the six performance points are comparable (Tasks 7, 8, 15).
+
+| Artifact | Location | Tracked? |
+|---|---|---|
+| Canonical split definition (test `id_student` list, 5,756 students) | `data/splits/test_student_ids.csv` | ✅ committed |
+| Split verification report (sizes, class balance, 0 overlap) | `reports/tables/split_report.csv` | ✅ committed |
+| Materialised train/test data (master + per checkpoint) | `data/splits/*_train.parquet`, `*_test.parquet` | git-ignored (regenerable) |
+
+Generate them with `python -m src.evaluation.make_split --materialise`. In the modelling phase, load a checkpoint's split directly:
+
+```python
+from src.evaluation.make_split import load_checkpoint_split
+X_train, X_test = load_checkpoint_split(40)   # train/test for the 40% checkpoint
+```
+
+Verified: train ≈ 26,104 rows · test ≈ 6,489 rows (5,756 students) · at-risk 0.530 / 0.520 · **0 student overlap** — identical across all six checkpoints.
+
 ## Reproduce everything
 
 ```bash
@@ -36,6 +55,7 @@ python setup_raw_data.py                 # verify the 7 raw CSVs + manifest
 python -m src.data.time_utils            # data/checkpoint_map.csv
 python -m src.data.build_master_table    # master_raw.parquet (+ join/cleaning logs)
 python -m src.data.make_checkpoints      # six checkpoint datasets
+python -m src.evaluation.make_split --materialise  # fixed train/test split (+ report)
 python -m src.eda.eda                    # figures + tables + eda_findings.json
 pytest tests/test_leakage.py             # 16 leakage/split tests
 ```

@@ -5,6 +5,9 @@ data/checkpoints/
 *.parquet
 *.pkl
 !data/.gitkeep
+# Train/test split: keep the canonical id list (committed); the materialised
+# train/test parquets are regenerable and stay ignored via the *.parquet rule.
+!data/splits/test_student_ids.csv
 
 # ---- Python ----
 __pycache__/

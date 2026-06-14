@@ -29,6 +29,25 @@ Bản thảo tổng hợp toàn bộ là `reports/Report2_DataTasks_{EN,VI}` (k�
 | Kiểm thử | `tests/test_leakage.py` (16 kiểm thử) |
 | Bộ sinh | `tools/` (docx, notebook, từ điển dữ liệu, phân loại biến, sơ đồ trình tự) |
 
+## Dữ liệu train / test
+
+Phép phân chia được định nghĩa **một lần** ở cấp sinh viên — **tập kiểm tra 20% cố định** theo `id_student` (phân tầng theo `at_risk`, seed 42) — và dùng lại đồng nhất trên `master_raw` và cả sáu mốc, để sáu điểm hiệu năng so sánh được (STT 7, 8, 15).
+
+| Sản phẩm | Vị trí | Có commit? |
+|---|---|---|
+| Định nghĩa phân chia (danh sách `id_student` tập test, 5.756 SV) | `data/splits/test_student_ids.csv` | ✅ có commit |
+| Báo cáo kiểm chứng phân chia (kích thước, tỉ lệ lớp, 0 trùng) | `reports/tables/split_report.csv` | ✅ có commit |
+| Dữ liệu train/test đã tạo (master + từng mốc) | `data/splits/*_train.parquet`, `*_test.parquet` | git bỏ qua (tái tạo được) |
+
+Sinh bằng `python -m src.evaluation.make_split --materialise`. Ở giai đoạn mô hình, nạp trực tiếp phân chia của một mốc:
+
+```python
+from src.evaluation.make_split import load_checkpoint_split
+X_train, X_test = load_checkpoint_split(40)   # train/test cho mốc 40%
+```
+
+Đã kiểm chứng: train ≈ 26.104 dòng · test ≈ 6.489 dòng (5.756 SV) · at-risk 0,530 / 0,520 · **0 sinh viên trùng** — đồng nhất qua cả sáu mốc.
+
 ## Tái tạo toàn bộ
 
 ```bash
@@ -36,6 +55,7 @@ python setup_raw_data.py                 # kiểm tra 7 CSV gốc + manifest
 python -m src.data.time_utils            # data/checkpoint_map.csv
 python -m src.data.build_master_table    # master_raw.parquet (+ nhật ký join/làm sạch)
 python -m src.data.make_checkpoints      # sáu bộ dữ liệu theo mốc
+python -m src.evaluation.make_split --materialise  # phân chia train/test cố định (+ báo cáo)
 python -m src.eda.eda                    # biểu đồ + bảng + eda_findings.json
 pytest tests/test_leakage.py             # 16 kiểm thử rò rỉ/phân chia
 ```
