@@ -14,8 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 targets = (
-    sorted(ROOT.glob("docs/*_EN.md"))
-    + sorted(ROOT.glob("docs/*_VI.md"))
+    sorted(ROOT.glob("docs/**/*_EN.md"))
+    + sorted(ROOT.glob("docs/**/*_VI.md"))
     + sorted(ROOT.glob("reports/Report2_DataTasks_*.md"))
 )
 

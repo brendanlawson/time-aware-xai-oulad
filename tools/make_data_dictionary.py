@@ -351,14 +351,43 @@ def build(lang: str, master: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def build_xlsx(master: pd.DataFrame, path: Path) -> None:
+    rows = []
+    for c in master.columns:
+        g, ten, tvi, origin, den, dvi = DESC[c]
+        s = master[c]
+        ex = (
+            f"min {s.min():g}, max {s.max():g}"
+            if pd.api.types.is_numeric_dtype(s)
+            else f"{s.nunique(dropna=True)} unique"
+        )
+        rows.append(
+            {
+                "variable": c,
+                "group": g,
+                "type_EN": ten,
+                "type_VI": tvi,
+                "origin": origin,
+                "description_EN": den,
+                "description_VI": dvi,
+                "example_range": ex,
+            }
+        )
+    pd.DataFrame(rows).to_excel(path, index=False, sheet_name="DataDictionary")
+
+
 def main():
     master = pd.read_parquet(MASTER)
     uncovered = [c for c in master.columns if c not in DESC]
     assert not uncovered, f"Data dictionary missing columns: {uncovered}"
+    out_dir = ROOT / "docs" / "01_data_specification"
+    out_dir.mkdir(parents=True, exist_ok=True)
     for lang in ("EN", "VI"):
-        out = ROOT / "docs" / f"DataDictionary_{lang}.md"
+        out = out_dir / f"Data_Dictionary_{lang}.md"
         out.write_text(build(lang, master), encoding="utf-8")
         print("wrote", out, "covering", len(master.columns), "columns")
+    build_xlsx(master, out_dir / "Data_Dictionary.xlsx")
+    print("wrote", out_dir / "Data_Dictionary.xlsx")
 
 
 if __name__ == "__main__":

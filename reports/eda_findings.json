@@ -1,6 +1,30 @@
 {
-  "class_distribution": {
+  "data_quality": {
     "n_records": 32593,
+    "n_columns": 33,
+    "columns_with_missing": {
+      "date_unregistration": 22521,
+      "imd_band": 1111,
+      "date_registration": 45
+    }
+  },
+  "univariate": {
+    "most_skewed": {
+      "clicks_resource": 34.71,
+      "clicks_url": 13.1,
+      "max_clicks_single_day": 10.56,
+      "clicks_oucollaborate": 7.83,
+      "clicks_forumng": 7.33
+    },
+    "most_leptokurtic": {
+      "clicks_resource": 2125.45,
+      "clicks_url": 516.09,
+      "max_clicks_single_day": 320.18,
+      "clicks_oucollaborate": 104.01,
+      "clicks_forumng": 83.33
+    }
+  },
+  "target_distribution": {
     "final_result_counts": {
       "Pass": 12361,
       "Withdrawn": 10156,
@@ -8,107 +32,123 @@
       "Distinction": 3024
     },
     "at_risk_rate": 0.528,
-    "not_at_risk_rate": 0.472,
     "imbalance_ratio": 1.118
   },
-  "descriptive_stats": {
-    "descriptive_stats_path": "reports/eda_descriptive_stats.csv",
-    "missing_values": {
-      "imd_band": 1111,
-      "date_registration": 45,
-      "date_unregistration": 22521
-    },
-    "most_skewed": {
-      "max_clicks_single_day": 10.56,
-      "num_of_prev_attempts": 3.81,
-      "total_clicks": 3.03,
-      "studied_credits": 1.88,
-      "mean_clicks_per_active_day": 1.56
-    }
+  "numeric_vs_target": {
+    "top5_by_cohens_d": [
+      {
+        "feature": "days_since_last_activity",
+        "cohens_d": 2.546,
+        "p_adj_bh": 0.0
+      },
+      {
+        "feature": "n_assessments_submitted",
+        "cohens_d": 2.054,
+        "p_adj_bh": 0.0
+      },
+      {
+        "feature": "weighted_score_to_date",
+        "cohens_d": 1.964,
+        "p_adj_bh": 0.0
+      },
+      {
+        "feature": "n_days_active",
+        "cohens_d": 1.584,
+        "p_adj_bh": 0.0
+      },
+      {
+        "feature": "mean_score_to_date",
+        "cohens_d": 1.578,
+        "p_adj_bh": 0.0
+      }
+    ],
+    "n_significant": 19,
+    "n_tested": 19
   },
-  "bivariate": {
-    "discriminative_power_cohens_d": {
-      "days_since_last_activity": 2.546,
-      "n_assessments_submitted": 2.054,
-      "weighted_score_to_date": 1.964,
-      "n_days_active": 1.584,
-      "mean_score_to_date": 1.578,
-      "total_clicks": 1.064,
-      "max_clicks_single_day": 0.674,
-      "mean_clicks_per_active_day": 0.587,
-      "studied_credits": 0.282,
-      "num_of_prev_attempts": 0.214
-    },
-    "top5_discriminative": [
-      "days_since_last_activity",
-      "n_assessments_submitted",
-      "weighted_score_to_date",
-      "n_days_active",
-      "mean_score_to_date"
-    ]
+  "categorical_vs_target": {
+    "association_cramers_v": {
+      "highest_education": 0.15,
+      "imd_band": 0.149,
+      "region": 0.081,
+      "age_band": 0.069,
+      "disability": 0.059,
+      "gender": 0.022
+    }
   },
   "correlation": {
     "strong_pairs_ge_0.6": [
-      [
-        "n_days_active",
-        "total_clicks",
-        0.837
-      ],
-      [
-        "days_since_last_activity",
-        "n_assessments_submitted",
-        -0.828
-      ],
-      [
-        "at_risk",
-        "days_since_last_activity",
-        0.778
-      ],
-      [
-        "days_since_last_activity",
-        "mean_score_to_date",
-        -0.769
-      ],
-      [
-        "days_since_last_activity",
-        "weighted_score_to_date",
-        -0.726
-      ],
-      [
-        "at_risk",
-        "n_assessments_submitted",
-        -0.716
-      ],
-      [
-        "at_risk",
-        "weighted_score_to_date",
-        -0.706
-      ],
-      [
-        "days_since_last_activity",
-        "n_days_active",
-        -0.694
-      ],
-      [
-        "n_days_active",
-        "weighted_score_to_date",
-        0.686
-      ],
-      [
-        "mean_score_to_date",
-        "n_assessments_submitted",
-        0.685
-      ],
-      [
-        "max_clicks_single_day",
-        "mean_clicks_per_active_day",
-        0.657
-      ],
-      [
-        "n_assessments_submitted",
-        "n_days_active",
-        0.651
-      ]
+      {
+        "a": "n_days_active",
+        "b": "total_clicks",
+        "r": 0.837
+      },
+      {
+        "a": "days_since_last_activity",
+        "b": "n_assessments_submitted",
+        "r": -0.828
+      },
+      {
+        "a": "at_risk",
+        "b": "days_since_last_activity",
+        "r": 0.778
+      },
+      {
+        "a": "days_since_last_activity",
+        "b": "mean_score_to_date",
+        "r": -0.769
+      },
+      {
+        "a": "days_since_last_activity",
+        "b": "weighted_score_to_date",
+        "r": -0.726
+      },
+      {
+        "a": "at_risk",
+        "b": "n_assessments_submitted",
+        "r": -0.716
+      },
+      {
+        "a": "at_risk",
+        "b": "weighted_score_to_date",
+        "r": -0.706
+      },
+      {
+        "a": "days_since_last_activity",
+        "b": "n_days_active",
+        "r": -0.694
+      },
+      {
+        "a": "n_days_active",
+        "b": "weighted_score_to_date",
+        "r": 0.686
+      },
+      {
+        "a": "mean_score_to_date",
+        "b": "n_assessments_submitted",
+        "r": 0.685
+      },
+      {
+        "a": "max_clicks_single_day",
+        "b": "mean_clicks_per_active_day",
+        "r": 0.657
+      },
+      {
+        "a": "n_assessments_submitted",
+        "b": "n_days_active",
+        "r": 0.651
+      }
+    ],
+    "multicollinear_ge_0.8": [
+      {
+        "a": "n_days_active",
+        "b": "total_clicks",
+        "r": 0.837
+      },
+      {
+        "a": "days_since_last_activity",
+        "b": "n_assessments_submitted",
+        "r": -0.828
+      }
     ],
     "top_target_corr": {
       "days_since_last_activity": 0.778,
@@ -122,32 +162,76 @@
     },
     "leakage_suspects_ge_0.95": []
   },
-  "time_trends": {
-    "mean_gap_by_checkpoint": {
-      "total_clicks": {
-        "10": 236.58,
-        "20": 396.71,
-        "40": 652.61,
-        "60": 1026.88,
-        "80": 1340.44,
-        "100": 1615.81
-      },
-      "n_days_active": {
-        "10": 7.81,
-        "20": 14.51,
-        "40": 26.75,
-        "60": 42.69,
-        "80": 56.91,
-        "100": 68.36
+  "time_aware": {
+    "discrimination_by_checkpoint": {
+      "days_since_last_activity": {
+        "10": 0.407,
+        "20": 0.688,
+        "40": 1.022,
+        "60": 1.281,
+        "80": 1.495,
+        "100": 1.562
       },
       "mean_score_to_date": {
-        "10": 29.51,
-        "20": 35.82,
-        "40": 40.81,
-        "60": 40.93,
-        "80": 40.84,
-        "100": 40.69
+        "10": 0.798,
+        "20": 1.113,
+        "40": 1.492,
+        "60": 1.559,
+        "80": 1.573,
+        "100": 1.578
+      },
+      "n_assessments_submitted": {
+        "10": 0.669,
+        "20": 0.919,
+        "40": 1.233,
+        "60": 1.652,
+        "80": 1.879,
+        "100": 2.054
+      },
+      "n_days_active": {
+        "10": 0.834,
+        "20": 0.991,
+        "40": 1.165,
+        "60": 1.367,
+        "80": 1.5,
+        "100": 1.584
+      },
+      "total_clicks": {
+        "10": 0.616,
+        "20": 0.688,
+        "40": 0.78,
+        "60": 0.913,
+        "80": 0.994,
+        "100": 1.064
+      },
+      "weighted_score_to_date": {
+        "10": 0.606,
+        "20": 1.058,
+        "40": 1.379,
+        "60": 1.82,
+        "80": 2.106,
+        "100": 1.964
       }
+    },
+    "earliest_checkpoint_d_ge_0.8": {
+      "total_clicks": 60,
+      "n_days_active": 10,
+      "mean_score_to_date": 20,
+      "n_assessments_submitted": 20,
+      "days_since_last_activity": 40,
+      "weighted_score_to_date": 20
+    }
+  },
+  "withdrawn_analysis": {
+    "median_days_since_last_activity": {
+      "Fail": 116.0,
+      "Not-at-risk": 11.0,
+      "Withdrawn": 233.0
+    },
+    "median_total_clicks": {
+      "Fail": 317.0,
+      "Not-at-risk": 1425.0,
+      "Withdrawn": 89.0
     }
   }
 }

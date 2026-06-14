@@ -10,7 +10,7 @@
 
 ### 3.1 Nguồn dữ liệu, giấy phép và đạo đức
 
-Đề tài sử dụng **Open University Learning Analytics Dataset (OULAD)** (Kuzilek và cộng sự, 2017 [3]): **32.593** bản ghi sinh viên–môn–kỳ trên **22** môn–kỳ và **7** bảng quan hệ, gồm ba nhóm đặc trưng (nhân khẩu học, tương tác/VLE, kết quả đánh giá) và biến kết quả `final_result`. OULAD đã được **ẩn danh tại nguồn** và phân phối theo **CC-BY 4.0**, nên yêu cầu đạo đức được đáp ứng bằng việc trích dẫn đúng quy cách; không xử lý dữ liệu cá nhân nhạy cảm. Phân tích phương pháp thu thập và lý do dùng dữ liệu thứ cấp công khai nằm trong `docs/03_DataCollection_Methods`; phần nguồn/giấy phép/đạo đức trong `docs/DataSource_License_Ethics`.
+Đề tài sử dụng **Open University Learning Analytics Dataset (OULAD)** (Kuzilek và cộng sự, 2017 [3]): **32.593** bản ghi sinh viên–môn–kỳ trên **22** môn–kỳ và **7** bảng quan hệ, gồm ba nhóm đặc trưng (nhân khẩu học, tương tác/VLE, kết quả đánh giá) và biến kết quả `final_result`. OULAD đã được **ẩn danh tại nguồn** và phân phối theo **CC-BY 4.0**, nên yêu cầu đạo đức được đáp ứng bằng việc trích dẫn đúng quy cách; không xử lý dữ liệu cá nhân nhạy cảm. Phân tích phương pháp thu thập và lý do dùng dữ liệu thứ cấp công khai nằm trong `docs/02_collection/Data_Collection_Methods`; phần nguồn/giấy phép/đạo đức trong `docs/02_collection/Data_Source_License_Ethics`.
 
 ### 3.2 Định nghĩa biến mục tiêu
 
@@ -21,7 +21,7 @@ Bài toán là **phân loại nhị phân**. Nhãn suy ra từ `final_result` v�
 | not-at-risk (0) | Pass (12.361) + Distinction (3.024) | 15.385 | 47,2% |
 | at-risk (1) | Fail (7.052) + Withdrawn (10.156) | 17.208 | **52,8%** |
 
-Lớp at-risk là **đa số nhẹ** (mất cân bằng nhẹ); con số 68/32 trên slide chỉ mang tính minh hoạ. Lập luận đầy đủ và quy ước xử lý Withdrawn theo thời gian (**Phương án A**: nhãn cố định, quần thể cố định, giữ Withdrawn-trước-*t* là at-risk) nằm trong `docs/01_TargetVariable_Definition` (biên bản BB-B0-N1).
+Lớp at-risk là **đa số nhẹ** (mất cân bằng nhẹ); con số 68/32 trên slide chỉ mang tính minh hoạ. Lập luận đầy đủ và quy ước xử lý Withdrawn theo thời gian (**Phương án A**: nhãn cố định, quần thể cố định, giữ Withdrawn-trước-*t* là at-risk) nằm trong `docs/01_data_specification/Target_Variable_Definition` (biên bản BB-B0-N1).
 
 ### 3.3 Tích hợp dữ liệu — bảng hợp nhất
 
@@ -41,7 +41,7 @@ Không dòng nào bị nhân bản hay thất thoát. **Đặc trưng tương t�
 - **Trùng lặp:** 0 khoá tổng hợp trùng sau `drop_duplicates`.
 - **Nhất quán:** nhãn phân loại được chuẩn hoá; số giá trị khớp từ điển dữ liệu (region 13, education 5, imd_band 10, age_band 3, gender/disability 2).
 - **Giá trị khuyết:** `imd_band` (1.111) → `"Unknown"`; điểm khuyết do chưa nộp → 0 kèm cờ `not_submitted` (một *tín hiệu*, không phải nhiễu); `date_registration` (45) → trung vị train. Khoảng khuyết lớn duy nhất, `date_unregistration` (22.521), là **bình thường** — đa số sinh viên không rút môn — và không dùng làm đặc trưng.
-- **Ngoại lai:** đặc trưng clickstream lệch phải dùng `log1p`; còn lại dùng `winsorize`; **không loại bỏ dòng nào** (`src/features/preprocessing.py`, `docs/07_Preprocessing_Sequence`).
+- **Ngoại lai:** đặc trưng clickstream lệch phải dùng `log1p`; còn lại dùng `winsorize`; **không loại bỏ dòng nào** (`src/features/preprocessing.py`, `docs/04_transformation/Preprocessing_Sequence`).
 
 ### 3.5 Trích đặc trưng theo thời gian
 
@@ -49,67 +49,96 @@ Thời lượng các môn khác nhau, nên mỗi phần trăm tiến độ đư�
 
 ### 3.6 Phòng tránh rò rỉ và phân chia
 
-Hai trục rò rỉ được kiểm soát. Trên trục **thời gian**, ba quy tắc (loại bài nộp sau mốc; loại click sau mốc; giữ Withdrawn-trước-*t* là at-risk) được nêu trong `docs/02_LeakagePrevention_Rules`. Trên trục **đặc trưng**, trình tự **phân chia → điền khuyết → ngoại lai → mã hoá/chuẩn hoá → tái lấy mẫu** chỉ khớp mọi bộ học trên fold huấn luyện (`docs/07_Preprocessing_Sequence`). Phân chia **bảo toàn nhóm (theo `id_student`) + phân tầng** với **tập kiểm tra 20% cố định** dùng lại qua các mốc (`docs/06_SplitStrategy_Analysis`): train ≈ 26.104 dòng, test ≈ 6.489 dòng, **0 sinh viên trùng**, tỉ lệ lớp 0,53/0,52. CV trên tập huấn luyện dùng **5-fold × 5 seed**; chỉ số chính là **PR-AUC** và **recall** trên lớp at-risk. `tests/test_leakage.py` khẳng định toàn bộ: **16/16 kiểm thử đạt**.
+Hai trục rò rỉ được kiểm soát. Trên trục **thời gian**, ba quy tắc (loại bài nộp sau mốc; loại click sau mốc; giữ Withdrawn-trước-*t* là at-risk) được nêu trong `docs/03_cleaning/Leakage_Prevention_Rules`. Trên trục **đặc trưng**, trình tự **phân chia → điền khuyết → ngoại lai → mã hoá/chuẩn hoá → tái lấy mẫu** chỉ khớp mọi bộ học trên fold huấn luyện (`docs/04_transformation/Preprocessing_Sequence`). Phân chia **bảo toàn nhóm (theo `id_student`) + phân tầng** với **tập kiểm tra 20% cố định** dùng lại qua các mốc (`docs/05_splitting/Split_Strategy_Analysis`): train ≈ 26.104 dòng, test ≈ 6.489 dòng, **0 sinh viên trùng**, tỉ lệ lớp 0,53/0,52. CV trên tập huấn luyện dùng **5-fold × 5 seed**; chỉ số chính là **PR-AUC** và **recall** trên lớp at-risk. `tests/test_leakage.py` khẳng định toàn bộ: **16/16 kiểm thử đạt**.
 
 ### 3.7 Khả năng tái lập
 
-`RANDOM_SEED = 42` xuyên suốt; nguồn gốc trong `data/data_manifest.txt` (MD5 + dung lượng + ngày); môi trường ghim trong `requirements.txt`/`environment.yml`; notebook chạy *Restart & Run All*; các bước dài có checkpoint/resume; ghi parquet nguyên tử. Quy trình đầy đủ trong `docs/10_Reproducibility`.
+`RANDOM_SEED = 42` xuyên suốt; nguồn gốc trong `data/data_manifest.txt` (MD5 + dung lượng + ngày); môi trường ghim trong `requirements.txt`/`environment.yml`; notebook chạy *Restart & Run All*; các bước dài có checkpoint/resume; ghi parquet nguyên tử. Quy trình đầy đủ trong `docs/07_standards/Reproducibility`.
 
 ---
 
 ## Chương 4 — Phân tích khám phá dữ liệu
 
-Mọi biểu đồ tuân theo quy chuẩn của nhóm (`docs/08_Chart_Standards`); mã phân tích trong `src/eda/eda.py` (notebook `02`).
+Mọi so sánh đều có kiểm định thống kê phù hợp, không chỉ dựa vào cảm quan: kiểm định **Mann-Whitney U** (hiệu chỉnh Benjamini-Hochberg) kèm **Cohen's d** cho biến định lượng; **chi-square** kèm **Cramér's V** cho biến phân loại; tương quan Pearson/Spearman kèm kiểm tra rò rỉ. Biểu đồ tuân theo quy chuẩn (`docs/07_standards/Chart_Standards`); mã phân tích là `src/eda/eda.py`, được thuyết minh trong notebook `02`, các bảng kết quả ở `reports/tables/`.
+
+### 4.0 Chất lượng dữ liệu
+
+Chỉ ba cột có khuyết: `date_unregistration` (22.521 — thiếu mang tính cấu trúc với sinh viên không rút môn, không là đặc trưng), `imd_band` (1.111 → `Unknown`) và `date_registration` (45 → trung vị train). Không cột đặc trưng nào thiếu đáng kể.
+
+![Giá trị khuyết theo cột](figures/quality_missingness.png)
 
 ### 4.1 Phân phối lớp và mất cân bằng (STT 27)
 
-Tỉ lệ at-risk thực tế là **52,8%** (tỉ số mất cân bằng 1,12 — nhẹ). Điều này loại bỏ giả định mất cân bằng nghiêm trọng nhưng vẫn biện minh cho PR-AUC/recall, vì **lớp dương at-risk là lớp không được bỏ sót**.
+Tỉ lệ at-risk quan sát được là **52,8%** (tỉ số mất cân bằng 1,12) — đa số nhẹ, không phải con số minh hoạ 68/32. Mất cân bằng là nhẹ (báo cáo trung thực; định hình RQ3); PR-AUC và recall trên lớp at-risk vẫn là chỉ số chính vì bỏ sót sinh viên nguy cơ là sai lầm tốn kém nhất.
 
-![Phân phối lớp: final_result và nhãn nhị phân at_risk](figures/dist_class_distribution.png)
+![Phân phối biến mục tiêu và mất cân bằng](figures/target_distribution.png)
 
-### 4.2 Thống kê mô tả (STT 28)
+### 4.2 Mô tả đơn biến (STT 28)
 
-Đặc trưng tương tác **lệch phải mạnh** — `max_clicks_single_day` (độ lệch 10,6), `total_clicks` (3,0), `mean_clicks_per_active_day` (1,6) — biện minh thực nghiệm cho phép biến đổi `log1p`. Bảng đầy đủ: `reports/eda_descriptive_stats.csv`.
+Đặc trưng tương tác lệch phải mạnh và đuôi nặng — `clicks_resource` (độ lệch ≈ 35, độ nhọn ≈ 2.125), `clicks_url` (độ lệch ≈ 13), `max_clicks_single_day` (độ lệch ≈ 11) — biện minh thực nghiệm cho phép biến đổi `log1p` ở bước làm sạch. Bảng đầy đủ (trung bình/trung vị/độ lệch chuẩn/tứ phân vị/skew/kurtosis): `reports/tables/univariate_numeric.csv`.
 
-![Biểu đồ tần suất kèm KDE cho các đặc trưng định lượng chính](figures/dist_numeric_hist_kde.png)
-![Biểu đồ hộp để soi giá trị ngoại lai](figures/dist_numeric_boxplots.png)
+![Phân phối đơn biến (histogram + KDE), tô màu theo nhóm đặc trưng](figures/univariate_hist_kde.png)
+![Biểu đồ hộp đơn biến (soi ngoại lai theo IQR)](figures/univariate_boxplots.png)
+![Phân phối tần suất biến phân loại](figures/univariate_categorical_freq.png)
 
-### 4.3 Phân tích song biến với biến mục tiêu (STT 36)
+### 4.3 Song biến — biến định lượng với mục tiêu (STT 36)
 
-Chênh lệch trung bình chuẩn hoá (|Cohen's d|) giữa hai lớp xếp hạng các đặc trưng **phân biệt** mạnh nhất:
+Kiểm định Mann-Whitney U (hiệu chỉnh BH) cho thấy **cả 19 biến định lượng đều có ý nghĩa** (q < 0,05) — điều dễ hiểu ở n ≈ 32.593 — nên **độ lớn hiệu ứng**, không phải p-value, mới là yếu tố phân biệt. Xếp hạng theo |Cohen's d|:
 
-| Đặc trưng | \|Cohen's d\| |
-|---|---|
-| days_since_last_activity | 2,55 |
-| n_assessments_submitted | 2,05 |
-| weighted_score_to_date | 1,96 |
-| n_days_active | 1,58 |
-| mean_score_to_date | 1,58 |
+| Đặc trưng | Nhóm | \|Cohen's d\| |
+|---|---|---|
+| days_since_last_activity | Tương tác | **2,55** |
+| n_assessments_submitted | Kết quả | **2,05** |
+| weighted_score_to_date | Kết quả | **1,96** |
+| n_days_active | Tương tác | **1,58** |
+| mean_score_to_date | Kết quả | **1,58** |
 
-Đặc trưng tương tác và kết quả chiếm ưu thế; đặc trưng nhân khẩu học yếu (`studied_credits` 0,28, `num_of_prev_attempts` 0,21).
+Hành vi và kết quả chiếm ưu thế; nhân khẩu học yếu nhất (`studied_credits` 0,28, `num_of_prev_attempts` 0,21). Bảng kiểm định đầy đủ: `reports/tables/bivariate_numeric_tests.csv`.
 
-![Đặc trưng định lượng phân theo lớp at-risk](figures/bivar_numeric_by_label.png)
-![Tỉ lệ at-risk theo các đặc trưng phân loại](figures/bivar_atrisk_rate_by_category.png)
+![Sức phân biệt (|Cohen's d|), tô màu theo nhóm đặc trưng](figures/bivariate_effect_sizes.png)
+![Sáu đặc trưng định lượng mạnh nhất phân theo lớp](figures/bivariate_top_boxplots.png)
 
-### 4.4 Phân tích tương quan (STT 37)
+### 4.4 Song biến — biến phân loại với mục tiêu
 
-Tương quan mạnh nhất với mục tiêu: `days_since_last_activity` (r=0,78), `n_assessments_submitted` (0,72), `weighted_score_to_date` (0,71), `n_days_active` (0,63). Cặp đặc trưng–đặc trưng mạnh nhất là `n_days_active`–`total_clicks` (0,84). **Không đặc trưng nào tương quan ≥0,95 với mục tiêu**, nên không có đặc trưng nghi rò rỉ.
+Kiểm định chi-square có ý nghĩa, nhưng độ lớn hiệu ứng **Cramér's V** đều nhỏ: `highest_education` (0,15) và `imd_band` (0,15) dẫn đầu, còn `gender` (0,02) gần như không đáng kể. Nhân khẩu học mang tín hiệu độc lập hạn chế, nên giữ để phân tích công bằng hơn là dựa vào để dự đoán.
+
+![Tỉ lệ at-risk theo từng mức biến phân loại (nét đứt = mức chung 52,8%)](figures/bivariate_categorical_rate.png)
+
+### 4.5 Đa biến — tương quan, đa cộng tuyến, rò rỉ (STT 37)
+
+Pearson và Spearman nhất quán về cấu trúc. Hai cặp đa cộng tuyến (|r| ≥ 0,8): `n_days_active`–`total_clicks` (0,84) và `days_since_last_activity`–`n_assessments_submitted` (−0,83) — liên quan đến độ ổn định giải thích (RQ2). Tương quan mạnh nhất với mục tiêu: `days_since_last_activity` (0,78), `n_assessments_submitted` (0,72), `weighted_score_to_date` (0,71). **Không đặc trưng nào tương quan ≥ 0,95 với mục tiêu**, nên không có đặc trưng đại diện rò rỉ.
 
 ![Ma trận tương quan Pearson](figures/corr_pearson.png)
 ![Ma trận tương quan Spearman](figures/corr_spearman.png)
+![Tương quan của đặc trưng với mục tiêu](figures/corr_with_target.png)
 
-### 4.5 EDA theo thời gian (STT 38)
+### 4.6 Phân tích theo thời gian — tín hiệu xuất hiện khi nào? (STT 38, RQ1)
 
-Khoảng cách giữa hai lớp ở trung bình `total_clicks` mở rộng đơn điệu — **237 → 397 → 653 → 1.027 → 1.340 → 1.616** từ t=10%→100% — và `n_days_active` cũng vậy. Khoảng cách điểm trung bình **bão hoà quanh t≈40%** (29,5 → 35,8 → 40,8 rồi phẳng).
+Theo dõi **|Cohen's d| theo từng mốc** cho thấy sức phân biệt giữa hai lớp tăng dần theo tiến độ. `n_days_active` đã vượt ngưỡng hiệu ứng lớn (d ≥ 0,8) ngay tại **t = 10%**; các đặc trưng điểm và nộp bài vượt ngưỡng tại **t = 20%**; `days_since_last_activity` tại **t = 40%**. Tín hiệu hành vi do đó khả dụng từ ~20–40% thời lượng khoá học.
 
-![Hành vi theo thời gian phân theo lớp qua các mốc](figures/time_trends_by_label.png)
+| Đặc trưng | mốc *t* sớm nhất có \|d\| ≥ 0,8 |
+|---|---|
+| n_days_active | 10% |
+| mean_score_to_date · n_assessments_submitted · weighted_score_to_date | 20% |
+| days_since_last_activity | 40% |
+| total_clicks | 60% |
 
-### 4.6 Các phát hiện chính và giả thuyết
+![Quỹ đạo trung bình đặc trưng theo lớp qua các mốc](figures/time_mean_trajectory.png)
+![Sức phân biệt tăng dần qua các mốc (RQ1)](figures/time_discrimination_curve.png)
 
-1. **F1 (RQ1) — tồn tại tín hiệu sớm.** Tương tác phân biệt hai lớp từ **t=10–20%** và tín hiệu điểm gần như xác lập tại **t≈40%**, ủng hộ khả năng dự đoán sớm đáng tin quanh 40–60% (nhất quán với Adnan và cộng sự [1]).
-2. **F2 (RQ1/RQ2) — hành vi > nhân khẩu học.** `days_since_last_activity`, việc nộp bài và điểm tích luỹ là các yếu tố phân biệt hàng đầu, trong khi nhân khẩu học yếu, khớp với Tomasevic và cộng sự [2]; điều này định hướng trọng tâm đặc trưng và kỳ vọng về các đặc trưng SHAP/LIME nên xếp hạng cao (RQ2).
-3. **F3 (RQ3) — mất cân bằng nhẹ.** Ở mức 52,8% at-risk, tái lấy mẫu mạnh có thể chỉ cải thiện vừa phải; RQ3 sẽ so sánh none/class-weight/SMOTE/ADASYN với mốc cơ sở này bằng PR-AUC/recall.
-4. **F4 (RQ2) — đặc trưng tương tác tương quan cao.** Các đặc trưng tương tác tương quan cao (ví dụ `total_clicks`–`n_days_active`, r=0,84) có thể khiến SHAP/LIME phân tán độ quan trọng giữa chúng, một yếu tố cần theo dõi khi đo độ ổn định giải thích (RQ2).
+### 4.7 Tín hiệu cảnh báo sớm của sinh viên Withdrawn (Phương án A)
+
+Dữ liệu xác nhận tiền đề của Phương án A rằng việc rút môn tạo ra tín hiệu thật chứ không phải nhiễu: trung vị số ngày không hoạt động là **11 ngày với not-at-risk, 116 với Fail, và 233 với Withdrawn**, còn trung vị tổng click giảm từ **1.425 (not-at-risk) xuống 89 (Withdrawn)**. Sự sụp đổ hoạt động của sinh viên rút môn chính là điều khiến phát hiện sớm khả thi.
+
+![Sinh viên Withdrawn: tín hiệu suy giảm hoạt động](figures/withdrawn_activity_decay.png)
+
+### 4.8 Phát hiện và hàm ý cho mô hình hoá
+
+1. **F1 (RQ1) — tín hiệu sớm và tăng dần.** Đặc trưng hành vi/kết quả phân biệt hai lớp từ t = 10–20% và mạnh dần đơn điệu; 40–60% là vùng ổn định, khả thi (nhất quán với Adnan và cộng sự [1]).
+2. **F2 (RQ1/RQ2) — hành vi ≫ nhân khẩu học.** Tương tác/kết quả đạt d > 2 trong khi liên hệ nhân khẩu học nhỏ (Cramér's V ≤ 0,15), tái hiện Tomasevic và cộng sự [2]; SHAP/LIME được kỳ vọng xếp hạng đặc trưng hành vi cao nhất.
+3. **F3 (RQ3) — mất cân bằng nhẹ.** Ở mức 52,8% at-risk, tái lấy mẫu có thể cải thiện ít; RQ3 định lượng SMOTE/ADASYN/class-weight so với mốc cơ sở bằng PR-AUC/recall.
+4. **F4 (RQ2) — đặc trưng tương quan cao.** Các đặc trưng tương tác đa cộng tuyến có thể làm độ quan trọng giải thích kém ổn định — yếu tố mà chỉ số ổn định phải tính đến.
+5. **F5 — không rò rỉ.** Không đặc trưng nào tương quan gần như hoàn hảo với nhãn, và phép cắt theo thời gian loại bỏ sự kiện tương lai; ước lượng trên tập kiểm tra do đó đáng tin cậy.
 
 ---
 

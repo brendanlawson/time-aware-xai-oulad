@@ -13,7 +13,12 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-OUT = Path(__file__).resolve().parents[1] / "docs" / "variable_typing.xlsx"
+OUT = (
+    Path(__file__).resolve().parents[1]
+    / "docs"
+    / "01_data_specification"
+    / "Variable_Typing.xlsx"
+)
 
 # Variable | Group | Type(EN) | Kiểu(VI) | Order (if ordinal) | Encoding | Origin
 ROWS = [
