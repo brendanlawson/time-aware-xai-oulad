@@ -1,8 +1,8 @@
 """Executable embodiment of the chart presentation standard (Task 39).
 
 Importing :func:`apply_style` configures matplotlib/seaborn so every EDA figure is
-visually consistent with docs/08_Chart_Standards. The fixed class colours guarantee
-not-at-risk and at-risk always read the same across every chart.
+visually consistent with docs/07_standards/Chart_Standards. The fixed class colours
+guarantee not-at-risk and at-risk always read the same across every chart.
 """
 
 from __future__ import annotations

@@ -1,8 +1,8 @@
 """Generate a complete bilingual data dictionary from the actual master table.
 
-Reads data/interim/master_raw.parquet and emits docs/DataDictionary_EN.md and
-docs/DataDictionary_VI.md covering 100% of the columns (asserted). Deriving it
-from the real table guarantees coverage stays in sync with the pipeline.
+Reads data/interim/master_raw.parquet and emits, into docs/01_data_specification/,
+Data_Dictionary_{EN,VI}.md and Data_Dictionary.xlsx covering 100% of the columns
+(asserted). Deriving it from the real table keeps coverage in sync with the pipeline.
 
 Run:  python tools/make_data_dictionary.py
 """
