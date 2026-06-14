@@ -60,7 +60,9 @@ Cập nhật từ handoff_outliers_for_Duc.csv (Bình → Đức)
 from __future__ import annotations
 
 import logging
+import sys
 import warnings
+from pathlib import Path
 from typing import Optional
 
 import joblib
@@ -76,7 +78,8 @@ warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
-RANDOM_SEED = 42
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.config import RANDOM_SEED  # noqa: E402
 
 # ════════════════════════════════════════════════════════════════════════
 # 0.  DANH MỤC KIỂU BIẾN  (Task 16)
@@ -85,27 +88,27 @@ RANDOM_SEED = 42
 # -- Biến định lượng (numeric) -------------------------------------------
 NUMERIC_FEATURES: list[str] = [
     # Nhân khẩu học
-    "num_of_prev_attempts",    # discrete  – số lần thử lại môn, min=0 max=6
-    "studied_credits",         # discrete  – tín chỉ đăng ký, min=30 max=655
-    "date_registration",       # continuous– ngày đăng ký (tương đối, có thể âm)
+    "num_of_prev_attempts",  # discrete  – số lần thử lại môn, min=0 max=6
+    "studied_credits",  # discrete  – tín chỉ đăng ký, min=30 max=655
+    "date_registration",  # continuous– ngày đăng ký (tương đối, có thể âm)
     # Tương tác VLE (phái sinh từ studentVle)
-    "total_clicks",            # continuous– tổng lượt click tới mốc t
-    "n_days_active",           # discrete  – số ngày có hoạt động tới mốc t
-    "clicks_forumng",          # continuous– click loại forumng
-    "clicks_oucontent",        # continuous– click loại oucontent
-    "clicks_resource",         # continuous– click loại resource
-    "clicks_homepage",         # continuous– click loại homepage
-    "clicks_oucollaborate",    # continuous– click loại oucollaborate
-    "clicks_quiz",             # continuous– click loại quiz
-    "clicks_subpage",          # continuous– click loại subpage
-    "clicks_url",              # continuous– click loại url
+    "total_clicks",  # continuous– tổng lượt click tới mốc t
+    "n_days_active",  # discrete  – số ngày có hoạt động tới mốc t
+    "clicks_forumng",  # continuous– click loại forumng
+    "clicks_oucontent",  # continuous– click loại oucontent
+    "clicks_resource",  # continuous– click loại resource
+    "clicks_homepage",  # continuous– click loại homepage
+    "clicks_oucollaborate",  # continuous– click loại oucollaborate
+    "clicks_quiz",  # continuous– click loại quiz
+    "clicks_subpage",  # continuous– click loại subpage
+    "clicks_url",  # continuous– click loại url
     # Tương tác VLE – đặc trưng phái sinh bổ sung (từ handoff Bình → Đức)
-    "max_clicks_single_day",        # continuous– click tối đa trong 1 ngày tới mốc t
-    "mean_clicks_per_active_day",   # continuous– trung bình click/ngày có hoạt động
-    "days_since_last_activity",     # continuous– số ngày từ lần tương tác cuối tới mốc t
+    "max_clicks_single_day",  # continuous– click tối đa trong 1 ngày tới mốc t
+    "mean_clicks_per_active_day",  # continuous– trung bình click/ngày có hoạt động
+    "days_since_last_activity",  # continuous– số ngày từ lần tương tác cuối tới mốc t
     # Kết quả học tập (phái sinh từ studentAssessment)
-    "mean_score_to_date",      # continuous– điểm trung bình các bài đã nộp [0–100]
-    "n_assessments_submitted", # discrete  – số bài đã nộp tới mốc t
+    "mean_score_to_date",  # continuous– điểm trung bình các bài đã nộp [0–100]
+    "n_assessments_submitted",  # discrete  – số bài đã nộp tới mốc t
     "weighted_score_to_date",  # continuous– tổng (score × weight) bài đã nộp
 ]
 
@@ -114,30 +117,30 @@ ORDINAL_FEATURES: list[str] = ["highest_education", "imd_band", "age_band"]
 
 ORDINAL_ORDERS: dict[str, list[str]] = {
     "highest_education": [
-        "No Formal quals",           # 0
-        "Lower Than A Level",        # 1
-        "A Level or Equivalent",     # 2
-        "HE Qualification",          # 3
+        "No Formal quals",  # 0
+        "Lower Than A Level",  # 1
+        "A Level or Equivalent",  # 2
+        "HE Qualification",  # 3
         "Post Graduate Qualification",  # 4
     ],
     # 'Unknown' xếp hạng 0 (thêm khi imd_band khuyết)
     "imd_band": [
-        "Unknown",   # 0  ← giá trị điền vào ô khuyết
-        "0-10%",     # 1
-        "10-20",     # 2  ← chú ý: OULAD viết thiếu dấu '%'
-        "20-30%",    # 3
-        "30-40%",    # 4
-        "40-50%",    # 5
-        "50-60%",    # 6
-        "60-70%",    # 7
-        "70-80%",    # 8
-        "80-90%",    # 9
-        "90-100%",   # 10
+        "Unknown",  # 0  ← giá trị điền vào ô khuyết
+        "0-10%",  # 1
+        "10-20",  # 2  ← chú ý: OULAD viết thiếu dấu '%'
+        "20-30%",  # 3
+        "30-40%",  # 4
+        "40-50%",  # 5
+        "50-60%",  # 6
+        "60-70%",  # 7
+        "70-80%",  # 8
+        "80-90%",  # 9
+        "90-100%",  # 10
     ],
     "age_band": [
-        "0-35",   # 0
+        "0-35",  # 0
         "35-55",  # 1
-        "55<=",   # 2
+        "55<=",  # 2
     ],
 }
 
@@ -161,13 +164,14 @@ ID_COLS: list[str] = ["id_student", "code_module", "code_presentation"]
 # 1.  XỬ LÝ GIÁ TRỊ KHUYẾT  (Task 17)
 # ════════════════════════════════════════════════════════════════════════
 
+
 def log_missing(df: pd.DataFrame) -> pd.DataFrame:
     """
     In bảng thống kê giá trị khuyết trước khi xử lý (dùng trong notebook).
     Trả về DataFrame thống kê để tiện lưu.
     """
     miss = df.isnull().sum()
-    pct  = (miss / len(df) * 100).round(2)
+    pct = (miss / len(df) * 100).round(2)
     report = pd.DataFrame({"count": miss, "pct_%": pct})[miss > 0].sort_values(
         "pct_%", ascending=False
     )
@@ -212,8 +216,11 @@ def handle_missing(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataF
             ORDINAL_ORDERS["imd_band"].insert(0, "Unknown")
 
     # ── 2. Các biến điểm số & số bài nộp (MNAR → 0) ─────────────────
-    for col in ("mean_score_to_date", "weighted_score_to_date",
-                "n_assessments_submitted"):
+    for col in (
+        "mean_score_to_date",
+        "weighted_score_to_date",
+        "n_assessments_submitted",
+    ):
         if col in df.columns:
             n = int(df[col].isnull().sum())
             log_dict[col] = {
@@ -236,7 +243,10 @@ def handle_missing(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataF
 
     # ── Kiểm tra sau xử lý ───────────────────────────────────────────
     all_feat_cols = [
-        c for c in (NUMERIC_FEATURES + ORDINAL_FEATURES + NOMINAL_FEATURES + BINARY_FEATURES)
+        c
+        for c in (
+            NUMERIC_FEATURES + ORDINAL_FEATURES + NOMINAL_FEATURES + BINARY_FEATURES
+        )
         if c in df.columns
     ]
     remaining = df[all_feat_cols].isnull().sum()
@@ -275,31 +285,31 @@ def handle_missing(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataF
 #   → Giữ winsorize(1%): bảo toàn tín hiệu "học lại nhiều lần" quan trọng với at-risk.
 OUTLIER_STRATEGY: dict[str, str] = {
     # VLE clicks – lệch phải rất mạnh
-    "total_clicks":                "log1p",
-    "n_days_active":               "log1p",
-    "clicks_forumng":              "log1p",
-    "clicks_oucontent":            "log1p",
-    "clicks_resource":             "log1p",
-    "clicks_homepage":             "log1p",
-    "clicks_oucollaborate":        "log1p",
-    "clicks_quiz":                 "log1p",
-    "clicks_subpage":              "log1p",
-    "clicks_url":                  "log1p",
+    "total_clicks": "log1p",
+    "n_days_active": "log1p",
+    "clicks_forumng": "log1p",
+    "clicks_oucontent": "log1p",
+    "clicks_resource": "log1p",
+    "clicks_homepage": "log1p",
+    "clicks_oucollaborate": "log1p",
+    "clicks_quiz": "log1p",
+    "clicks_subpage": "log1p",
+    "clicks_url": "log1p",
     # VLE – đặc trưng phái sinh mới (từ handoff Bình)
-    "max_clicks_single_day":       "log1p",       # max=7920, rất lệch phải
-    "mean_clicks_per_active_day":  "log1p",       # max=1879, rất lệch phải
-    "days_since_last_activity":    "winsorize",   # chỉ 6 bản ghi, lệch nhẹ
+    "max_clicks_single_day": "log1p",  # max=7920, rất lệch phải
+    "mean_clicks_per_active_day": "log1p",  # max=1879, rất lệch phải
+    "days_since_last_activity": "winsorize",  # chỉ 6 bản ghi, lệch nhẹ
     # Nhân khẩu học
-    "studied_credits":             "winsorize",   # max=655, lệch phải vừa
-    "num_of_prev_attempts":        "winsorize",   # IQR=0 → can_tren=0; winsorize(1%) giữ tín hiệu
+    "studied_credits": "winsorize",  # max=655, lệch phải vừa
+    "num_of_prev_attempts": "winsorize",  # IQR=0 → can_tren=0; winsorize(1%) giữ tín hiệu
     # Kết quả học tập
-    "mean_score_to_date":          "none",        # [0–100], can_tren=103.15 → không outlier thực
-    "weighted_score_to_date":      "winsorize",   # phạm vi lý thuyết mở, winsorize an toàn
-    "n_assessments_submitted":     "none",        # bị chặn bởi số bài tối đa của khoá học
-    "date_registration":           "none",        # âm đến dương – phạm vi tự nhiên
+    "mean_score_to_date": "none",  # [0–100], can_tren=103.15 → không outlier thực
+    "weighted_score_to_date": "winsorize",  # phạm vi lý thuyết mở, winsorize an toàn
+    "n_assessments_submitted": "none",  # bị chặn bởi số bài tối đa của khoá học
+    "date_registration": "none",  # âm đến dương – phạm vi tự nhiên
 }
 
-WINSORIZE_LIMITS = (0.01, 0.01)   # cắt 1% hai đầu
+WINSORIZE_LIMITS = (0.01, 0.01)  # cắt 1% hai đầu
 
 
 def _iqr_mask(s: pd.Series) -> pd.Series:
@@ -318,19 +328,21 @@ def log_outliers(df: pd.DataFrame) -> pd.DataFrame:
     for col, strat in OUTLIER_STRATEGY.items():
         if col not in df.columns:
             continue
-        mask  = _iqr_mask(df[col])
-        q1    = df[col].quantile(0.25)
-        q3    = df[col].quantile(0.75)
-        rows.append({
-            "biến":                 col,
-            "n_ngoại_lai (IQR)":   int(mask.sum()),
-            "pct_%":               round(mask.mean() * 100, 2),
-            "Q1":                  round(q1, 2),
-            "Q3":                  round(q3, 2),
-            "min":                 round(df[col].min(), 2),
-            "max":                 round(df[col].max(), 2),
-            "chiến_lược":          strat,
-        })
+        mask = _iqr_mask(df[col])
+        q1 = df[col].quantile(0.25)
+        q3 = df[col].quantile(0.75)
+        rows.append(
+            {
+                "biến": col,
+                "n_ngoại_lai (IQR)": int(mask.sum()),
+                "pct_%": round(mask.mean() * 100, 2),
+                "Q1": round(q1, 2),
+                "Q3": round(q3, 2),
+                "min": round(df[col].min(), 2),
+                "max": round(df[col].max(), 2),
+                "chiến_lược": strat,
+            }
+        )
     report = pd.DataFrame(rows)
     print("=== Ngoại lai trước khi xử lý (IQR rule) ===")
     print(report.to_string(index=False))
@@ -363,33 +375,35 @@ def handle_outliers(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.Data
         if col not in df.columns or strat == "none":
             continue
 
-        b_min  = round(df[col].min(),  3)
-        b_max  = round(df[col].max(),  3)
+        b_min = round(df[col].min(), 3)
+        b_max = round(df[col].max(), 3)
         b_mean = round(df[col].mean(), 3)
-        n_out  = int(_iqr_mask(df[col]).sum())
+        n_out = int(_iqr_mask(df[col]).sum())
 
         if strat == "log1p":
             df[col] = np.log1p(df[col].clip(lower=0))
-            reason  = "Phân phối lệch phải → log1p giảm độ lệch"
+            reason = "Phân phối lệch phải → log1p giảm độ lệch"
         elif strat == "winsorize":
-            arr     = winsorize(df[col].values, limits=WINSORIZE_LIMITS)
+            arr = winsorize(df[col].values, limits=WINSORIZE_LIMITS)
             df[col] = np.array(arr)
-            reason  = f"Winsorize cắt {int(WINSORIZE_LIMITS[0]*100)}% hai đầu"
+            reason = f"Winsorize cắt {int(WINSORIZE_LIMITS[0]*100)}% hai đầu"
         else:
-            reason  = "Không xử lý"
+            reason = "Không xử lý"
 
-        report_rows.append({
-            "biến":                    col,
-            "chiến_lược":              strat,
-            "n_nghi_ngoại_lai":        n_out,
-            "before_min":              b_min,
-            "before_max":              b_max,
-            "before_mean":             b_mean,
-            "after_min":               round(df[col].min(),  3),
-            "after_max":               round(df[col].max(),  3),
-            "after_mean":              round(df[col].mean(), 3),
-            "lý_do":                   reason,
-        })
+        report_rows.append(
+            {
+                "biến": col,
+                "chiến_lược": strat,
+                "n_nghi_ngoại_lai": n_out,
+                "before_min": b_min,
+                "before_max": b_max,
+                "before_mean": b_mean,
+                "after_min": round(df[col].min(), 3),
+                "after_max": round(df[col].max(), 3),
+                "after_mean": round(df[col].mean(), 3),
+                "lý_do": reason,
+            }
+        )
 
     report_df = pd.DataFrame(report_rows)
 
@@ -397,9 +411,19 @@ def handle_outliers(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.Data
         report_df.to_csv(log_path, index=False, encoding="utf-8-sig")
         log.info("Bảng so sánh ngoại lai → %s", log_path)
     else:
-        log.info("Bảng xử lý ngoại lai:\n%s",
-                 report_df[["biến","chiến_lược","n_nghi_ngoại_lai",
-                             "before_max","after_max","lý_do"]].to_string(index=False))
+        log.info(
+            "Bảng xử lý ngoại lai:\n%s",
+            report_df[
+                [
+                    "biến",
+                    "chiến_lược",
+                    "n_nghi_ngoại_lai",
+                    "before_max",
+                    "after_max",
+                    "lý_do",
+                ]
+            ].to_string(index=False),
+        )
 
     log.info("✔ handle_outliers: KHÔNG loại bỏ bản ghi nào | n_rows = %d", len(df))
     return df
@@ -408,6 +432,7 @@ def handle_outliers(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.Data
 # ════════════════════════════════════════════════════════════════════════
 # 3.  MÃ HOÁ BIẾN PHÂN LOẠI  (Task 19)
 # ════════════════════════════════════════════════════════════════════════
+
 
 class BinaryEncoder(BaseEstimator, TransformerMixin):
     """
@@ -421,13 +446,15 @@ class BinaryEncoder(BaseEstimator, TransformerMixin):
     """
 
     _MAPS: dict[str, dict[str, int]] = {
-        "gender":     {"M": 1, "F": 0},
+        "gender": {"M": 1, "F": 0},
         "disability": {"Y": 1, "N": 0},
     }
 
     def __init__(self, feature_names: list[str] = None):
         # Nhận danh sách tên cột từ bên ngoài để get_feature_names_out hoạt động đúng
-        self.feature_names = feature_names if feature_names is not None else BINARY_FEATURES
+        self.feature_names = (
+            feature_names if feature_names is not None else BINARY_FEATURES
+        )
 
     def fit(self, X, y=None):
         return self
@@ -488,6 +515,7 @@ def build_onehot_encoder() -> OneHotEncoder:
 # 4.  CHUẨN HOÁ THANG ĐO  (Task 20)
 # ════════════════════════════════════════════════════════════════════════
 
+
 def build_scaler() -> StandardScaler:
     """
     StandardScaler: đưa biến định lượng về trung bình 0, độ lệch chuẩn 1.
@@ -511,6 +539,7 @@ def build_scaler() -> StandardScaler:
 # ════════════════════════════════════════════════════════════════════════
 # 5.  COLUMN TRANSFORMER  (gộp Tasks 19 + 20)
 # ════════════════════════════════════════════════════════════════════════
+
 
 def build_column_transformer(
     numeric_cols: Optional[list[str]] = None,
@@ -540,11 +569,11 @@ def build_column_transformer(
 
     return ColumnTransformer(
         transformers=[
-            ("num",       build_scaler(),                           numeric_cols),
-            ("ordinal",   build_ordinal_encoder(),                  ORDINAL_FEATURES),
-            ("nominal",   build_onehot_encoder(),                   nominal_cols),
-            ("binary",    BinaryEncoder(BINARY_FEATURES),           BINARY_FEATURES),
-            ("indicator", "passthrough",                            INDICATOR_FEATURES),
+            ("num", build_scaler(), numeric_cols),
+            ("ordinal", build_ordinal_encoder(), ORDINAL_FEATURES),
+            ("nominal", build_onehot_encoder(), nominal_cols),
+            ("binary", BinaryEncoder(BINARY_FEATURES), BINARY_FEATURES),
+            ("indicator", "passthrough", INDICATOR_FEATURES),
         ],
         remainder="drop",
         verbose_feature_names_out=True,
@@ -555,7 +584,7 @@ def fit_transform_train(
     X_train: pd.DataFrame,
     save_path: Optional[str] = None,
     numeric_cols: Optional[list[str]] = None,
-    nominal_cols:  Optional[list[str]] = None,
+    nominal_cols: Optional[list[str]] = None,
 ) -> tuple[ColumnTransformer, np.ndarray]:
     """
     Fit ColumnTransformer trên X_train; trả về (transformer, X_train_proc).
@@ -579,7 +608,8 @@ def fit_transform_train(
     n_show = min(5, len(scaler.mean_))
     log.info(
         "✔ scaler.mean_ (train only, %d biến đầu) = %s",
-        n_show, np.round(scaler.mean_[:n_show], 4)
+        n_show,
+        np.round(scaler.mean_[:n_show], 4),
     )
 
     if save_path:
@@ -614,14 +644,15 @@ def get_feature_names(ct: ColumnTransformer) -> list[str]:
 # 6.  FULL PIPELINE  (Task 22 – trình tự anti-leakage)
 # ════════════════════════════════════════════════════════════════════════
 
+
 def preprocess(
     X_train: pd.DataFrame,
-    X_test:  pd.DataFrame,
-    missing_log_path:  Optional[str] = None,
-    outlier_log_path:  Optional[str] = None,
-    scaler_save_path:  Optional[str] = "scaler.pkl",
-    numeric_cols:      Optional[list[str]] = None,
-    nominal_cols:      Optional[list[str]] = None,
+    X_test: pd.DataFrame,
+    missing_log_path: Optional[str] = None,
+    outlier_log_path: Optional[str] = None,
+    scaler_save_path: Optional[str] = "scaler.pkl",
+    numeric_cols: Optional[list[str]] = None,
+    nominal_cols: Optional[list[str]] = None,
 ) -> tuple[np.ndarray, np.ndarray, ColumnTransformer, list[str]]:
     """
     Thực thi đầy đủ pipeline tiền xử lý theo đúng trình tự anti-leakage:
@@ -672,12 +703,12 @@ def preprocess(
     # ── Bước 2: Xử lý giá trị khuyết ─────────────────────────────────
     log.info("── Bước 2: handle_missing ──")
     X_train = handle_missing(X_train, log_path=missing_log_path)
-    X_test  = handle_missing(X_test,  log_path=None)   # dùng cùng quy tắc
+    X_test = handle_missing(X_test, log_path=None)  # dùng cùng quy tắc
 
     # ── Bước 3: Xử lý ngoại lai ───────────────────────────────────────
     log.info("── Bước 3: handle_outliers ──")
     X_train = handle_outliers(X_train, log_path=outlier_log_path)
-    X_test  = handle_outliers(X_test,  log_path=None)
+    X_test = handle_outliers(X_test, log_path=None)
 
     # ── Bước 4a: Fit & transform trên train ───────────────────────────
     log.info("── Bước 4a: fit_transform (train only) ──")
@@ -696,11 +727,11 @@ def preprocess(
     feature_names = get_feature_names(ct)
     log.info(
         "✔ preprocess hoàn tất | train: %s | test: %s | n_features: %d",
-        X_train_proc.shape, X_test_proc.shape, len(feature_names)
+        X_train_proc.shape,
+        X_test_proc.shape,
+        len(feature_names),
     )
-    log.info(
-        "  [Bước 5 tiếp theo] Áp dụng SMOTE/ADASYN CHỈ trên X_train_proc"
-    )
+    log.info("  [Bước 5 tiếp theo] Áp dụng SMOTE/ADASYN CHỈ trên X_train_proc")
 
     return X_train_proc, X_test_proc, ct, feature_names
 
@@ -711,73 +742,76 @@ def preprocess(
 
 if __name__ == "__main__":
     rng = np.random.default_rng(RANDOM_SEED)
-    n   = 250
+    n = 250
 
     # ── Dữ liệu giả đủ mọi loại biến ──────────────────────────────────
-    imd_vals = ORDINAL_ORDERS["imd_band"][1:]   # bỏ 'Unknown' khi tạo dữ liệu thô
-    dummy = pd.DataFrame({
-        # numeric
-        "num_of_prev_attempts":    rng.integers(0, 5, n).astype(float),
-        "studied_credits":         rng.integers(30, 655, n).astype(float),
-        "date_registration":       rng.integers(-30, 10, n).astype(float),
-        "total_clicks":            rng.integers(0, 6000, n).astype(float),
-        "n_days_active":           rng.integers(0, 270, n).astype(float),
-        "clicks_forumng":          rng.integers(0, 500, n).astype(float),
-        "clicks_oucontent":        rng.integers(0, 800, n).astype(float),
-        "clicks_resource":         rng.integers(0, 600, n).astype(float),
-        "clicks_homepage":         rng.integers(0, 200, n).astype(float),
-        "clicks_oucollaborate":    rng.integers(0, 300, n).astype(float),
-        "clicks_quiz":             rng.integers(0, 400, n).astype(float),
-        "clicks_subpage":          rng.integers(0, 700, n).astype(float),
-        "clicks_url":              rng.integers(0, 500, n).astype(float),
-        # VLE – đặc trưng phái sinh mới (từ handoff Bình)
-        "max_clicks_single_day":      rng.integers(0, 8000, n).astype(float),
-        "mean_clicks_per_active_day": rng.integers(0, 2000, n).astype(float),
-        "days_since_last_activity":   rng.integers(0, 80, n).astype(float),
-        "mean_score_to_date":      np.where(
-            rng.random(n) < 0.12, np.nan, rng.uniform(0, 100, n)),
-        "n_assessments_submitted": rng.integers(0, 5, n).astype(float),
-        "weighted_score_to_date":  np.where(
-            rng.random(n) < 0.10, np.nan, rng.uniform(0, 100, n)),
-        # ordinal – với 8% imd_band khuyết
-        "highest_education": rng.choice(ORDINAL_ORDERS["highest_education"], n),
-        "imd_band":          np.where(
-            rng.random(n) < 0.08, None,
-            rng.choice(imd_vals, n)),
-        "age_band":          rng.choice(ORDINAL_ORDERS["age_band"], n),
-        # nominal
-        "region":            rng.choice(
-            ["London Region","Scotland","Wales","Ireland","North Region"], n),
-        "code_module":       rng.choice(["AAA","BBB","CCC","DDD"], n),
-        "code_presentation": rng.choice(["2013J","2013B","2014J","2014B"], n),
-        # binary
-        "gender":            rng.choice(["M","F"], n),
-        "disability":        rng.choice(["Y","N"], n),
-        # indicator (đã là 0/1)
-        "not_submitted":     rng.integers(0, 2, n),
-        # target
-        "at_risk":           rng.integers(0, 2, n),
-    })
+    imd_vals = ORDINAL_ORDERS["imd_band"][1:]  # bỏ 'Unknown' khi tạo dữ liệu thô
+    dummy = pd.DataFrame(
+        {
+            # numeric
+            "num_of_prev_attempts": rng.integers(0, 5, n).astype(float),
+            "studied_credits": rng.integers(30, 655, n).astype(float),
+            "date_registration": rng.integers(-30, 10, n).astype(float),
+            "total_clicks": rng.integers(0, 6000, n).astype(float),
+            "n_days_active": rng.integers(0, 270, n).astype(float),
+            "clicks_forumng": rng.integers(0, 500, n).astype(float),
+            "clicks_oucontent": rng.integers(0, 800, n).astype(float),
+            "clicks_resource": rng.integers(0, 600, n).astype(float),
+            "clicks_homepage": rng.integers(0, 200, n).astype(float),
+            "clicks_oucollaborate": rng.integers(0, 300, n).astype(float),
+            "clicks_quiz": rng.integers(0, 400, n).astype(float),
+            "clicks_subpage": rng.integers(0, 700, n).astype(float),
+            "clicks_url": rng.integers(0, 500, n).astype(float),
+            # VLE – đặc trưng phái sinh mới (từ handoff Bình)
+            "max_clicks_single_day": rng.integers(0, 8000, n).astype(float),
+            "mean_clicks_per_active_day": rng.integers(0, 2000, n).astype(float),
+            "days_since_last_activity": rng.integers(0, 80, n).astype(float),
+            "mean_score_to_date": np.where(
+                rng.random(n) < 0.12, np.nan, rng.uniform(0, 100, n)
+            ),
+            "n_assessments_submitted": rng.integers(0, 5, n).astype(float),
+            "weighted_score_to_date": np.where(
+                rng.random(n) < 0.10, np.nan, rng.uniform(0, 100, n)
+            ),
+            # ordinal – với 8% imd_band khuyết
+            "highest_education": rng.choice(ORDINAL_ORDERS["highest_education"], n),
+            "imd_band": np.where(rng.random(n) < 0.08, None, rng.choice(imd_vals, n)),
+            "age_band": rng.choice(ORDINAL_ORDERS["age_band"], n),
+            # nominal
+            "region": rng.choice(
+                ["London Region", "Scotland", "Wales", "Ireland", "North Region"], n
+            ),
+            "code_module": rng.choice(["AAA", "BBB", "CCC", "DDD"], n),
+            "code_presentation": rng.choice(["2013J", "2013B", "2014J", "2014B"], n),
+            # binary
+            "gender": rng.choice(["M", "F"], n),
+            "disability": rng.choice(["Y", "N"], n),
+            # indicator (đã là 0/1)
+            "not_submitted": rng.integers(0, 2, n),
+            # target
+            "at_risk": rng.integers(0, 2, n),
+        }
+    )
 
     split = 200
     X_tr_raw = dummy.iloc[:split].drop(columns=[TARGET_COL]).copy()
     X_te_raw = dummy.iloc[split:].drop(columns=[TARGET_COL]).copy()
-    y_tr     = dummy.iloc[:split][TARGET_COL].values
+    y_tr = dummy.iloc[:split][TARGET_COL].values
 
     # ── Test từng hàm tiện ích ─────────────────────────────────────────
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SMOKE TEST 1: log_missing")
-    print("="*60)
+    print("=" * 60)
     log_missing(X_tr_raw)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SMOKE TEST 2: log_outliers")
-    print("="*60)
+    print("=" * 60)
     log_outliers(X_tr_raw)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SMOKE TEST 3: preprocess() đầy đủ pipeline")
-    print("="*60)
+    print("=" * 60)
     X_tr_proc, X_te_proc, ct, feat_names = preprocess(
         X_tr_raw.copy(),
         X_te_raw.copy(),
@@ -787,7 +821,7 @@ if __name__ == "__main__":
     print(f"\nX_train_proc shape  : {X_tr_proc.shape}")
     print(f"X_test_proc  shape  : {X_te_proc.shape}")
     print(f"n_features          : {len(feat_names)}")
-    print(f"\nTên 10 đặc trưng đầu:")
+    print("\nTên 10 đặc trưng đầu:")
     for i, fn in enumerate(feat_names[:10], 1):
         print(f"  {i:2d}. {fn}")
 
@@ -804,12 +838,13 @@ if __name__ == "__main__":
     # ── Mô phỏng Bước 5: SMOTE (nếu imbalanced-learn đã cài) ──────────
     try:
         from imblearn.over_sampling import SMOTE
+
         X_res, y_res = SMOTE(random_state=RANDOM_SEED).fit_resample(X_tr_proc, y_tr)
         print(f"\n✔ SMOTE: train trước = {X_tr_proc.shape[0]} | sau = {X_res.shape[0]}")
         print("   (SMOTE chỉ áp dụng trên X_train_proc, không trên X_test_proc)")
     except ImportError:
         print("\n[INFO] imbalanced-learn chưa cài – bỏ qua kiểm tra SMOTE.")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("✔ TẤT CẢ KIỂM TRA ĐẠT — preprocessing.py hoạt động đúng.")
-    print("="*60)
+    print("=" * 60)

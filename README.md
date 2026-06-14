@@ -200,7 +200,7 @@ Group 1, DSP391m — FPT University. Supervisor: **Nguyễn Thị Hoàng Yến**
 
 ## 10. Project Status
 
-**Work in progress.** Current phase: Report 2 — Data Tasks (collection, cleaning, EDA). The repository scaffold and reproducibility tooling are being established; modelling and XAI phases follow per the seven-week work plan.
+**Report 2 — Data Tasks (collection, cleaning, EDA): complete.** The full data pipeline (`src/data`, `src/features`, `src/eda`, `src/evaluation`) builds the master table (32,593 × 33), six time-aware checkpoint datasets, and the leakage-safe split harness; `tests/test_leakage.py` passes (16 tests); EDA figures and the bilingual Report 2 draft are in `reports/`. Every work item (STT 1–40) and its artifact are mapped in [`docs/README_EN.md`](docs/README_EN.md) (Vietnamese: `docs/README_VI.md`). Modelling and XAI phases follow per the seven-week work plan.
 
 ## 11. Citation
 
