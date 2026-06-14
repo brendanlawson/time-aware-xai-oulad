@@ -1,29 +1,32 @@
-"""Time-aware utilities for OULAD (tasks #10 and #11 — Khoa).
+"""Time-aware utilities (Tasks 10 and 11, Khoa).
 
-#10: Build the checkpoint map that converts progress percentages (10/20/40/60/80/100%)
-     into concrete day thresholds per module-presentation, since course lengths differ.
-#11: cut_at_checkpoint() keeps only records generated on or before the checkpoint day,
-     simulating the information available at prediction time (temporal leakage rule #2).
+Task 10: build the checkpoint map converting progress percentages
+         (10/20/40/60/80/100%) into concrete day thresholds per module-
+         presentation, since course lengths differ.
+Task 11: cut_at_checkpoint() keeps only records on or before the checkpoint day,
+         simulating the information available at prediction time (leakage rule #2).
 """
 
+from __future__ import annotations
+
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-CHECKPOINTS = (10, 20, 40, 60, 80, 100)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.data.io_utils import CHECKPOINT_MAP_PATH, PRESENTATION_KEY, RAW_DIR  # noqa: E402
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RAW_DIR = PROJECT_ROOT / "data" / "raw"
-CHECKPOINT_MAP_PATH = PROJECT_ROOT / "data" / "checkpoint_map.csv"
+CHECKPOINTS = (10, 20, 40, 60, 80, 100)
 
 
 def build_checkpoint_map(
     courses: pd.DataFrame, checkpoints=CHECKPOINTS
 ) -> pd.DataFrame:
-    """Build the lookup table: (code_module, code_presentation, t_percent) -> cutoff_day.
+    """Lookup table: (code_module, code_presentation, t_percent) -> cutoff_day.
 
-    cutoff_day = round(module_presentation_length * t / 100), per the agreed formula.
-    Returned in long format, one row per module-presentation per checkpoint.
+    cutoff_day = round(module_presentation_length * t / 100). Long format: one row
+    per module-presentation per checkpoint.
     """
     rows = []
     for _, course in courses.iterrows():
@@ -51,36 +54,29 @@ def cut_at_checkpoint(
     checkpoint_map: pd.DataFrame,
     date_col: str = "date",
 ) -> pd.DataFrame:
-    """Keep only rows of ``df`` whose ``date_col`` does not exceed the checkpoint day.
+    """Keep only rows whose ``date_col`` does not exceed the checkpoint day.
 
-    ``df`` must contain code_module, code_presentation and ``date_col`` (days relative
-    to the presentation start, as in studentVle/assessments). Rows with a missing date
-    are dropped, since their timing cannot be verified against the checkpoint.
+    ``df`` must contain PRESENTATION_KEY and ``date_col`` (days relative to the
+    presentation start). Rows with a missing date are dropped: their timing cannot
+    be verified against the checkpoint.
     """
     if t_percent not in set(checkpoint_map["t_percent"]):
         raise ValueError(
             f"t_percent={t_percent} not in checkpoint map "
             f"(available: {sorted(checkpoint_map['t_percent'].unique())})"
         )
-    missing = {"code_module", "code_presentation", date_col} - set(df.columns)
+    missing = set(PRESENTATION_KEY + [date_col]) - set(df.columns)
     if missing:
         raise KeyError(f"df is missing required columns: {sorted(missing)}")
 
     cutoffs = checkpoint_map.loc[
         checkpoint_map["t_percent"] == t_percent,
-        ["code_module", "code_presentation", "cutoff_day"],
+        PRESENTATION_KEY + ["cutoff_day"],
     ]
-    merged = df.merge(
-        cutoffs,
-        on=["code_module", "code_presentation"],
-        how="left",
-        validate="many_to_one",
-    )
+    merged = df.merge(cutoffs, on=PRESENTATION_KEY, how="left", validate="many_to_one")
     if merged["cutoff_day"].isna().any():
         unmatched = (
-            merged.loc[
-                merged["cutoff_day"].isna(), ["code_module", "code_presentation"]
-            ]
+            merged.loc[merged["cutoff_day"].isna(), PRESENTATION_KEY]
             .drop_duplicates()
             .to_records(index=False)
             .tolist()
@@ -120,9 +116,8 @@ def main():
         f"{len(courses)} module-presentations x {len(CHECKPOINTS)} checkpoints)"
     )
 
-    # --- Verification of cut_at_checkpoint on one module-presentation (task #11) ---
+    # Verify cut_at_checkpoint on one module-presentation (Task 11).
     module, presentation = "AAA", "2013J"
-
     vle = pd.read_csv(RAW_DIR / "studentVle.csv")
     vle = vle[
         (vle["code_module"] == module) & (vle["code_presentation"] == presentation)
@@ -164,9 +159,7 @@ def main():
 
     full_vle = vle[vle["date"].notna()]
     vle_100 = cut_at_checkpoint(vle, 100, checkpoint_map, date_col="date")
-    assert len(vle_100) == len(
-        full_vle
-    ), f"t=100% should keep all dated interactions: {len(vle_100)} vs {len(full_vle)}"
+    assert len(vle_100) == len(full_vle), "t=100% should keep all dated interactions"
     print(
         "\nAll checks passed: counts non-decreasing in t; t=100% keeps all dated records."
     )

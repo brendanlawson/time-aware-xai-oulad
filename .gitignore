@@ -42,7 +42,6 @@ Thumbs.db
 # ---- Secrets ----
 .env
 *.local
-requirements.txt
 
 # --- task ----
 task/
