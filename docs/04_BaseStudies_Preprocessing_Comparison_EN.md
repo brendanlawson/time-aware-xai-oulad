@@ -65,12 +65,12 @@ Adnan et al. [1] enforce a temporal cut-off aligned with each course-length chec
 
 ## References
 
-[1] Adnan, M., Habib, A., Ashraf, J., Mussadiq, S., Raza, A. A., Abid, M., Nawaz, M., & Khan, S. U. (2021). Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models. *IEEE Access*, 9, 7519–7539.
+[1] Adnan, M., et al. (2021). Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models. *IEEE Access*, 9, 7519–7539. *(full author list to be confirmed against the source)*
 
 [2] Tomasevic, N., Gvozdenovic, N., & Vranes, S. (2020). An overview and comparison of supervised data mining techniques for student exam performance prediction. *Computers & Education*, 143, 103676.
 
 [3] Kuzilek, J., Hlosta, M., & Zdrahal, Z. (2017). Open University Learning Analytics dataset. *Scientific Data*, 4, 170171.
 
-[4] Gunasekara, N., & Saarela, M. (2025). Explainable AI in Education: Techniques and Qualitative Assessment. *Applied Sciences*, 15(1), 1–28.
+[4] Gunasekara, S., & Saarela, M. (2025). Explainable AI in Education: Techniques and Qualitative Assessment. *Applied Sciences*. *(volume/pages to be confirmed against the source)*
 
 [5] Anonymous (2023). VLE Clickstream Aggregation for Student Engagement Prediction using OULAD. *(Manuscript / internal reference — full citation to be confirmed by the team.)*

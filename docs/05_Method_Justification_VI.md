@@ -8,7 +8,7 @@
 
 ## 1. Tại Sao Các Điểm Kiểm Tra Ở Mức 40–60% Độ Dài Khóa Học Là Thời Điểm Dự Đoán Sớm Đáng Tin Cậy
 
-Một trong những quyết định quan trọng nhất của hệ thống cảnh báo sớm là *thời điểm* thực hiện dự đoán. Can thiệp quá muộn mang lại ít lợi ích; dự đoán quá sớm lại dẫn đến độ không chắc chắn cao. Adnan và cộng sự [1] đã đánh giá có hệ thống độ chính xác dự đoán tại nhiều thời điểm khác nhau trong suốt tiến trình khóa học và phát hiện rằng khoảng thời gian từ 40–60% độ dài khóa học thể hiện sự cân bằng thực tiễn tối ưu: đã tích lũy đủ dữ liệu hoạt động của sinh viên để tạo ra các dự đoán ổn định, đồng thời vẫn còn đủ thời gian để giảng viên triển khai hỗ trợ có ý nghĩa. Do đó, quy trình của nhóm xác định ba điểm kiểm tra nhận thức thời gian (time-aware checkpoint) — xấp xỉ 40%, 50% và 60% tổng số tuần học — và lấy điểm kiểm tra ở khoảng giữa khóa học làm điểm đánh giá chính. Lựa chọn này trực tiếp trả lời **RQ1** (điểm kiểm tra sớm nhất đáng tin cậy và thuật toán tốt nhất) bằng cách neo lịch kiểm tra vào bằng chứng thực nghiệm thay vì các ngày tùy ý trên lịch.
+Một trong những quyết định quan trọng nhất của hệ thống cảnh báo sớm là *thời điểm* thực hiện dự đoán. Can thiệp quá muộn mang lại ít lợi ích; dự đoán quá sớm lại dẫn đến độ không chắc chắn cao. Adnan và cộng sự [1] đã đánh giá có hệ thống độ chính xác dự đoán tại nhiều thời điểm khác nhau trong suốt tiến trình khóa học và phát hiện rằng khoảng thời gian từ 40–60% độ dài khóa học thể hiện sự cân bằng thực tiễn tối ưu: đã tích lũy đủ dữ liệu hoạt động của sinh viên để tạo ra các dự đoán ổn định, đồng thời vẫn còn đủ thời gian để giảng viên triển khai hỗ trợ có ý nghĩa. Do đó, quy trình của nhóm xác định **sáu** điểm kiểm tra nhận thức thời gian (time-aware checkpoint) — 10 / 20 / 40 / 60 / 80 / 100% độ dài khóa học — và lấy **vùng 40–60%** làm điểm đánh giá chính, khả thi nhất cho can thiệp sớm. Lựa chọn này trực tiếp trả lời **RQ1** (điểm kiểm tra sớm nhất đáng tin cậy và thuật toán tốt nhất) bằng cách neo lịch kiểm tra vào bằng chứng thực nghiệm thay vì các ngày tùy ý trên lịch.
 
 *Tài liệu tham khảo hỗ trợ: [1]*
 
@@ -16,9 +16,9 @@ Một trong những quyết định quan trọng nhất của hệ thống cản
 
 ## 2. Tại Sao Đặc Trưng Mức Độ Tương Tác Và Kết Quả Đánh Giá Được Ưu Tiên Hơn Đặc Trưng Nhân Khẩu Học
 
-Lựa chọn đặc trưng (feature selection) trong khai thác dữ liệu giáo dục phải được hướng dẫn bởi bằng chứng về tính giá trị dự đoán. Tomasevic và cộng sự [2] đã thực hiện đánh giá có hệ thống các phương pháp học máy (machine learning) trong dự đoán kết quả học tập sinh viên qua 60 nghiên cứu và nhất quán phát hiện rằng các chỉ số mức độ tương tác — đặc biệt là nhật ký tương tác với Môi trường Học tập Ảo (VLE — Virtual Learning Environment), tức dữ liệu luồng nhấp chuột (clickstream) — và điểm số đánh giá trung gian mang tín hiệu dự đoán cao. Ngược lại, các thuộc tính nhân khẩu học (demographic) như nhóm tuổi, khu vực và trình độ học vấn cao nhất trước đây đóng góp tương đối ít giá trị dự đoán bổ sung khi các đặc trưng hành vi và kết quả học tập đã được đưa vào mô hình.
+Lựa chọn đặc trưng (feature selection) trong khai thác dữ liệu giáo dục phải được hướng dẫn bởi bằng chứng về tính giá trị dự đoán. Tomasevic và cộng sự [2] đã so sánh nhiều kỹ thuật học máy (machine learning) có giám sát để dự đoán kết quả học tập sinh viên trên OULAD và phát hiện rằng các chỉ số mức độ tương tác — đặc biệt là nhật ký tương tác với Môi trường Học tập Ảo (VLE — Virtual Learning Environment), tức dữ liệu luồng nhấp chuột (clickstream) — và điểm số đánh giá trung gian mang tín hiệu dự đoán cao. Ngược lại, các thuộc tính nhân khẩu học (demographic) như nhóm tuổi, khu vực và trình độ học vấn cao nhất trước đây đóng góp tương đối ít giá trị dự đoán bổ sung khi các đặc trưng hành vi và kết quả học tập đã được đưa vào mô hình.
 
-Trong dự án này, bộ dữ liệu OULAD [3] cung cấp bản ghi clickstream VLE phong phú (tổng số và số lượng theo ngày của các tương tác tài nguyên) và kết quả đánh giá liên tục (CMA — Continuous Module Assessment). Đây là các nhóm đặc trưng cốt lõi, trong khi các trường nhân khẩu học được giữ lại nhưng không được ưu tiên. Thiết kế này tránh xây dựng mô hình mà các quyết định của nó dựa vào các đặc điểm được bảo vệ, thay vào đó neo các dự đoán vào các hành động của người học có thể quan sát trực tiếp và có ý nghĩa giáo dục.
+Trong dự án này, bộ dữ liệu OULAD [3] cung cấp bản ghi clickstream VLE phong phú (tổng số và số lượng theo ngày của các tương tác tài nguyên) và kết quả đánh giá (TMA/CMA). Đây là các nhóm đặc trưng cốt lõi, trong khi các trường nhân khẩu học được giữ lại nhưng không được ưu tiên. Thiết kế này tránh xây dựng mô hình mà các quyết định của nó dựa vào các đặc điểm được bảo vệ, thay vào đó neo các dự đoán vào các hành động của người học có thể quan sát trực tiếp và có ý nghĩa giáo dục.
 
 *Tài liệu tham khảo hỗ trợ: [2], [3]*
 
@@ -40,7 +40,7 @@ Mặc dù sự mất cân bằng là nhẹ, **RQ3** vẫn điều tra rõ ràng 
 
 Các bản ghi sinh viên trong OULAD chứa nhiều lần trình bày mô-đun (module presentation) trên mỗi sinh viên (`id_student`). Nếu các bản ghi của cùng một sinh viên xuất hiện trong cả tập huấn luyện và tập kiểm tra, mô hình có thể học các đặc điểm riêng lẻ thay vì các quy luật tổng quát hóa — một dạng *rò rỉ nhóm* (group leakage) làm tăng giả tạo hiệu suất trên tập dữ liệu giữ lại. Để ngăn chặn điều này, việc phân chia huấn luyện/xác nhận/kiểm tra phải được thực hiện ở cấp độ sinh viên (nhóm theo `id_student`) sao cho tất cả các bản ghi của một sinh viên nhất định nằm hoàn toàn trong một phân vùng.
 
-Ngoài việc ngăn ngừa rò rỉ, dự án đánh giá dự đoán tại sáu thời điểm (qua hai hoặc ba điểm kiểm tra và ít nhất hai mô hình). Giữ tập kiểm tra cố định trong tất cả các thí nghiệm đảm bảo rằng các so sánh hiệu suất được thực hiện trên cùng một tổng thể, bảo toàn tính hợp lệ của các kiểm định thống kê bắt cặp và so sánh xuyên điểm kiểm tra. Phân tầng (stratification) theo nhãn `at_risk` trong phân chia ở cấp độ nhóm duy trì tỷ lệ dương tính khoảng 52,8% trong mỗi phân vùng, ngăn ngừa sự mất cân bằng ngẫu nhiên do chính việc phân chia gây ra.
+Ngoài việc ngăn ngừa rò rỉ, dự án đánh giá dự đoán tại sáu điểm kiểm tra theo thời gian (10–100% độ dài khóa học). Giữ tập kiểm tra cố định qua tất cả các mốc đảm bảo rằng các so sánh hiệu suất được thực hiện trên cùng một tổng thể, bảo toàn tính hợp lệ của các kiểm định thống kê bắt cặp và so sánh xuyên điểm kiểm tra. Phân tầng (stratification) theo nhãn `at_risk` trong phân chia ở cấp độ nhóm duy trì tỷ lệ dương tính khoảng 52,8% trong mỗi phân vùng, ngăn ngừa sự mất cân bằng ngẫu nhiên do chính việc phân chia gây ra.
 
 *Thiết kế này là thông lệ tiêu chuẩn trong tài liệu kiểm định chéo có nhóm (grouped cross-validation) và là yêu cầu bắt buộc để đảm bảo tính toàn vẹn của RQ1 và RQ2.*
 
@@ -58,12 +58,12 @@ Do đó, **RQ2** giới thiệu một chỉ số ổn định định lượng (
 
 ## Tài Liệu Tham Khảo
 
-[1] M. Adnan, A. Habib, J. Zuraiq và A. Yousaf, "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, tập 9, tr. 7519–7539, 2021.
+[1] M. Adnan và cộng sự, "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, tập 9, tr. 7519–7539, 2021. *(danh sách tác giả đầy đủ cần đối chiếu nguồn)*
 
 [2] N. Tomasevic, N. Gvozdenovic và S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, tập 143, tr. 103676, 2020.
 
 [3] J. Kuzilek, M. Hlosta và Z. Zdrahal, "Open University Learning Analytics Dataset," *Scientific Data*, tập 4, tr. 170171, 2017.
 
-[4] S. Gunasekara và M. Saarela, "Explainable Artificial Intelligence in Education: A Systematic Review," *Applied Sciences*, 2025.
+[4] S. Gunasekara và M. Saarela, "Explainable AI in Education: Techniques and Qualitative Assessment," *Applied Sciences*, 2025.
 
 [6] N. V. Chawla, K. W. Bowyer, L. O. Hall và W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research*, tập 16, tr. 321–357, 2002.

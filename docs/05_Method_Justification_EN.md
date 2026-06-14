@@ -8,7 +8,7 @@
 
 ## 1. Why Checkpoints at 40–60% of Course Length Provide a Reliable Early-Prediction Point
 
-One of the most consequential choices in an early-warning system is *when* to make a prediction. Intervening too late offers little benefit; predicting too early risks high uncertainty. Adnan et al. [1] systematically evaluated prediction accuracy at multiple points across the course timeline and found that the window spanning 40–60% of course length represents a pragmatic balance: enough student-activity data has accumulated to produce stable predictions, yet sufficient time remains for instructors to deploy meaningful support. Our pipeline therefore defines three time-aware checkpoints—approximately 40%, 50%, and 60% of total weeks—and treats the checkpoint at roughly half-course as the primary evaluation point. This choice directly answers **RQ1** (earliest reliable checkpoint and best algorithm) by grounding the checkpoint schedule in empirical evidence rather than arbitrary calendar dates.
+One of the most consequential choices in an early-warning system is *when* to make a prediction. Intervening too late offers little benefit; predicting too early risks high uncertainty. Adnan et al. [1] systematically evaluated prediction accuracy at multiple points across the course timeline and found that the window spanning 40–60% of course length represents a pragmatic balance: enough student-activity data has accumulated to produce stable predictions, yet sufficient time remains for instructors to deploy meaningful support. Our pipeline therefore defines **six** time-aware checkpoints (10 / 20 / 40 / 60 / 80 / 100% of course length) and treats the **40–60% window** as the primary, most-actionable evaluation point. This choice directly answers **RQ1** (earliest reliable checkpoint and best algorithm) by grounding the checkpoint schedule in empirical evidence rather than arbitrary calendar dates.
 
 *Supporting citation: [1]*
 
@@ -16,9 +16,9 @@ One of the most consequential choices in an early-warning system is *when* to ma
 
 ## 2. Why Engagement and Assessment Features Are Prioritised Over Demographic Features
 
-Feature selection in educational data mining must be guided by evidence of predictive validity. Tomasevic et al. [2] conducted a systematic review of machine-learning approaches for student performance prediction across 60 studies and consistently found that engagement indicators—particularly Virtual Learning Environment (VLE) interaction logs (clickstream data)—and intermediate assessment scores carry high predictive signal. In contrast, demographic attributes such as age band, region, and highest prior education level contributed comparatively little additional predictive power once behavioural and academic-performance features were available.
+Feature selection in educational data mining must be guided by evidence of predictive validity. Tomasevic et al. [2] compared multiple supervised machine-learning techniques for student performance prediction on OULAD and found that engagement indicators—particularly Virtual Learning Environment (VLE) interaction logs (clickstream data)—and intermediate assessment scores carry high predictive signal. In contrast, demographic attributes such as age band, region, and highest prior education level contributed comparatively little additional predictive power once behavioural and academic-performance features were available.
 
-In our project, the OULAD dataset [3] provides rich VLE clickstream records (sum and daily counts of resource interactions) and continuous assessment (CMA) results. These form the core feature groups, while demographic fields are retained but deprioritised. This design choice avoids building a model whose decisions rest on protected characteristics and instead anchors predictions in learner actions that are directly observable and educationally meaningful.
+In our project, the OULAD dataset [3] provides rich VLE clickstream records (sum and daily counts of resource interactions) and assessment (TMA/CMA) results. These form the core feature groups, while demographic fields are retained but deprioritised. This design choice avoids building a model whose decisions rest on protected characteristics and instead anchors predictions in learner actions that are directly observable and educationally meaningful.
 
 *Supporting citations: [2], [3]*
 
@@ -40,7 +40,7 @@ Although the imbalance is mild, **RQ3** explicitly investigates whether resampli
 
 Student records in OULAD contain multiple module presentations per student (`id_student`). If records from the same student appear in both training and test sets, the model can learn individual idiosyncrasies rather than generalisable patterns—a form of *group leakage* that inflates held-out performance. To prevent this, the train/validation/test split must be performed at the student level (grouped by `id_student`) so that all records of a given student fall entirely in one partition.
 
-Beyond leakage prevention, the project evaluates predictions at six time points (across two or three checkpoints and at least two models). Keeping the test set fixed across all experiments ensures that performance comparisons are made on an identical population, preserving the validity of paired statistical tests and cross-checkpoint comparisons. Stratification on the `at_risk` label within the group-level split maintains the approximately 52.8% positive rate in each partition, preventing accidental imbalance introduced by the split itself.
+Beyond leakage prevention, the project evaluates predictions at six time-aware checkpoints (10–100% of course length). Keeping the test set fixed across all checkpoints ensures that performance comparisons are made on an identical population, preserving the validity of paired statistical tests and cross-checkpoint comparisons. Stratification on the `at_risk` label within the group-level split maintains the approximately 52.8% positive rate in each partition, preventing accidental imbalance introduced by the split itself.
 
 *This design is standard practice in grouped cross-validation literature and is required for the integrity of RQ1 and RQ2.*
 
@@ -58,12 +58,12 @@ SHAP and LIME are the two most widely deployed post-hoc explanation methods in e
 
 ## References
 
-[1] M. Adnan, A. Habib, J. Zuraiq, and A. Yousaf, "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, vol. 9, pp. 7519–7539, 2021.
+[1] M. Adnan et al., "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, vol. 9, pp. 7519–7539, 2021. *(full author list to be confirmed against the source)*
 
 [2] N. Tomasevic, N. Gvozdenovic, and S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, vol. 143, p. 103676, 2020.
 
 [3] J. Kuzilek, M. Hlosta, and Z. Zdrahal, "Open University Learning Analytics Dataset," *Scientific Data*, vol. 4, p. 170171, 2017.
 
-[4] S. Gunasekara and M. Saarela, "Explainable Artificial Intelligence in Education: A Systematic Review," *Applied Sciences*, 2025.
+[4] S. Gunasekara and M. Saarela, "Explainable AI in Education: Techniques and Qualitative Assessment," *Applied Sciences*, 2025.
 
 [6] N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research*, vol. 16, pp. 321–357, 2002.
