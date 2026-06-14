@@ -1,76 +1,76 @@
-# Các Nghiên Cứu Nền: So Sánh Quy Trình Tiền Xử Lý Dữ Liệu OULAD
+# Các nghiên cứu nền: Đối chiếu quy trình tiền xử lý OULAD
 
-**Phụ đề:** So sánh thu thập dữ liệu, làm sạch, kỹ thuật đặc trưng và phân chia tập dữ liệu qua bốn nghiên cứu tiên khởi nhằm củng cố cơ sở lựa chọn thiết kế của nhóm.
+**Phụ đề:** So sánh thu thập, làm sạch, tạo đặc trưng và phân chia dữ liệu giữa bốn nghiên cứu nền để lập luận cho các lựa chọn của nhóm.
 
-**DSP391m – Nhóm 1 · Báo cáo 2 (Nhiệm vụ Dữ liệu), Chương 3 · Hạng mục công việc STT 24 (Sơn)**
+**DSP391m – Nhóm 1 · Báo cáo 2 (Tác vụ dữ liệu), Chương 3 · Hạng mục STT 24 (Sơn)**
 
 ---
 
-> **Lưu ý:** Các con số chính xác, ngưỡng giá trị và kết quả trích dẫn từ mỗi nghiên cứu cần được nhóm tự đối chiếu với tài liệu gốc trước khi nộp bài cuối.
+> **Ghi chú kiểm chứng.** Các ô dưới đây đã được đối chiếu nguồn: toàn văn cho [1] (bản mở) và [4] (kho mở của tác giả); phần tóm tắt cùng các bài trích dẫn độc lập cho [2] và [5] (toàn văn nhà xuất bản bị giới hạn). Những ô nguồn không nêu rõ được đánh dấu *"không nêu rõ"* thay vì suy đoán.
 
 ---
 
 ## 1. Giới thiệu
 
-Bộ dữ liệu phân tích học tập của Đại học Mở — Open University Learning Analytics Dataset (OULAD) — được Kuzilek và cộng sự mô tả trong [3] — cung cấp bảy bảng quan hệ bao gồm 32.593 lượt đăng ký học, hồ sơ nhân khẩu học (demographic), nhật ký tương tác với Môi trường Học tập Ảo (Virtual Learning Environment — VLE), và hồ sơ kiểm tra đánh giá (assessment). Do nhiều nhóm nghiên cứu đã sử dụng bộ dữ liệu này để dự đoán bỏ học và kết quả học tập, các quyết định tiền xử lý (preprocessing) của họ tạo thành một mốc tham chiếu thực tiễn cho dự án của nhóm. Chương này khảo sát bốn nghiên cứu tiêu biểu và rút ra những bài học phương pháp luận có thể áp dụng trực tiếp vào quy trình của chúng ta.
+Bộ dữ liệu Open University Learning Analytics Dataset (OULAD) — mô tả bởi Kuzilek và cộng sự [3] — gồm bảy bảng quan hệ bao phủ 32.593 lượt đăng ký sinh viên, gồm hồ sơ nhân khẩu học, tương tác clickstream trên môi trường học ảo (VLE) và kết quả đánh giá. Vì nhiều nhóm nghiên cứu đã dùng bộ dữ liệu này, các quyết định tiền xử lý của họ là cơ sở thực tiễn cho dự án. Chương này khảo sát bốn nghiên cứu và rút ra bài học định hướng pipeline của nhóm.
 
 ---
 
-## 2. Bảng So Sánh: Quy Trình Tiền Xử Lý Qua Các Nghiên Cứu Nền
+## 2. Bảng đối chiếu quy trình tiền xử lý của các nghiên cứu nền
 
-| Nghiên cứu | **Thu thập dữ liệu** | **Làm sạch** | **Kỹ thuật đặc trưng** | **Phân chia tập dữ liệu** |
+| Nghiên cứu | **Thu thập** | **Làm sạch** | **Tạo đặc trưng** | **Phân chia / Kiểm định** |
 |---|---|---|---|---|
-| **[1] Adnan và cộng sự (2021)** | OULAD đầy đủ; gộp ba bảng nhân khẩu học, nhật ký VLE và đánh giá theo từng sinh viên và từng học phần [1] | Loại bỏ hoặc nội suy giá trị thiếu; loại các lượt đăng ký có hoạt động quá ít [1] | Đặc trưng cắt ngưỡng theo thời gian tại nhiều mốc phần trăm độ dài khóa học (10–100%); kết hợp nhân khẩu học + mức độ tương tác tích lũy + điểm đánh giá liên tục [1] | Áp dụng ngưỡng thời gian (temporal cut-off) cho từng mốc; phân chia train/test để ngăn rò rỉ sự kiện tương lai; mất cân bằng lớp (class imbalance) xử lý bằng tái lấy mẫu [1] |
-| **[2] Tomasevic và cộng sự (2020)** | OULAD; tập trung vào bảng tương tác VLE và đánh giá; nhân khẩu học được xem là đầu vào phụ [2] | Loại bỏ bản ghi thiếu nhãn kết quả; mã hóa trường phân loại; kiểm tra bản ghi có số lượt nhấp bất thường [2] | Tổng hợp luồng nhấp (clickstream) thành số lượt tương tác; điểm đánh giá lịch sử dùng làm đặc trưng trực tiếp; đặc trưng nhân khẩu học đóng góp ít [2] | Phân chia hold-out hoặc kiểm định chéo (cross-validation) tiêu chuẩn; không có ngưỡng thời gian tường minh; phân chia theo tầng (stratified) trên nhãn đỗ/trượt [2] |
-| **[4] Gunasekara & Saarela (2025)** | OULAD (trong số các bộ dữ liệu giáo dục khác); chủ yếu dùng làm chuẩn mực đánh giá khả năng giải thích (XAI) [4] | Làm sạch tiêu chuẩn theo quy trình thượng nguồn; chi tiết tiền xử lý là thứ yếu so với mục tiêu đánh giá XAI [4] | Tập đặc trưng kế thừa từ nghiên cứu trước; ít kỹ thuật mới; SHAP/LIME áp dụng hậu nghiệm (post-hoc) sau huấn luyện [4] | Phân chia train/test theo quy ước; phương pháp phân chia không phải đóng góp chính của nghiên cứu [4] |
-| **[5] Nghiên cứu clickstream (2023)** | Toàn bộ nhật ký tương tác VLE (~10 triệu hàng); gộp với bảng nhân khẩu học và đánh giá [5] | Lọc bản ghi hoạt động thấp; loại trùng lặp; loại sự kiện có ngày ngoài phạm vi [5] | Tổng hợp luồng nhấp theo từng sinh viên thành: tổng số lượt nhấp, số ngày hoạt động, số lượt theo từng loại hoạt động; tạo véc-tơ đặc trưng gọn nhẹ [5] | Phân chia ngẫu nhiên hoặc phân tầng trên nhãn cuối; tổng hợp thực hiện trước khi phân chia để tránh rò rỉ ở mức hàng [5] |
+| **[1] Adnan và cộng sự (2021)** | Toàn bộ OULAD (22 môn–kỳ, 32.593 sinh viên); bảng nhân khẩu học, clickstream VLE và đánh giá [1] | Giá trị ngày khuyết được điền bằng **trung bình**; giữ Withdrawn như một lớp; không nêu lọc sinh viên không hoạt động [1] | Ba nhóm đặc trưng (nhân khẩu học; sum/mean click; điểm, điểm tương đối, số bài nộp muộn) tính tích luỹ tại **đầu khoá và 20/40/60/80/100%** thời lượng [1] | **CV 10-fold** cho mô hình ML, **chia 85/15** cho mô hình học sâu; xử lý mất cân bằng bằng **gộp lớp** (Pass+Distinction; Fail+Withdrawn), *không* tái lấy mẫu; chỉ số: accuracy, precision, recall, F-score, AUC [1] |
+| **[2] Tomasevic và cộng sự (2020)** | OULAD; kết hợp dữ liệu nhân khẩu học, tương tác (clickstream) và kết quả trước đó [2] | *Không nêu rõ* trong phần văn bản truy cập được [2] | Ba nhóm đặc trưng; phát hiện chính: **tương tác + kết quả** mang tín hiệu cao nhất, còn nhân khẩu học "không ảnh hưởng đáng kể" [2] | Cả phân loại và hồi quy; **ANN tốt nhất**; quy trình chia/CV cụ thể *không nêu rõ* trong nguồn truy cập được [2] |
+| **[4] Gunasekara & Saarela (2025)** | **Chỉ** OULAD, một **tập con 3 môn (AAA/BBB/CCC)** → 14 đặc trưng, 17.091 mẫu (Pass 5.963 / Fail 7.128); dùng làm benchmark minh hoạ XAI [4] | Loại dòng/cột khuyết quá nhiều; chuẩn hoá biến số về ~0–1; gộp lớp (Pass+Distinction; Fail+Withdrawn) [4] | **14 thuộc tính chọn/tổng hợp** từ OULAD (ví dụ `sum_click`, `assessment_count`, `delay`, `score` + nhân khẩu học); SHAP/LIME áp dụng hậu kỳ [4] | **CV 5-fold lặp 50 lần** (+ một lần chia train/test); **ANN vs Cây quyết định**; SHAP+LIME, chủ yếu giải thích cục bộ định tính [4] |
+| **[5] Liu và cộng sự (2023)** | OULAD; `studentInfo` ghép với clickstream `studentVle`; **5.341 sinh viên** sau làm sạch [5] | **Loại 180 sinh viên không có click** (→ 5.341); các bước khác *không nêu rõ* [5] | Số click trên **12 trang học (learning sites)**, tổng hợp theo **tuần và tháng** (ảnh hưởng nhất: content, subpage, homepage, quiz) [5] | Nhị phân pass/fail; **LSTM vs 1D-CNN vs ML truyền thống** (LSTM tốt nhất, ≈90%); độ chính xác tăng theo kỳ; tỉ lệ train/test và xử lý mất cân bằng *không nêu rõ* [5] |
 
 ---
 
-## 3. Thảo Luận
+## 3. Thảo luận
 
-### 3.1 Thu Thập Dữ Liệu
+### 3.1 Thu thập
 
-Cả bốn nghiên cứu đều sử dụng OULAD [3] ở dạng đã công bố mà không thu thập thêm dữ liệu bên ngoài. Sự khác biệt chính nằm ở việc nhấn mạnh bảng nào: Adnan và cộng sự [1] tích hợp cả ba nhóm đặc trưng một cách tường minh; Tomasevic và cộng sự [2] coi tương tác VLE và điểm đánh giá là chính, nhân khẩu học là phụ; nghiên cứu clickstream [5] tập trung hẹp vào nhật ký tương tác VLE và thực hiện tổng hợp quy mô lớn; trong khi Gunasekara & Saarela [4] xử lý bộ dữ liệu như một chuẩn mực sẵn có.
+Cả bốn nghiên cứu dùng OULAD [3] không thu thập thêm, nhưng phạm vi khác nhau: Adnan và cộng sự [1] dùng toàn bộ và tích hợp cả ba nhóm đặc trưng; Tomasevic và cộng sự [2] kết hợp tương tác, kết quả và nhân khẩu học; Liu và cộng sự [5] tập trung clickstream VLE ghép với `studentInfo`; còn Gunasekara & Saarela [4] cố ý chỉ dùng **tập con 3 môn** làm benchmark XAI. Pipeline của nhóm, như [1], dùng toàn bộ 32.593 bản ghi với cả ba nhóm đặc trưng.
 
-### 3.2 Làm Sạch
+### 3.2 Làm sạch
 
-Cách tiếp cận xử lý giá trị thiếu và ngoại lệ nhìn chung nhất quán: loại bỏ hoặc nội suy nhãn kết quả bị thiếu, lọc các lượt đăng ký rõ ràng không hoạt động, và mã hóa nhân khẩu học phân loại. Không nghiên cứu nào báo cáo phương pháp làm sạch thực sự mới; sự đồng thuận là OULAD tương đối sạch, và gánh nặng làm sạch chính là quyết định đưa vào tập con module-presentations nào.
+Nơi có mô tả, việc làm sạch nhẹ: Adnan và cộng sự [1] điền trung bình ngày khuyết; Gunasekara & Saarela [4] loại dòng/cột khuyết nhiều, chuẩn hoá và gộp lớp; Liu và cộng sự [5] loại 180 sinh viên không click. Tomasevic và cộng sự [2] không nêu tiền xử lý trong văn bản truy cập được. Đáng chú ý, **không bài nào coi "chưa nộp bài" là tín hiệu thông tin** — khoảng trống mà pipeline của nhóm lấp bằng cờ `not_submitted`.
 
-### 3.3 Kỹ Thuật Đặc Trưng
+### 3.3 Tạo đặc trưng
 
-Sự biến thiên đáng kể nhất xảy ra ở đây. Adnan và cộng sự [1] giới thiệu ý tưởng then chốt về **cắt ngưỡng nhận thức thời gian (time-aware truncation)**: đặc trưng được tính lại tại mỗi mốc kiểm tra (checkpoint) để mô hình chỉ nhìn thấy thông tin có sẵn đến thời điểm đó trong khóa học. Nghiên cứu clickstream [5] chứng minh cách nhật ký tương tác thô có thể được nén lại thành véc-tơ đặc trưng gọn nhẹ theo từng sinh viên. Tomasevic và cộng sự [2] cung cấp bằng chứng thực nghiệm rằng đặc trưng mức độ tương tác và đánh giá chiếm ưu thế, trong khi đặc trưng nhân khẩu học đóng góp tương đối ít sức mạnh dự đoán.
+Đây là nơi khác biệt nhất. Adnan và cộng sự [1] giới thiệu **cắt theo thời gian** — tính lại đặc trưng tích luỹ tại các mốc phần trăm thời lượng cố định — là cơ sở trực tiếp cho thiết kế mốc của nhóm (họ dùng 20–100% còn nhóm thêm mốc 10%). Liu và cộng sự [5] cho thấy cách nén click thô thành số đếm theo trang/tuần/tháng. Tomasevic và cộng sự [2] cung cấp cơ sở thực nghiệm cho việc ưu tiên tương tác và kết quả hơn nhân khẩu học.
 
-### 3.4 Phân Chia Tập Dữ Liệu
+### 3.4 Phân chia / Kiểm định
 
-Adnan và cộng sự [1] áp dụng ngưỡng thời gian căn chỉnh với từng mốc độ dài khóa học — đây là phương pháp chặt chẽ nhất để tránh rò rỉ dữ liệu (data leakage). Các nghiên cứu khác sử dụng phân chia phân tầng hoặc ngẫu nhiên thông thường. Không có nghiên cứu nào trong số này sử dụng phân chia nhận biết nhóm (group-aware split) — đảm bảo một sinh viên không xuất hiện đồng thời trong tập train và test qua nhiều lần đăng ký — đây là một cải tiến mà quy trình của nhóm ta áp dụng.
-
----
-
-## 4. Những Điều Chúng Ta Kế Thừa
-
-- **Dự đoán theo mốc thời gian (checkpoint-based prediction)** [1]: Chúng ta áp dụng nguyên tắc cắt ngưỡng tính đặc trưng tại nhiều mốc phần trăm độ dài khóa học (10 / 20 / 40 / 60 / 80 / 100%). Bằng chứng từ Adnan và cộng sự cho thấy các dự đoán ổn định vào khoảng mốc 40–60%, làm cho các mốc này trở nên hữu dụng nhất cho can thiệp sớm.
-
-- **Ưu tiên nhóm đặc trưng** [2]: Dựa trên phát hiện của Tomasevic và cộng sự rằng tương tác clickstream và điểm đánh giá tích lũy mang tín hiệu dự đoán cao nhất, kỹ thuật đặc trưng của chúng ta ưu tiên hai nhóm này. Đặc trưng nhân khẩu học vẫn được giữ lại cho phân tích công bằng (fairness analysis) nhưng không phụ thuộc vào chúng cho độ chính xác dự đoán.
-
-- **Chiến lược tổng hợp clickstream** [5]: Chúng ta tổng hợp toàn bộ nhật ký tương tác VLE (khoảng 10 triệu hàng) thành đặc trưng tóm tắt theo từng sinh viên, từng mốc thời gian (tổng lượt nhấp, số ngày hoạt động, số lượt theo từng loại hoạt động), trực tiếp theo cách tiếp cận được chứng minh trong nghiên cứu clickstream.
-
-- **Ngăn chặn rò rỉ dữ liệu** [1][5]: Bộ mã hóa (encoder), bộ chuẩn hóa (scaler) và bộ nội suy (imputer) chỉ được khớp trên phân vùng huấn luyện, và tất cả sự kiện được ghi nhận sau một mốc thời gian nhất định bị loại trước khi xây dựng ma trận đặc trưng của mốc đó, nhất quán với tính kỷ luật thời gian trong [1].
-
-- **Phân chia phân tầng nhận biết nhóm**: Chúng ta mở rộng thực hành phân chia của [2] bằng cách đảm bảo toàn bộ lượt đăng ký của cùng một sinh viên (`id_student`) đều nằm hoàn toàn trong tập train hoặc test, đồng thời áp dụng kiểm định chéo 5-fold × 5-seed trên phần huấn luyện. Biện pháp bảo vệ chống rò rỉ ở cấp độ sinh viên này không có trong các nghiên cứu được khảo sát nhưng được thúc đẩy bởi các giả định ngầm kết hợp của chúng về tính độc lập của mẫu.
-
-- **Khung XAI** [4]: Trong khi Gunasekara & Saarela [4] đánh giá khả năng giải thích (explainability) theo cách định tính, khảo sát của họ thúc đẩy việc nhóm bổ sung chỉ số ổn định giải thích (explanation-stability metric) định lượng để bổ sung cho đầu ra SHAP — vượt ra ngoài những gì bất kỳ nghiên cứu nền nào cung cấp.
+Các nghiên cứu dựa vào hold-out hoặc k-fold tiêu chuẩn (10-fold ở [1], 5-fold ×50 ở [4]); chỉ [1] áp dụng cắt theo thời gian theo từng mốc. Quan trọng, **không bài nào dùng phân chia bảo toàn nhóm** theo sinh viên, nên một sinh viên có nhiều môn–kỳ có thể nằm ở cả train lẫn test — rủi ro rò rỉ mà pipeline của nhóm loại bỏ (mục "Những điều kế thừa").
 
 ---
 
-## Tài Liệu Tham Khảo
+## 4. Những điều nhóm kế thừa
 
-[1] Adnan, M., và cộng sự (2021). Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models. *IEEE Access*, 9, 7519–7539.
+- **Dự đoán theo mốc thời gian** [1]: nhóm áp dụng cắt đặc trưng tích luỹ tại các mốc phần trăm thời lượng. Adnan dùng 20/40/60/80/100%; nhóm thêm mốc 10% (10/20/40/60/80/100%) và lấy **40–60%** làm vùng dự đoán sớm đáng tin mà họ báo cáo.
 
-[2] Tomasevic, N., Gvozdenovic, N., & Vranes, S. (2020). An overview and comparison of supervised data mining techniques for student exam performance prediction. *Computers & Education*, 143, 103676.
+- **Ưu tiên nhóm đặc trưng** [2]: theo phát hiện rằng tương tác và kết quả chiếm ưu thế còn nhân khẩu học đóng góp ít, nhóm tập trung vào nhóm hành vi và kết quả; nhân khẩu học giữ để phân tích công bằng, không dựa vào để dự đoán.
 
-[3] Kuzilek, J., Hlosta, M., & Zdrahal, Z. (2017). Open University Learning Analytics dataset. *Scientific Data*, 4, 170171.
+- **Tổng hợp clickstream** [5]: như Liu và cộng sự, nhóm nén clickstream ~10,6 triệu dòng thành đặc trưng/sinh viên gọn (tổng click, ngày hoạt động, số click theo loại, cùng các tỉ lệ phái sinh), nhưng tính **theo từng mốc** cho bối cảnh time-aware.
 
-[4] Gunasekara, S., & Saarela, M. (2025). Explainable AI in Education: Techniques and Qualitative Assessment. *Applied Sciences*, 15(3), art. 1239.
+- **Phòng rò rỉ** [1]: bộ mã hoá, chuẩn hoá và điền khuyết chỉ khớp trên fold huấn luyện, và mọi sự kiện sau mốc bị loại trước khi dựng đặc trưng tại mốc đó — mở rộng kỷ luật thời gian của [1].
 
-[5] "Predicting Student Performance Using Clickstream Data and Machine Learning," *Education Sciences*, vol. 13, no. 1, art. 17, 2023.
+- **Phân chia phân tầng bảo toàn nhóm (đóng góp của nhóm)**: khác mọi nghiên cứu khảo sát, nhóm giữ toàn bộ bản ghi của một `id_student` hoàn toàn ở train hoặc test, với tập kiểm tra 20% cố định dùng lại qua các mốc và CV 5-fold × 5 seed trên tập huấn luyện — lấp khoảng trống rò rỉ cấp sinh viên mà các phân chia theo dòng của họ để ngỏ.
+
+- **Định lượng độ ổn định giải thích** [4]: Gunasekara & Saarela đánh giá SHAP/LIME chủ yếu định tính; nhóm thêm chỉ số ổn định định lượng (Jaccard top-*k* + độ lệch chuẩn độ quan trọng đặc trưng), vượt qua đánh giá định tính của họ.
+
+---
+
+## Tài liệu tham khảo
+
+[1] M. Adnan và cộng sự, "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, tập 9, tr. 7519–7539, 2021.
+
+[2] N. Tomasevic, N. Gvozdenovic, và S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, tập 143, art. 103676, 2020.
+
+[3] J. Kuzilek, M. Hlosta, và Z. Zdrahal, "Open University Learning Analytics dataset," *Scientific Data*, tập 4, art. 170171, 2017.
+
+[4] S. Gunasekara và M. Saarela, "Explainable AI in Education: Techniques and Qualitative Assessment," *Applied Sciences*, tập 15, số 3, art. 1239, 2025.
+
+[5] Y. Liu, S. Fan, S. Xu, A. Sajjanhar, S. Yeom, và Y. Wei, "Predicting Student Performance Using Clickstream Data and Machine Learning," *Education Sciences*, tập 13, số 1, art. 17, 2023.

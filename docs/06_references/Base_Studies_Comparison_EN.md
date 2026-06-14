@@ -6,7 +6,7 @@
 
 ---
 
-> **Disclaimer:** Exact figures, thresholds, and quoted results from each study should be verified against the original source by the team before final submission.
+> **Verification note.** The cells below were cross-checked against sources: full text for [1] (open mirror) and [4] (authors' open-access repository); the abstract plus independent citing studies for [2] and [5] (publisher full text paywalled). Cells the source does not state are marked *"not specified"* rather than inferred.
 
 ---
 
@@ -18,12 +18,12 @@ The Open University Learning Analytics Dataset (OULAD) — described by Kuzilek 
 
 ## 2. Comparison Table: Preprocessing Pipelines Across Base Studies
 
-| Study | **Collection** | **Cleaning** | **Feature Engineering** | **Splitting** |
+| Study | **Collection** | **Cleaning** | **Feature Engineering** | **Splitting / Validation** |
 |---|---|---|---|---|
-| **[1] Adnan et al. (2021)** | Full OULAD; demographic, VLE clickstream, and assessment tables merged per student per module [1] | Missing values removed or imputed; student registrations with insufficient activity excluded [1] | Time-aware features truncated at multiple course-length checkpoints (10–100%); combined demographic + cumulative engagement + running assessment score [1] | Temporal cut-off enforced per checkpoint; train/test partitioned to prevent leakage of future events; class imbalance addressed via resampling strategies [1] |
-| **[2] Tomasevic et al. (2020)** | OULAD; focus on engagement (clickstream) and assessment sub-tables; demographic fields included as secondary inputs [2] | Records with missing outcome labels dropped; categorical fields encoded; outlier records with extreme click counts inspected [2] | Clickstream aggregated into total interaction counts; past assessment scores used as direct features; demographic variables appended but found to contribute little [2] | Standard hold-out or cross-validation; no explicit temporal cut-off reported; stratified split on the pass/fail label [2] |
-| **[4] Gunasekara & Saarela (2025)** | OULAD (among other educational datasets); primarily used as a benchmark for explainability evaluation [4] | Standard cleaning following upstream pipeline; preprocessing details are secondary to the XAI evaluation focus [4] | Feature set largely inherited from prior work; minimal new engineering; SHAP/LIME applied post-hoc to the trained model [4] | Train/test split conventional; splitting methodology not a primary contribution of this study [4] |
-| **[5] Clickstream study (2023)** | Full OULAD VLE interaction log (~10 M rows); demographic and assessment tables joined [5] | Low-activity records filtered; duplicate interaction events de-duplicated; date-out-of-range events removed [5] | Clickstream aggregated per student into total clicks, active days, and per-activity-type interaction counts; resulting in a compact per-student feature vector [5] | Random or stratified split on the final label; aggregation performed before splitting to avoid row-level leakage [5] |
+| **[1] Adnan et al. (2021)** | Full OULAD (22 module-presentations, 32,593 students); demographic, VLE clickstream, and assessment tables [1] | Missing date values imputed with the **mean**; Withdrawn kept as a class; no inactive-student filtering reported [1] | Three feature groups (demographic; clickstream sum/mean clicks; assessment scores, relative score, late-submission counts) computed cumulatively at **course start and 20/40/60/80/100%** of course length [1] | **10-fold CV** for the ML models, **85/15 split** for the deep model; imbalance handled by **class-merging** (Pass+Distinction; Fail+Withdrawn), *not* resampling; metrics: accuracy, precision, recall, F-score, AUC [1] |
+| **[2] Tomasevic et al. (2020)** | OULAD; demographic, engagement (clickstream) and past-performance data combined [2] | *Not specified* in the paper's accessible text [2] | Three feature groups; key finding: **engagement + performance** carry the highest signal, while demographics "did not show significant influence" [2] | Classification and regression tasks; **ANN performed best**; the exact split/CV procedure is *not specified* in accessible sources [2] |
+| **[4] Gunasekara & Saarela (2025)** | OULAD **only**, a **3-module subset (AAA/BBB/CCC)** → 14 features, 17,091 samples (Pass 5,963 / Fail 7,128); used as a benchmark to illustrate XAI [4] | Rows/columns with excessive missingness removed; numerical features normalised to ~0–1; classes merged (Pass+Distinction; Fail+Withdrawn) [4] | **14 selected/aggregated** OULAD attributes (e.g. `sum_click`, `assessment_count`, `delay`, `score` + demographics); SHAP/LIME applied post-hoc [4] | **5-fold CV repeated 50×** (+ a train/test split); **ANN vs Decision Tree**; SHAP+LIME, mainly qualitative local explanations [4] |
+| **[5] Liu et al. (2023)** | OULAD; `studentInfo` merged with the `studentVle` clickstream; **5,341 students** after cleaning [5] | **180 students with no recorded clicks removed** (→ 5,341); other steps *not specified* [5] | Clicks on **12 learning sites**, aggregated at **weekly and monthly** intervals (top-influential: content, subpage, homepage, quiz) [5] | Binary pass/fail; **LSTM vs 1D-CNN vs traditional ML** (LSTM best, ≈90%); accuracy rises across the term; train/test ratio and imbalance handling *not specified* [5] |
 
 ---
 
@@ -31,46 +31,46 @@ The Open University Learning Analytics Dataset (OULAD) — described by Kuzilek 
 
 ### 3.1 Collection
 
-All four studies draw on OULAD [3] in its published form without additional data collection. The key difference lies in which tables are emphasised: Adnan et al. [1] integrate all three feature groups (demographic, VLE, assessment) explicitly; Tomasevic et al. [2] treat engagement and assessment as primary and demographics as supplementary; the clickstream study [5] focuses narrowly on the VLE interaction log and performs heavy aggregation; while Gunasekara & Saarela [4] treat the dataset as a ready-made benchmark.
+All four studies draw on OULAD [3] without additional collection, but at different scope: Adnan et al. [1] use the full set and integrate all three feature groups; Tomasevic et al. [2] combine engagement, performance and demographic data; Liu et al. [5] focus on the VLE clickstream merged with `studentInfo`; and Gunasekara & Saarela [4] deliberately use only a **3-module subset** as an XAI benchmark. Our pipeline, like [1], uses the full 32,593-record set across all three feature groups.
 
 ### 3.2 Cleaning
 
-Approaches to missing data and outlier handling are broadly consistent: drop or impute missing outcome labels, filter clearly inactive registrations, and encode categorical demographics. No study reports a fundamentally novel cleaning method; the consensus is that OULAD is relatively clean and the main cleaning burden is deciding which subset of module-presentations to include.
+Where described, cleaning is light: Adnan et al. [1] mean-impute missing dates; Gunasekara & Saarela [4] drop excessively-missing rows/columns, normalise, and merge classes; Liu et al. [5] drop the 180 click-less students. Tomasevic et al. [2] do not report their preprocessing in accessible text. Notably, **none mean-imputes scores or treats "not submitted" as an informative signal** — a gap our pipeline fills with the `not_submitted` indicator.
 
 ### 3.3 Feature Engineering
 
-The most significant variation occurs here. Adnan et al. [1] introduce the critical idea of **time-aware truncation**: features are re-computed at each checkpoint so that the model only sees information available up to that point in the course. The clickstream study [5] demonstrates how raw interaction logs can be compacted into a manageable per-student feature vector. Tomasevic et al. [2] provide empirical evidence that engagement and assessment features dominate, while demographic features add comparatively little predictive power.
+This is where the studies differ most. Adnan et al. [1] introduce **time-aware truncation** — re-computing features cumulatively at fixed course-length percentages — which is the direct basis of our checkpoint design (though they use 20–100% while we add a 10% point). Liu et al. [5] show how raw clicks compress into per-site weekly/monthly counts. Tomasevic et al. [2] provide the empirical basis for prioritising engagement and performance over demographics.
 
-### 3.4 Splitting
+### 3.4 Splitting / Validation
 
-Adnan et al. [1] enforce a temporal cut-off aligned with each course-length checkpoint, which is the most rigorous approach for avoiding leakage. The other studies use conventional stratified or random splits. None of the surveyed studies use a group-aware split (ensuring a student does not appear in both train and test sets across multiple registrations), which is a refinement our pipeline adopts.
+The studies rely on standard hold-out or k-fold cross-validation (10-fold in [1], 5-fold ×50 in [4]); only [1] enforces a temporal cut-off aligned with each checkpoint. Importantly, **none uses a group-aware split** keyed on the student, so a student with several module-presentations can fall in both train and test — a leakage risk our pipeline removes (Section "What we inherit").
 
 ---
 
 ## 4. What We Inherit
 
-- **Time-aware checkpoint prediction** [1]: We adopt the same principle of truncating feature computation at multiple course-length percentages (10 / 20 / 40 / 60 / 80 / 100%). The evidence from Adnan et al. suggests that predictions stabilise around the 40–60% mark, making these checkpoints the most actionable for early intervention.
+- **Time-aware checkpoint prediction** [1]: we adopt cumulative feature truncation at course-length percentages. Adnan et al. use 20/40/60/80/100%; we add a 10% point (10/20/40/60/80/100%) and treat **40–60%** as the reliable early window they report.
 
-- **Feature group prioritisation** [2]: Following Tomasevic et al.'s finding that clickstream engagement and running assessment scores carry the highest predictive signal, our feature engineering prioritises these two groups. Demographic features are retained for fairness analysis but are not relied upon for predictive accuracy.
+- **Feature-group prioritisation** [2]: following the finding that engagement and performance dominate while demographics contribute little, our engineering centres on the behavioural and assessment groups; demographics are kept for fairness analysis, not predictive reliance.
 
-- **Clickstream aggregation strategy** [5]: We aggregate the full VLE interaction log (approximately 10 million rows) into per-student, per-checkpoint summary features (total clicks, active days, per-activity-type counts), directly following the approach demonstrated in the clickstream study.
+- **Clickstream aggregation** [5]: like Liu et al., we compress the ~10.6M-row clickstream into compact per-student features (total clicks, active days, per-activity-type counts, plus derived rates), but computed **per checkpoint** for the time-aware setting.
 
-- **Leakage prevention** [1][5]: Encoders, scalers, and imputers are fitted exclusively on the training partition, and all events dated after a given checkpoint are excluded before that checkpoint's feature matrix is constructed, consistent with the temporal discipline in [1].
+- **Leakage prevention** [1]: encoders, scaler and imputer are fitted on the training fold only, and all events after a checkpoint are removed before that checkpoint's features are built — extending the temporal discipline of [1].
 
-- **Group-aware stratified splitting**: We extend the splitting practice of [2] by ensuring that all registrations belonging to the same student (`id_student`) fall entirely within either the train or test set, and apply 5-fold × 5-seed cross-validation on the training portion. This guard against student-level leakage is not present in the surveyed studies but is motivated by their combined implicit assumptions about independent samples.
+- **Group-aware stratified split (our addition)**: unlike any surveyed study, we keep every record of a given `id_student` entirely in train or test, with a fixed 20% test set reused across checkpoints and 5-fold × 5-seed CV on the training portion — closing the student-level leakage gap left open by their row-level splits.
 
-- **XAI framing** [4]: While Gunasekara & Saarela [4] assess explainability qualitatively, their survey motivates our addition of a quantitative explanation-stability metric to complement SHAP output — moving beyond what any single base study provides.
+- **Quantitative explanation stability** [4]: Gunasekara & Saarela evaluate SHAP/LIME mainly qualitatively; we add a quantitative stability metric (Jaccard top-*k* + feature-importance standard deviation), moving beyond their qualitative assessment.
 
 ---
 
 ## References
 
-[1] Adnan, M., et al. (2021). Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models. *IEEE Access*, 9, 7519–7539.
+[1] M. Adnan et al., "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, vol. 9, pp. 7519–7539, 2021.
 
-[2] Tomasevic, N., Gvozdenovic, N., & Vranes, S. (2020). An overview and comparison of supervised data mining techniques for student exam performance prediction. *Computers & Education*, 143, 103676.
+[2] N. Tomasevic, N. Gvozdenovic, and S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, vol. 143, art. 103676, 2020.
 
-[3] Kuzilek, J., Hlosta, M., & Zdrahal, Z. (2017). Open University Learning Analytics dataset. *Scientific Data*, 4, 170171.
+[3] J. Kuzilek, M. Hlosta, and Z. Zdrahal, "Open University Learning Analytics dataset," *Scientific Data*, vol. 4, art. 170171, 2017.
 
-[4] Gunasekara, S., & Saarela, M. (2025). Explainable AI in Education: Techniques and Qualitative Assessment. *Applied Sciences*, 15(3), art. 1239.
+[4] S. Gunasekara and M. Saarela, "Explainable AI in Education: Techniques and Qualitative Assessment," *Applied Sciences*, vol. 15, no. 3, art. 1239, 2025.
 
-[5] "Predicting Student Performance Using Clickstream Data and Machine Learning," *Education Sciences*, vol. 13, no. 1, art. 17, 2023.
+[5] Y. Liu, S. Fan, S. Xu, A. Sajjanhar, S. Yeom, and Y. Wei, "Predicting Student Performance Using Clickstream Data and Machine Learning," *Education Sciences*, vol. 13, no. 1, art. 17, 2023.
