@@ -6,7 +6,7 @@
 
 ---
 
-> **Ghi chú kiểm chứng.** Các ô dưới đây đã được đối chiếu nguồn: toàn văn cho [1] (bản mở) và [4] (kho mở của tác giả); phần tóm tắt cùng các bài trích dẫn độc lập cho [2] và [5] (toàn văn nhà xuất bản bị giới hạn). Những ô nguồn không nêu rõ được đánh dấu *"không nêu rõ"* thay vì suy đoán.
+> **Ghi chú kiểm chứng.** Các ô dưới đây đã được đối chiếu với bản gốc: toàn văn cho [1], [2] và [4]; phần tóm tắt cùng các bài trích dẫn độc lập cho [5] (toàn văn nhà xuất bản bị giới hạn). Những ô nguồn không nêu rõ được đánh dấu *"không nêu rõ"* thay vì suy đoán.
 
 ---
 
@@ -21,7 +21,7 @@ Bộ dữ liệu Open University Learning Analytics Dataset (OULAD) — mô tả
 | Nghiên cứu | **Thu thập** | **Làm sạch** | **Tạo đặc trưng** | **Phân chia / Kiểm định** |
 |---|---|---|---|---|
 | **[1] Adnan và cộng sự (2021)** | Toàn bộ OULAD (22 môn–kỳ, 32.593 sinh viên); bảng nhân khẩu học, clickstream VLE và đánh giá [1] | Giá trị ngày khuyết được điền bằng **trung bình**; giữ Withdrawn như một lớp; không nêu lọc sinh viên không hoạt động [1] | Ba nhóm đặc trưng (nhân khẩu học; sum/mean click; điểm, điểm tương đối, số bài nộp muộn) tính tích luỹ tại **đầu khoá và 20/40/60/80/100%** thời lượng [1] | **CV 10-fold** cho mô hình ML, **chia 85/15** cho mô hình học sâu; xử lý mất cân bằng bằng **gộp lớp** (Pass+Distinction; Fail+Withdrawn), *không* tái lấy mẫu; chỉ số: accuracy, precision, recall, F-score, AUC [1] |
-| **[2] Tomasevic và cộng sự (2020)** | OULAD; kết hợp dữ liệu nhân khẩu học, tương tác (clickstream) và kết quả trước đó [2] | *Không nêu rõ* trong phần văn bản truy cập được [2] | Ba nhóm đặc trưng; phát hiện chính: **tương tác + kết quả** mang tín hiệu cao nhất, còn nhân khẩu học "không ảnh hưởng đáng kể" [2] | Cả phân loại và hồi quy; **ANN tốt nhất**; quy trình chia/CV cụ thể *không nêu rõ* trong nguồn truy cập được [2] |
+| **[2] Tomasevic và cộng sự (2020)** | OULAD master table; thực nghiệm dùng **tập con môn DDD** (DDD_2013J + DDD_2014B) → **3.166 sinh viên** sau khi loại SV không thi cuối kỳ [2] | **Loại mọi dòng có giá trị khuyết** (NaN = bài đánh giá/thi không làm); đặc trưng **co giãn/chuẩn hoá về [0,1]** [2] | Ba nhóm — nhân khẩu học; tương tác (click VLE hàng ngày); kết quả (6 điểm đánh giá trung gian, điểm thi cuối, số lần thi); còn phân tích tích luỹ sau mỗi bài đánh giá. Phát hiện: **tương tác + kết quả** chiếm ưu thế; nhân khẩu học "không ảnh hưởng đáng kể" [2] | **Chia ngẫu nhiên 80:20** (train:test), hoặc **60:20:20** có tập validation cho ANN; **k-fold CV cho ANN** (không cho cây quyết định); F1 (phân loại) / RMSE (hồi quy), trung bình hoá qua **10 lần chạy** [2] |
 | **[4] Gunasekara & Saarela (2025)** | **Chỉ** OULAD, một **tập con 3 môn (AAA/BBB/CCC)** → 14 đặc trưng, 17.091 mẫu (Pass 5.963 / Fail 7.128); dùng làm benchmark minh hoạ XAI [4] | Loại dòng/cột khuyết quá nhiều; chuẩn hoá biến số về ~0–1; gộp lớp (Pass+Distinction; Fail+Withdrawn) [4] | **14 thuộc tính chọn/tổng hợp** từ OULAD (ví dụ `sum_click`, `assessment_count`, `delay`, `score` + nhân khẩu học); SHAP/LIME áp dụng hậu kỳ [4] | **CV 5-fold lặp 50 lần** (+ một lần chia train/test); **ANN vs Cây quyết định**; SHAP+LIME, chủ yếu giải thích cục bộ định tính [4] |
 | **[5] Liu và cộng sự (2023)** | OULAD; `studentInfo` ghép với clickstream `studentVle`; **5.341 sinh viên** sau làm sạch [5] | **Loại 180 sinh viên không có click** (→ 5.341); các bước khác *không nêu rõ* [5] | Số click trên **12 trang học (learning sites)**, tổng hợp theo **tuần và tháng** (ảnh hưởng nhất: content, subpage, homepage, quiz) [5] | Nhị phân pass/fail; **LSTM vs 1D-CNN vs ML truyền thống** (LSTM tốt nhất, ≈90%); độ chính xác tăng theo kỳ; tỉ lệ train/test và xử lý mất cân bằng *không nêu rõ* [5] |
 
@@ -35,7 +35,7 @@ Cả bốn nghiên cứu dùng OULAD [3] không thu thập thêm, nhưng phạm 
 
 ### 3.2 Làm sạch
 
-Nơi có mô tả, việc làm sạch nhẹ: Adnan và cộng sự [1] điền trung bình ngày khuyết; Gunasekara & Saarela [4] loại dòng/cột khuyết nhiều, chuẩn hoá và gộp lớp; Liu và cộng sự [5] loại 180 sinh viên không click. Tomasevic và cộng sự [2] không nêu tiền xử lý trong văn bản truy cập được. Đáng chú ý, **không bài nào coi "chưa nộp bài" là tín hiệu thông tin** — khoảng trống mà pipeline của nhóm lấp bằng cờ `not_submitted`.
+Làm sạch nhìn chung nhẹ, nhưng các nghiên cứu khác nhau ở dữ liệu khuyết: Adnan và cộng sự [1] điền trung bình ngày khuyết; Tomasevic và cộng sự [2] **loại mọi dòng có giá trị khuyết** (bài không làm) và chuẩn hoá đặc trưng về [0,1]; Gunasekara & Saarela [4] loại dòng/cột khuyết nhiều, chuẩn hoá và gộp lớp; Liu và cộng sự [5] loại 180 sinh viên không click. Đáng chú ý, **không bài nào coi "chưa nộp bài" là tín hiệu thông tin** — thậm chí [2] loại bỏ đúng những sinh viên đó — khoảng trống mà pipeline của nhóm lấp bằng cờ `not_submitted` thay vì loại bỏ họ.
 
 ### 3.3 Tạo đặc trưng
 
@@ -43,7 +43,7 @@ Nơi có mô tả, việc làm sạch nhẹ: Adnan và cộng sự [1] điền t
 
 ### 3.4 Phân chia / Kiểm định
 
-Các nghiên cứu dựa vào hold-out hoặc k-fold tiêu chuẩn (10-fold ở [1], 5-fold ×50 ở [4]); chỉ [1] áp dụng cắt theo thời gian theo từng mốc. Quan trọng, **không bài nào dùng phân chia bảo toàn nhóm** theo sinh viên, nên một sinh viên có nhiều môn–kỳ có thể nằm ở cả train lẫn test — rủi ro rò rỉ mà pipeline của nhóm loại bỏ (mục "Những điều kế thừa").
+Các nghiên cứu dựa vào hold-out ngẫu nhiên hoặc k-fold tiêu chuẩn (10-fold ở [1]; chia ngẫu nhiên 80:20 / 60:20:20 kèm k-fold cho ANN ở [2]; 5-fold ×50 ở [4]); chỉ [1] áp dụng cắt theo thời gian theo từng mốc. Quan trọng, **không bài nào dùng phân chia bảo toàn nhóm** theo sinh viên, nên một sinh viên có nhiều môn–kỳ có thể nằm ở cả train lẫn test — rủi ro rò rỉ mà pipeline của nhóm loại bỏ (mục "Những điều kế thừa").
 
 ---
 

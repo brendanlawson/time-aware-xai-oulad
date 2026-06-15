@@ -6,7 +6,7 @@
 
 ---
 
-> **Verification note.** The cells below were cross-checked against sources: full text for [1] (open mirror) and [4] (authors' open-access repository); the abstract plus independent citing studies for [2] and [5] (publisher full text paywalled). Cells the source does not state are marked *"not specified"* rather than inferred.
+> **Verification note.** The cells below were cross-checked against the original papers: full text for [1], [2] and [4]; abstract plus independent citing studies for [5] (publisher full text paywalled). Cells the source does not state are marked *"not specified"* rather than inferred.
 
 ---
 
@@ -21,7 +21,7 @@ The Open University Learning Analytics Dataset (OULAD) — described by Kuzilek 
 | Study | **Collection** | **Cleaning** | **Feature Engineering** | **Splitting / Validation** |
 |---|---|---|---|---|
 | **[1] Adnan et al. (2021)** | Full OULAD (22 module-presentations, 32,593 students); demographic, VLE clickstream, and assessment tables [1] | Missing date values imputed with the **mean**; Withdrawn kept as a class; no inactive-student filtering reported [1] | Three feature groups (demographic; clickstream sum/mean clicks; assessment scores, relative score, late-submission counts) computed cumulatively at **course start and 20/40/60/80/100%** of course length [1] | **10-fold CV** for the ML models, **85/15 split** for the deep model; imbalance handled by **class-merging** (Pass+Distinction; Fail+Withdrawn), *not* resampling; metrics: accuracy, precision, recall, F-score, AUC [1] |
-| **[2] Tomasevic et al. (2020)** | OULAD; demographic, engagement (clickstream) and past-performance data combined [2] | *Not specified* in the paper's accessible text [2] | Three feature groups; key finding: **engagement + performance** carry the highest signal, while demographics "did not show significant influence" [2] | Classification and regression tasks; **ANN performed best**; the exact split/CV procedure is *not specified* in accessible sources [2] |
+| **[2] Tomasevic et al. (2020)** | OULAD master table; the reported experiments use a **DDD-module subset** (DDD_2013J + DDD_2014B) → **3,166 students** after excluding non-exam-takers [2] | **Rows with any missing value dropped** (a NaN = a non-attempted intermediary/final assessment); features **scaled/normalised to [0,1]** [2] | Three groups — demographics; engagement (daily VLE clicks); performance (6 intermediary-assessment scores, final-exam score, attempts); also analysed cumulatively after each assessment. Finding: **engagement + performance** dominate; demographics "did not show significant influence" [2] | **Random split 80:20** (train:test), or **60:20:20** with a validation set for ANN; **k-fold CV for the ANN** (not for decision trees); F1 (classification) / RMSE (regression), averaged over **10 trials** [2] |
 | **[4] Gunasekara & Saarela (2025)** | OULAD **only**, a **3-module subset (AAA/BBB/CCC)** → 14 features, 17,091 samples (Pass 5,963 / Fail 7,128); used as a benchmark to illustrate XAI [4] | Rows/columns with excessive missingness removed; numerical features normalised to ~0–1; classes merged (Pass+Distinction; Fail+Withdrawn) [4] | **14 selected/aggregated** OULAD attributes (e.g. `sum_click`, `assessment_count`, `delay`, `score` + demographics); SHAP/LIME applied post-hoc [4] | **5-fold CV repeated 50×** (+ a train/test split); **ANN vs Decision Tree**; SHAP+LIME, mainly qualitative local explanations [4] |
 | **[5] Liu et al. (2023)** | OULAD; `studentInfo` merged with the `studentVle` clickstream; **5,341 students** after cleaning [5] | **180 students with no recorded clicks removed** (→ 5,341); other steps *not specified* [5] | Clicks on **12 learning sites**, aggregated at **weekly and monthly** intervals (top-influential: content, subpage, homepage, quiz) [5] | Binary pass/fail; **LSTM vs 1D-CNN vs traditional ML** (LSTM best, ≈90%); accuracy rises across the term; train/test ratio and imbalance handling *not specified* [5] |
 
@@ -35,7 +35,7 @@ All four studies draw on OULAD [3] without additional collection, but at differe
 
 ### 3.2 Cleaning
 
-Where described, cleaning is light: Adnan et al. [1] mean-impute missing dates; Gunasekara & Saarela [4] drop excessively-missing rows/columns, normalise, and merge classes; Liu et al. [5] drop the 180 click-less students. Tomasevic et al. [2] do not report their preprocessing in accessible text. Notably, **none mean-imputes scores or treats "not submitted" as an informative signal** — a gap our pipeline fills with the `not_submitted` indicator.
+Cleaning is generally light, but the studies diverge on missing data: Adnan et al. [1] mean-impute missing dates; Tomasevic et al. [2] **drop every row containing a missing value** (a non-attempted assessment) and normalise features to [0,1]; Gunasekara & Saarela [4] drop excessively-missing rows/columns, normalise, and merge classes; Liu et al. [5] drop the 180 click-less students. Notably, **none treats "not submitted" as an informative signal** — indeed [2] discards exactly those students — a gap our pipeline fills with the `not_submitted` indicator instead of dropping them.
 
 ### 3.3 Feature Engineering
 
@@ -43,7 +43,7 @@ This is where the studies differ most. Adnan et al. [1] introduce **time-aware t
 
 ### 3.4 Splitting / Validation
 
-The studies rely on standard hold-out or k-fold cross-validation (10-fold in [1], 5-fold ×50 in [4]); only [1] enforces a temporal cut-off aligned with each checkpoint. Importantly, **none uses a group-aware split** keyed on the student, so a student with several module-presentations can fall in both train and test — a leakage risk our pipeline removes (Section "What we inherit").
+The studies rely on standard random hold-out or k-fold cross-validation (10-fold in [1]; random 80:20 / 60:20:20 with k-fold for the ANN in [2]; 5-fold ×50 in [4]); only [1] enforces a temporal cut-off aligned with each checkpoint. Importantly, **none uses a group-aware split** keyed on the student, so a student with several module-presentations can fall in both train and test — a leakage risk our pipeline removes (Section "What we inherit").
 
 ---
 
