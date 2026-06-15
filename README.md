@@ -221,7 +221,7 @@ If you use this work, please cite it as:
 
 1. N. Tomasevic, N. Gvozdenovic, S. Vranes. *An overview and comparison of supervised data mining techniques for student exam performance prediction.* Computers & Education, 2020.
 2. M. Adnan et al. *Predicting at-risk students at different percentages of course length for early intervention.* IEEE Access, 2021.
-3. S. Gunasekara, M. Saarela. *Explainable AI in Education: Techniques and Qualitative Assessment.* Applied Sciences, 2025.
+3. S. Gunasekara, M. Saarela. *Explainable AI in Education: Techniques and Qualitative Assessment.* Applied Sciences, vol. 15, no. 3, art. 1239, 2025.
 4. H. Alamri, B. Alharbi. *Explainable Student Performance Prediction Models: A Systematic Review.* IEEE Access, 2021.
 5. J. Kuzilek, M. Hlosta, Z. Zdrahal. *Open University Learning Analytics Dataset (OULAD).* Scientific Data, 2017.
 6. S. Lundberg, S.-I. Lee. *A Unified Approach to Interpreting Model Predictions (SHAP).* NeurIPS, 2017.

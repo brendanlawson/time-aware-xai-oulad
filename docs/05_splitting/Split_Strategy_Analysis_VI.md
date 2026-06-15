@@ -41,6 +41,23 @@ Vì lớp dương (at-risk) là lớp không được bỏ sót, chỉ số chí
 
 Dùng phân chia 20% cố định trên `master_raw` (32.593 dòng): **0 sinh viên trùng** giữa train và test, và tỉ lệ at-risk được bảo toàn (train ≈ 0,53, test ≈ 0,52, chênh lệch ≤ 0,02). Các kiểm tra này được khẳng định trong `tests/test_leakage.py`.
 
+## 6. Phân chia đã vật chất hoá và dữ liệu nằm ở đâu
+
+Phép phân chia được định nghĩa **một lần** và lưu lại bởi `src/evaluation/make_split.py`:
+
+| Sản phẩm | Vị trí | Có commit? |
+|---|---|---|
+| Danh sách `id_student` tập test (5.756 SV) | `data/splits/test_student_ids.csv` | có |
+| Báo cáo kiểm chứng (theo từng dataset) | `reports/tables/split_report.csv` | có |
+| Dữ liệu train/test đã tạo (master + từng mốc) | `data/splits/*_train.parquet`, `*_test.parquet` | git bỏ qua, tái tạo được |
+
+Báo cáo phân chia xác nhận thiết kế trên `master_raw` và **cả sáu mốc**: train **26.104** dòng · test **6.489** dòng (5.756 SV) · at-risk **0,530 / 0,520** · **0 trùng** — y hệt ở mọi mốc. Giai đoạn mô hình nạp phân chia của một mốc bằng một lệnh:
+
+```python
+from src.evaluation.make_split import load_checkpoint_split
+X_train, X_test = load_checkpoint_split(40)   # train/test tại mốc 40%
+```
+
 ## Tài liệu tham khảo
 
 1. M. Adnan và cộng sự, *IEEE Access*, vol. 9, tr. 7519–7539, 2021.

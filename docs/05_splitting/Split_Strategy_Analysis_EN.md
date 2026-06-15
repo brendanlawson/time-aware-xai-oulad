@@ -41,6 +41,23 @@ Because the positive (at-risk) class is the one we must not miss, headline metri
 
 Using the fixed 20% split on `master_raw` (32,593 rows): **0 students overlap** between train and test, and the at-risk rate is preserved (train ≈ 0.53, test ≈ 0.52, gap ≤ 0.02). These checks are asserted in `tests/test_leakage.py`.
 
+## 6. Materialised split and where the data lives
+
+The split is defined **once** and persisted by `src/evaluation/make_split.py`:
+
+| Artifact | Location | Committed? |
+|---|---|---|
+| Canonical test `id_student` list (5,756 students) | `data/splits/test_student_ids.csv` | yes |
+| Verification report (per dataset) | `reports/tables/split_report.csv` | yes |
+| Materialised train/test data (master + per checkpoint) | `data/splits/*_train.parquet`, `*_test.parquet` | git-ignored, regenerable |
+
+The split report confirms the design across `master_raw` and **all six checkpoints**: train **26,104** rows · test **6,489** rows (5,756 students) · at-risk **0.530 / 0.520** · **0 overlap** — identical at every checkpoint. The modelling phase loads a checkpoint's split with one call:
+
+```python
+from src.evaluation.make_split import load_checkpoint_split
+X_train, X_test = load_checkpoint_split(40)   # train/test at the 40% checkpoint
+```
+
 ## References
 
 1. M. Adnan et al., *IEEE Access*, vol. 9, pp. 7519–7539, 2021.

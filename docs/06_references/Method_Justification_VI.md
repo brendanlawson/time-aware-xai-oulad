@@ -58,12 +58,12 @@ Do đó, **RQ2** giới thiệu một chỉ số ổn định định lượng (
 
 ## Tài Liệu Tham Khảo
 
-[1] M. Adnan và cộng sự, "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, tập 9, tr. 7519–7539, 2021. *(danh sách tác giả đầy đủ cần đối chiếu nguồn)*
+[1] M. Adnan và cộng sự, "Predicting at-Risk Students at Different Percentages of Course Length for Early Intervention Using Machine Learning Models," *IEEE Access*, tập 9, tr. 7519–7539, 2021.
 
 [2] N. Tomasevic, N. Gvozdenovic và S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, tập 143, tr. 103676, 2020.
 
 [3] J. Kuzilek, M. Hlosta và Z. Zdrahal, "Open University Learning Analytics Dataset," *Scientific Data*, tập 4, tr. 170171, 2017.
 
-[4] S. Gunasekara và M. Saarela, "Explainable AI in Education: Techniques and Qualitative Assessment," *Applied Sciences*, 2025.
+[4] S. Gunasekara và M. Saarela, "Explainable AI in Education: Techniques and Qualitative Assessment," *Applied Sciences*, vol. 15, no. 3, art. 1239, 2025.
 
 [6] N. V. Chawla, K. W. Bowyer, L. O. Hall và W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research*, tập 16, tr. 321–357, 2002.
