@@ -133,6 +133,8 @@ The workflow follows the **CRISP-DM** lifecycle and is organised into six phases
 
 ## 7. Getting Started
 
+> 🇻🇳 **Thành viên:** xem hướng dẫn từng bước (clone → tải data → sinh đủ `.parquet`) tại **[`SETUP_VI.md`](SETUP_VI.md)**.
+
 ### Prerequisites
 
 - Python 3.10 or later
