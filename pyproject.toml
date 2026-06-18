@@ -1,0 +1,31 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "src"
+version = "0.0.1"
+description = "A reproducible machine-learning pipeline that predicts at-risk students early (at multiple points across a course), explains every prediction with SHAP and LIME, and quantifies the stability of those explanations \u2014 all on the public Open University Learning Analytics Dataset (OULAD). This repository accompanies the DSP391m Data Science Capstone Project at FPT University."
+authors = [
+  { name = "group_1" },
+]
+
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+
+]
+requires-python = "~=3.14.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["src"]
+include = ["pyproject.toml", "src/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+force-sort-within-sections = true

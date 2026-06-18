@@ -1,37 +1,34 @@
-"""Shared I/O helpers: project paths, the at-risk label, atomic parquet writes.
+"""Shared I/O helpers: the at-risk label, atomic parquet writes, raw-table loading.
 
 Centralising these keeps every pipeline stage (engagement, performance, master
-table, checkpoints) consistent with the Step-0 agreement (BB-B0-N1) and with the
-data dictionary. The at-risk mapping lives here so it can never drift between
-modules.
+table, checkpoints) consistent. The at-risk mapping lives here so it can never
+drift between modules.
+
+Constants below are GIVEN (project facts). The three functions are yours to
+implement — see guide section "data/io_utils.py".
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pandas as pd
 
-# --- Project layout (resolved from this file, independent of the cwd) ---------
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RAW_DIR = PROJECT_ROOT / "data" / "raw"
-INTERIM_DIR = PROJECT_ROOT / "data" / "interim"
-CHECKPOINTS_DIR = PROJECT_ROOT / "data" / "checkpoints"
-CHECKPOINT_MAP_PATH = PROJECT_ROOT / "data" / "checkpoint_map.csv"
+from src.config import RAW_DATA_DIR  # re-used by callers as the default raw dir
 
-# --- Composite key shared by every per-student table --------------------------
+# Short alias used across the data layer and tests.
+RAW_DIR = RAW_DATA_DIR
+
+# --- Composite keys shared by every per-student table -------------------------
 GROUP_COLS = ["code_module", "code_presentation", "id_student"]
 PRESENTATION_KEY = ["code_module", "code_presentation"]
 
 # --- Target definition (Step-0 agreement, Option A) ---------------------------
 # at-risk (1) = {Fail, Withdrawn}; not-at-risk (0) = {Pass, Distinction}.
-# The label is derived from final_result and is fixed across all checkpoints.
+# Derived from final_result and fixed across all checkpoints.
 AT_RISK_RESULTS = ("Fail", "Withdrawn")
 
-# Eight canonical VLE activity types kept as engagement features. total_clicks
-# still sums clicks over *all* activity types; these eight are the per-type
-# breakdown referenced by preprocessing.py and the data dictionary.
+# --- Eight canonical VLE activity types kept as per-type engagement features ---
 CANONICAL_ACTIVITY_TYPES = (
     "forumng",
     "oucontent",
@@ -45,38 +42,38 @@ CANONICAL_ACTIVITY_TYPES = (
 
 
 def add_at_risk_label(student_info: pd.DataFrame) -> pd.DataFrame:
-    """Append the binary ``at_risk`` column derived from ``final_result``."""
-    out = student_info.copy()
-    out["at_risk"] = out["final_result"].isin(AT_RISK_RESULTS).astype("int8")
-    return out
+    """Append the binary ``at_risk`` column derived from ``final_result``.
+
+    TODO:
+      1. Copy the frame (do not mutate the caller's).
+      2. at_risk = final_result is in AT_RISK_RESULTS -> 1 else 0 (dtype int8).
+      3. Return the copy.
+    """
+    raise NotImplementedError
 
 
 def save_parquet_atomic(df: pd.DataFrame, path: Path) -> Path:
-    """Write a DataFrame to parquet via a temp file + atomic rename.
+    """Write ``df`` to parquet via a temp file + atomic rename (kill-safe).
 
-    A crash mid-write therefore never leaves a half-written, unreadable parquet
-    in place of a good one (global checkpointing rule).
+    TODO:
+      1. Ensure path.parent exists (mkdir parents=True, exist_ok=True).
+      2. Write to a sibling temp path (e.g. path.with_suffix(".parquet.tmp")).
+      3. os.replace(tmp, path)  # atomic on the same filesystem.
+      4. Return path.
+    Why: a crash mid-write must never leave a half-written parquet behind.
     """
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
-    return path
+    raise NotImplementedError
 
 
-def load_raw_tables(raw_dir: Path = RAW_DIR) -> dict[str, pd.DataFrame]:
-    """Load the small OULAD tables (everything except the 432 MB studentVle).
+def load_raw_tables(raw_dir: Path = RAW_DATA_DIR) -> dict[str, pd.DataFrame]:
+    """Load the OULAD CSVs into a dict keyed by table name.
 
-    studentVle is read separately by the engagement builder, which streams it in
-    chunks to bound peak memory.
+    Tables: studentInfo, studentRegistration, studentVle, studentAssessment,
+    assessments, vle, courses.
+
+    TODO:
+      1. Map name -> filename.csv under raw_dir.
+      2. pd.read_csv each (consider dtype hints for big tables later).
+      3. Return {name: DataFrame}.
     """
-    names = [
-        "studentInfo",
-        "studentRegistration",
-        "studentAssessment",
-        "assessments",
-        "courses",
-        "vle",
-    ]
-    return {name: pd.read_csv(raw_dir / f"{name}.csv") for name in names}
+    raise NotImplementedError

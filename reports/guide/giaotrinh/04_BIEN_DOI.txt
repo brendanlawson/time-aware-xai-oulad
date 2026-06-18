@@ -1,0 +1,612 @@
+TẬP 4 — BIẾN ĐỔI & CHUẨN HOÁ DỮ LIỆU
+========================================================================
+
+Tập này dạy bước "biến đổi" (transform) trong pipeline tiền xử lý: từ
+một bảng dữ liệu đã làm sạch (đã xử lý thiếu/outlier ở Tập 3, đã áp
+log1p cho biến đếm), ta chuyển nó thành một MA TRẬN SỐ HOÀN TOÀN, sẵn
+sàng đưa vào mô hình máy học. Có hai việc lớn:
+
+  1) MÃ HOÁ (encoding): biến các cột chữ (region, gender, ...) thành số.
+  2) CO GIÃN / CHUẨN HOÁ (scaling): đưa các cột số về cùng một thang đo.
+
+Bối cảnh dự án cần nhớ suốt tập này: đây là một dự án EXPLAINABLE AI —
+ta không chỉ cần dự đoán "sinh viên này có nguy cơ rớt không", mà còn
+phải GIẢI THÍCH ĐƯỢC từng dự đoán bằng SHAP/LIME ("vì biến X cao, vì
+biến Y thuộc vùng Z..."). Yêu cầu giải thích được sẽ chi phối nhiều
+quyết định mã hoá bên dưới — hãy để ý các chỗ đánh dấu [WHY].
+
+
+========================================================================
+CHƯƠNG 8 — PHÂN LOẠI BIẾN & MÃ HOÁ (ENCODING)
+========================================================================
+
+------------------------------------------------------------------------
+8.1  [ĐN] Vì sao thuật toán ML chỉ "ăn" số → phải mã hoá chữ
+------------------------------------------------------------------------
+
+Hầu hết thuật toán máy học, ở lõi của chúng, là PHÉP TOÁN trên số:
+cộng, nhân, tính khoảng cách, đạo hàm (gradient), nhân ma trận. Một mô
+hình hồi quy logistic chẳng hạn tính một tổng có trọng số:
+
+        z = w1*x1 + w2*x2 + ... + wn*xn + b
+
+Mỗi xi phải là một con số để nhân với trọng số wi. Nếu xi là chữ
+"Scotland" hay "East Anglian Region" thì phép nhân w*x đơn giản là vô
+nghĩa — máy tính không biết nhân một trọng số với một chuỗi ký tự.
+
+Vì vậy MỌI giá trị chữ (categorical / text) phải được chuyển thành số
+trước khi vào mô hình. Việc chuyển đó gọi là MÃ HOÁ (encoding). Nghe
+thì đơn giản ("gán mỗi nhãn một số"), nhưng cách gán SAI sẽ bịa ra
+quan hệ toán học không có thật trong dữ liệu — đó là nội dung cả chương.
+
+  ★ Q: "Sao không cứ gán region = 0,1,2,3,... cho gọn?"
+  A: Vì gán như thế là áp đặt THỨ TỰ và KHOẢNG CÁCH giả. Máy sẽ hiểu
+     "region 3" lớn gấp 3 lần "region 1", và "region 2" nằm chính giữa
+     "region 1" và "region 3". Với region (vùng địa lý) điều đó vô
+     nghĩa — Scotland không "lớn gấp đôi" Wales. Đây chính là lý do ta
+     cần phân biệt KIỂU biến (mục 8.2) trước khi chọn cách mã hoá.
+
+
+------------------------------------------------------------------------
+8.2  [ĐN] Phân biệt các KIỂU biến — và vì sao kiểu quyết định cách mã hoá
+------------------------------------------------------------------------
+
+Trước khi mã hoá, phải hỏi: cột này thuộc KIỂU gì? Có 5 kiểu ta dùng
+trong dự án:
+
+(1) ĐỊNH LƯỢNG (numeric / quantitative) — là số thật, đo đếm được.
+    - Liên tục (continuous): có thể nhận giá trị thập phân bất kỳ trong
+      một khoảng. Ví dụ: điểm trung bình, tỉ lệ.
+    - Đếm (count): số nguyên không âm, đếm số lần. Ví dụ: số lần click,
+      số lần truy cập tài nguyên học.
+    Quan hệ thứ tự VÀ khoảng cách đều có thật: 200 click nhiều gấp đôi
+    100 click. → Không cần "mã hoá" (đã là số), nhưng cần SCALE (Ch.9).
+
+(2) DANH ĐỊNH (nominal) — phân loại KHÔNG có thứ tự tự nhiên.
+    Ví dụ: region (vùng), code_module (mã môn học), code_presentation
+    (mã kỳ học). "East Anglian" không lớn hơn hay nhỏ hơn "Scotland";
+    chúng chỉ KHÁC nhau. → One-Hot Encoding (mục 8.3).
+
+(3) THỨ BẬC (ordinal) — phân loại CÓ thứ tự tự nhiên, nhưng khoảng cách
+    giữa các bậc không nhất thiết bằng nhau.
+    Ví dụ: highest_education (trình độ học vấn: dưới trung học < trung
+    học < cao đẳng < đại học...), imd_band (dải nghèo khó, 0-10% <
+    10-20% < ...), age_band (nhóm tuổi: 0-35 < 35-55 < 55+).
+    THỨ TỰ có thật và quan trọng. → Ordinal Encoding (mục 8.3).
+
+(4) NHỊ PHÂN (binary) — chỉ có đúng 2 giá trị.
+    Ví dụ: gender (M/F), disability (Y/N). → mã thành 0/1 (mục 8.3).
+
+(5) CHỈ BÁO (indicator / flag) — bản thân nó ĐÃ là cờ 0/1 do ta tự tạo
+    ở bước làm sạch. Ví dụ: not_submitted (1 = sinh viên không nộp bài).
+    → không cần làm gì, để nguyên (passthrough).
+
+  [WHY] "Kiểu biến quyết định cách mã hoá" — vì mỗi kiểu mang một loại
+  THÔNG TIN khác nhau (thứ tự? khoảng cách? chỉ là tên?), và cách mã
+  hoá tốt là cách GIỮ ĐÚNG thông tin đó mà KHÔNG bịa thêm. Mã hoá thứ
+  bậc bằng one-hot sẽ VỨT BỎ thông tin thứ tự; mã hoá danh định bằng số
+  thứ tự sẽ BỊA RA thông tin thứ tự. Cả hai đều làm mô hình học sai.
+
+  Bảng tóm:
+  +-------------+----------------------+--------------------------------+
+  | Kiểu        | Có thứ tự? Khoảng?   | Bộ mã hoá phù hợp              |
+  +-------------+----------------------+--------------------------------+
+  | Định lượng  | có thứ tự + khoảng   | (đã là số) → scale             |
+  | Thứ bậc     | có thứ tự, ko khoảng | Ordinal Encoder                |
+  | Danh định   | không                | One-Hot Encoder                |
+  | Nhị phân    | không (2 giá trị)    | Binary (0/1)                   |
+  | Chỉ báo     | không (đã 0/1)       | passthrough                    |
+  +-------------+----------------------+--------------------------------+
+
+
+------------------------------------------------------------------------
+8.3  [ĐN/ALT] CATALOGUE các bộ mã hoá — ưu, nhược, khi nào dùng
+------------------------------------------------------------------------
+
+Đây là "danh mục công cụ". Hiểu hết để biết ta CHỌN gì và LOẠI gì.
+
+--- (a) Label Encoding / Ordinal Encoding ---
+  Cách làm: gán mỗi nhãn một số nguyên 0,1,2,3,...
+  Ví dụ: dưới-trung-học=0, trung-học=1, cao-đẳng=2, đại-học=3.
+  Ưu:   gọn (1 cột cho mọi nhãn), giữ được THỨ TỰ nếu ta gán đúng thứ tự.
+  Nhược: ÁP ĐẶT thứ tự + khoảng cách đều nhau. Nếu nhãn không có thứ tự
+         (danh định) thì thông tin thứ tự đó là BỊA → mô hình học sai.
+  Khi nào dùng: CHỈ cho biến THỨ BẬC, và phải tự định nghĩa đúng thứ tự.
+  (Ghi chú thuật ngữ: "Label Encoding" trong sklearn vốn dành cho NHÃN
+   đích y; cho biến đầu vào X có thứ tự ta dùng OrdinalEncoder — cùng ý
+   tưởng gán số nguyên, nhưng OrdinalEncoder cho phép khai báo thứ tự.)
+
+--- (b) One-Hot Encoding ---
+  Cách làm: mỗi nhãn thành MỘT CỘT riêng, giá trị 0/1.
+  Ví dụ region 3 vùng → 3 cột: is_Scotland, is_Wales, is_London; một
+  sinh viên ở Wales = (0,1,0).
+  Ưu:   KHÔNG áp đặt thứ tự hay khoảng cách giả — mọi nhãn "bình đẳng",
+        khoảng cách giữa hai nhãn bất kỳ là như nhau. Lý tưởng cho danh
+        định. Mỗi cột mang ý nghĩa rõ ràng, RẤT TỐT cho diễn giải.
+  Nhược: số cột nở ra bằng số nhãn (cardinality cao → "bùng nổ" cột);
+         tạo đa cộng tuyến / "bẫy biến giả" (mục 8.4).
+  Khi nào dùng: biến DANH ĐỊNH với số nhãn vừa phải. ← dự án ta dùng.
+
+--- (c) Binary Encoding ---
+  Cách làm: gán mỗi nhãn một số nguyên rồi viết số đó dưới dạng NHỊ PHÂN,
+  mỗi bit thành một cột. N nhãn cần khoảng log2(N) cột (ít hơn one-hot).
+  Ưu:   tiết kiệm cột khi nhãn rất nhiều (cardinality cao).
+  Nhược: các cột bit KHÔNG có ý nghĩa trực giác → khó diễn giải SHAP.
+  Khi nào dùng: biến danh định có RẤT nhiều nhãn.
+  (Trong dự án, với biến NHỊ PHÂN thật sự — chỉ 2 giá trị như gender,
+   disability — "binary encoding" rút gọn về đúng việc map M/Y → 1,
+   F/N → 0, tức 1 cột. Xem mục 8.6.)
+
+--- (d) Target / Mean Encoding ---
+  Cách làm: thay mỗi nhãn bằng GIÁ TRỊ TRUNG BÌNH của biến đích y trong
+  nhóm nhãn đó. Ví dụ region "Scotland" → tỉ lệ rớt trung bình của
+  Scotland.
+  Ưu:   mạnh khi cardinality cao, đưa "tín hiệu dự đoán" thẳng vào 1 cột.
+  Nhược: RÒ RỈ ĐÍCH (target leakage) nghiêm trọng nếu không cẩn thận —
+         vì ta dùng chính y để tạo đặc trưng, mô hình dễ "học vẹt" và
+         tự tin giả; cần cross-fitting/smoothing phức tạp.
+         Quan trọng cho ta: con số sau mã hoá KHÓ GIẢI THÍCH ("region =
+         0.43" nghĩa là gì với người đọc?).
+  Khi nào dùng: tree-boosting với cardinality rất cao, chấp nhận độ phức
+  tạp. → dự án ta KHÔNG dùng (xem Q/A 8.8).
+
+--- (e) Frequency / Count Encoding ---
+  Cách làm: thay mỗi nhãn bằng TẦN SUẤT (số lần) xuất hiện của nó.
+  Ưu:   1 cột, đơn giản, đôi khi tần suất là tín hiệu hữu ích.
+  Nhược: hai nhãn khác nhau nhưng cùng tần suất sẽ thành CÙNG một số →
+         mất phân biệt; ý nghĩa mơ hồ, khó diễn giải.
+  Khi nào dùng: cardinality cao, khi tần suất thật sự có ý nghĩa.
+
+--- (f) Hashing (Feature Hashing / "hashing trick") ---
+  Cách làm: đưa nhãn qua một hàm băm (hash) về một số cố định các cột.
+  Ưu:   khống chế được số cột kể cả khi nhãn cực nhiều / vô hạn.
+  Nhược: VA CHẠM (collision) — hai nhãn khác nhau có thể rơi vào cùng
+         cột; cột băm vô nghĩa → KHÔNG diễn giải được.
+  Khi nào dùng: dữ liệu cực lớn, cardinality khổng lồ (vd văn bản).
+
+  [WHY] Một sợi chỉ đỏ xuyên suốt: target/frequency/hashing đều cho ra
+  những con số KHÓ GIẢI THÍCH. Trong dự án Explainable AI, ta ưu tiên
+  những bộ mã hoá mà mỗi cột có Ý NGHĨA RÕ RÀNG (one-hot, ordinal,
+  0/1) để SHAP/LIME chỉ ra được "đặc trưng nào đẩy dự đoán theo hướng
+  nào". Đây là tiêu chí chọn công cụ, không chỉ là độ chính xác.
+
+
+------------------------------------------------------------------------
+8.4  [ĐN] Bẫy biến giả (dummy variable trap) & đa cộng tuyến
+------------------------------------------------------------------------
+
+Khi one-hot một biến danh định K nhãn, ta tạo K cột 0/1. Vấn đề: K cột
+này có một RÀNG BUỘC — với mỗi dòng, đúng một cột bằng 1, phần còn lại
+bằng 0, nên TỔNG của K cột luôn = 1. Điều đó nghĩa là cột cuối cùng
+"đoán được" từ các cột kia:
+
+        is_London = 1 - is_Scotland - is_Wales   (ví dụ minh hoạ 3 vùng)
+
+Khi một cột là tổ hợp tuyến tính của các cột khác (cộng cả cột hằng số
+intercept), ta có ĐA CỘNG TUYẾN HOÀN HẢO (perfect multicollinearity).
+Hệ quả với mô hình tuyến tính (hồi quy): ma trận không khả nghịch duy
+nhất → trọng số KHÔNG xác định duy nhất, không ổn định. Đó là "BẪY BIẾN
+GIẢ" (dummy variable trap).
+
+Cách xử lý KINH ĐIỂN: drop 1 cột (drop='first') — bỏ một "hạng tham
+chiếu" (reference/baseline). Với 3 vùng, giữ 2 cột là đủ; vùng bị bỏ
+trở thành "mặc định" và trọng số các vùng còn lại được hiểu là "so với
+vùng tham chiếu". Điều này phá ràng buộc tổng-bằng-1 và loại bỏ đa cộng
+tuyến hoàn hảo.
+
+  [DA] Vì lý do này, mặc định của RẤT NHIỀU giáo trình là one-hot rồi
+  drop 1 cột. NHƯNG dự án ta CHỦ Ý LÀM NGƯỢC LẠI — xem mục 8.5.
+
+
+------------------------------------------------------------------------
+8.5  [WHY] Quyết định phản biện: drop=None (GIỮ ĐỦ mọi cột one-hot)
+------------------------------------------------------------------------
+
+Trong dự án này, OneHotEncoder được cấu hình drop=None — tức là GIỮ ĐỦ
+mọi cột, KHÔNG bỏ hạng tham chiếu. Đây là quyết định cần bảo vệ kỹ vì
+nó đi ngược "mặc định sách giáo khoa" ở mục 8.4.
+
+LÝ DO: đây là dự án EXPLAINABLE AI.
+
+  - Nếu drop 1 cột (vd bỏ is_London), thì hạng "London" BIẾN MẤT khỏi
+    danh sách đặc trưng. Khi chạy SHAP/LIME để giải thích một dự đoán,
+    ta sẽ thấy đóng góp của is_Scotland, is_Wales... nhưng KHÔNG BAO GIỜ
+    thấy "London" — nó bị hoà tan vào hệ số chặn (intercept) và trở
+    thành "điểm gốc vô hình". Người đọc giải thích sẽ không thấy được
+    "sinh viên ở London ảnh hưởng thế nào đến dự đoán".
+  - Giữ ĐỦ mọi cột → MỌI nhãn (kể cả London) đều có một đặc trưng riêng,
+    nên SHAP/LIME quy được đóng góp cụ thể cho TỪNG vùng/môn/kỳ. Lời
+    giải thích đầy đủ và đối xứng giữa các nhãn.
+
+TRADE-OFF (phải trình bày trung thực):
+
+  Mất gì khi giữ đủ cột?
+  - Quay lại nguy cơ đa cộng tuyến / bẫy biến giả (mục 8.4), gây bất ổn
+    cho mô hình TUYẾN TÍNH THUẦN, không phạt.
+
+  Vì sao ta CHẤP NHẬN được trade-off này?
+  - Các mô hình ta hướng tới có khả năng chịu được hoặc trung hoà đa
+    cộng tuyến: cây/rừng/boosting (RF, XGBoost, LightGBM) không hề bị
+    ảnh hưởng bởi đa cộng tuyến tuyến tính; còn hồi quy có
+    REGULARIZATION (phạt L2/Ridge, L1/Lasso) thì hệ số vẫn xác định
+    được dù có cột thừa.
+  - Cái GIÁ của việc mất khả năng giải thích một nhãn (vi phạm mục tiêu
+    cốt lõi của dự án) LỚN HƠN cái lợi "gọn hơn 1 cột / sạch đa cộng
+    tuyến cho mô hình tuyến tính trần". Khi mục tiêu là GIẢI THÍCH ĐƯỢC,
+    ta ưu tiên sự đầy đủ và đối xứng của đặc trưng.
+
+  [WHY] Tóm gọn để nhớ: "drop 1 cột là để mô hình tuyến tính trần
+  ngoan; giữ đủ cột là để CON NGƯỜI hiểu được mô hình." Dự án này chọn
+  vế thứ hai một cách CÓ Ý THỨC.
+
+
+------------------------------------------------------------------------
+8.6  [ĐN] Cấu hình mã hoá thực tế trong dự án (5 kiểu → 5 bộ)
+------------------------------------------------------------------------
+
+Áp các nguyên tắc trên vào 28 đặc trưng, chia làm 5 nhóm, mỗi nhóm một
+bộ biến đổi:
+
+(1) NUMERIC — 19 biến định lượng → StandardScaler.
+    (Chi tiết scaler ở Chương 9. Ở đây chỉ ghi: nhóm số → đưa đi scale.)
+
+(2) ORDINAL — 3 biến thứ bậc (highest_education, imd_band, age_band)
+    → OrdinalEncoder.
+    - Khai báo thứ tự đúng (thấp → cao), encoder gán 0,1,2,...
+    - GIÁ TRỊ LẠ (không thấy lúc train, vd một nhãn trình độ chưa từng
+      gặp) → mã thành -1, không làm vỡ pipeline.
+
+(3) NOMINAL — 3 biến danh định (region, code_module, code_presentation)
+    → OneHotEncoder với:
+       * drop=None  → giữ ĐỦ mọi cột (lý do ở mục 8.5).
+       * handle_unknown='ignore' → giá trị lạ ở test xử lý an toàn (8.7).
+
+(4) BINARY — 2 biến nhị phân (gender, disability) → BinaryEncoder.
+    - Quy ước map: M/Y → 1 (và F/N → 0). Mỗi biến thành 1 cột 0/1.
+
+(5) INDICATOR — 1 biến chỉ báo (vd cờ not_submitted) → passthrough.
+    - Đã là 0/1 sẵn từ bước làm sạch, không cần biến đổi gì thêm; chỉ
+      "đi xuyên qua" pipeline để có mặt trong ma trận cuối.
+
+  [WHY] Vì sao OrdinalEncoder cho (2) mà không One-Hot? Vì
+  highest_education, imd_band, age_band CÓ thứ tự thật và thứ tự đó MANG
+  TÍN HIỆU dự đoán (trình độ cao hơn / nhóm nghèo khó nặng hơn liên quan
+  đến kết quả học). Giữ trong 1 cột số có thứ tự giúp mô hình học được
+  xu hướng "tăng dần", và lời giải thích gọn ("trình độ học vấn càng
+  cao thì..."). One-hot sẽ vứt bỏ thứ tự này.
+
+  [WHY] Vì sao One-Hot cho (3) mà không Ordinal? Vì region / code_module
+  / code_presentation KHÔNG có thứ tự tự nhiên. Gán số thứ tự sẽ bịa ra
+  "vùng 3 > vùng 1", làm mô hình học quan hệ giả. One-hot giữ mọi nhãn
+  bình đẳng.
+
+
+------------------------------------------------------------------------
+8.7  [WHY] handle_unknown='ignore' & giá trị lạ ordinal → -1
+------------------------------------------------------------------------
+
+Bộ biến đổi được "học" (fit) trên TẬP TRAIN, nên nó chỉ "biết" những
+nhãn đã xuất hiện ở train. Ở tập test (hoặc dữ liệu thật sau này) có thể
+xuất hiện một nhãn CHƯA TỪNG THẤY. Cần xử lý để pipeline không vỡ:
+
+  - One-Hot (nominal), handle_unknown='ignore': nhãn lạ → TẤT CẢ các cột
+    one-hot của biến đó = 0 (không bật cột nào). Không tạo cột mới,
+    không báo lỗi. Hợp lý: "đây là một giá trị tôi chưa học, tôi không
+    khẳng định nó thuộc vùng nào đã biết".
+
+  - Ordinal, giá trị lạ → -1: nhãn thứ bậc lạ được gán mã -1 (một giá
+    trị nằm ngoài dải 0,1,2,... của các bậc đã biết), đánh dấu "không
+    rõ", không làm crash.
+
+  [WHY] Đây là tính BỀN VỮNG (robustness) của pipeline triển khai thực
+  tế: mô hình sẽ gặp dữ liệu mới, và một nhãn lạ KHÔNG được phép làm sập
+  hệ thống dự đoán. Lựa chọn này hy sinh một chút thông tin (nhãn lạ
+  thành "trống") để đổi lấy sự an toàn vận hành.
+
+
+------------------------------------------------------------------------
+8.8  [DA] Bảng tổng: 5 kiểu → bộ mã hoá → số cột (cộng ra 49)
+------------------------------------------------------------------------
+
++----------------+------------+--------------------+----------+
+| Kiểu biến      | # biến vào | Bộ mã hoá          | # cột ra |
++----------------+------------+--------------------+----------+
+| Numeric        |     19     | StandardScaler     |    19    |
+| Ordinal        |      3     | OrdinalEncoder     |     3    |
+| Binary         |      2     | BinaryEncoder      |     2    |
+| Indicator      |      1     | passthrough        |     1    |
+| Nominal:       |      3     | OneHotEncoder      |   (24)   |
+|   region       |    (1)     |  → one-hot         |    13    |
+|   code_module  |    (1)     |  → one-hot         |     7    |
+|   code_present.|    (1)     |  → one-hot         |     4    |
++----------------+------------+--------------------+----------+
+| TỔNG           |     28     |                    |    49    |
++----------------+------------+--------------------+----------+
+
+Phép cộng số cột đầu ra:
+
+        19 + 3 + 2 + 1 + 13 + 7 + 4 = 49
+
+Lưu ý chỗ "nở cột": 3 biến nominal đầu vào nhưng tạo 13+7+4 = 24 cột ra
+(vì one-hot tách mỗi nhãn thành một cột). Đó là lý do 28 biến → 49 cột.
+Kết quả: ma trận 49 cột, TOÀN SỐ, KHÔNG NaN.
+
+  ★ Q: "Sao region ra 13 cột?"
+  A: Vì biến region trong dữ liệu có 13 nhãn vùng khác nhau; one-hot
+     giữ ĐỦ (drop=None) nên mỗi vùng một cột → 13 cột. Tương tự
+     code_module có 7 mã môn → 7 cột, code_presentation có 4 mã kỳ → 4
+     cột.
+
+
+------------------------------------------------------------------------
+8.9  ★ Q/A phản biện — Chương 8
+------------------------------------------------------------------------
+
+★ Q: "Vì sao KHÔNG drop cột one-hot như sách dạy?"
+A: Vì dự án là Explainable AI. Drop 1 cột làm hạng tham chiếu BIẾN MẤT
+   khỏi đặc trưng → SHAP/LIME không giải thích được đóng góp của nhãn
+   đó (nó bị nuốt vào intercept). Ta chấp nhận đánh đổi (nguy cơ đa cộng
+   tuyến) vì mô hình ta dùng (cây/boosting, hoặc hồi quy có
+   regularization) chịu được, còn giá trị giải thích được thì không thể
+   hy sinh. Xem mục 8.5.
+
+★ Q: "Ordinal khác One-Hot ở chỗ nào, một câu?"
+A: Ordinal = 1 cột, GIỮ thứ tự (0<1<2<...), cho biến CÓ thứ tự.
+   One-Hot = nhiều cột 0/1, KHÔNG áp thứ tự, cho biến KHÔNG thứ tự.
+   Chọn sai = bịa thứ tự (one-hot→ordinal cho danh định) hoặc vứt thứ
+   tự (ordinal→one-hot cho thứ bậc).
+
+★ Q: "Target encoding mạnh thế sao không dùng?"
+A: Ba lý do: (1) nguy cơ RÒ RỈ ĐÍCH cao, cần cross-fitting phức tạp;
+   (2) số mã hoá ("region = 0.43") KHÓ GIẢI THÍCH, đi ngược mục tiêu
+   Explainable AI; (3) cardinality của ta vừa phải nên one-hot đủ tốt,
+   không cần kỹ thuật cardinality-cao. Xem mục 8.3(d).
+
+★ Q: "One-hot làm nở 24 cột, có sợ quá nhiều chiều không?"
+A: 24 cột nominal trong tổng 49 là vẫn rất nhỏ với cỡ dữ liệu OULAD;
+   không gặp "lời nguyền chiều cao". Lợi ích giải thích được vượt xa
+   chi phí thêm vài chục cột.
+
+★ Q: "Sao gender/disability không one-hot luôn cho đồng bộ?"
+A: Biến chỉ 2 giá trị thì one-hot ra 2 cột nhưng 1 cột là phần bù của
+   cột kia (luôn cộng = 1) → thừa hoàn toàn. Map thẳng về 1 cột 0/1 gọn
+   hơn và đủ thông tin.
+
+
+========================================================================
+CHƯƠNG 9 — CO GIÃN / CHUẨN HOÁ (SCALING)
+========================================================================
+
+------------------------------------------------------------------------
+9.1  [ĐN] Vì sao cần scale — đưa các biến về cùng "thang đo"
+------------------------------------------------------------------------
+
+Sau khi mã hoá, các cột số vẫn có ĐƠN VỊ và ĐỘ LỚN rất khác nhau:
+
+  - số lần click trong kỳ: có thể từ 0 đến hàng NGHÌN.
+  - một điểm số: 0 đến 100.
+  - một cột one-hot: chỉ 0 hoặc 1.
+
+Nhiều thuật toán hiểu "độ lớn con số" là "tầm quan trọng". Nếu một biến
+có giá trị tới hàng nghìn còn biến khác chỉ 0–1, thuật toán dựa trên
+KHOẢNG CÁCH hoặc GRADIENT sẽ bị biến lớn LẤN ÁT:
+
+  - Ví dụ KNN tính khoảng cách Euclid: chênh lệch "click" (đơn vị nghìn)
+    sẽ áp đảo hoàn toàn chênh lệch "điểm" (đơn vị chục), khiến biến điểm
+    gần như vô hình — dù nó có thể quan trọng hơn.
+  - Hồi quy/mạng nơ-ron học bằng gradient descent: thang đo lệch khiến
+    mặt mất mát méo mó, hội tụ chậm và bất ổn.
+
+SCALE = đưa mọi biến số về CÙNG MỘT THANG để chúng "cạnh tranh công
+bằng", để mô hình quyết định biến nào quan trọng DỰA TRÊN DỮ LIỆU chứ
+không phải dựa trên đơn vị đo tình cờ.
+
+
+------------------------------------------------------------------------
+9.2  [ĐN/ALT] CATALOGUE các scaler — công thức, ưu/nhược
+------------------------------------------------------------------------
+
+--- (a) StandardScaler (chuẩn hoá z-score) ← dự án ta dùng ---
+  Công thức:        z = (x - μ) / σ
+    với μ = trung bình, σ = độ lệch chuẩn (ĐLC) của cột (tính trên TRAIN).
+  Kết quả: cột có TRUNG BÌNH ≈ 0, ĐỘ LỆCH CHUẨN ≈ 1.
+  Ưu:   tự nhiên cho mô hình tuyến tính & dựa-gradient; không ép vào một
+        khoảng cứng nên ÍT nhạy outlier hơn Min-Max; z-score dễ diễn giải
+        ("cao hơn trung bình bao nhiêu ĐLC").
+  Nhược: không cho ra khoảng cố định [0,1]; vẫn bị ảnh hưởng (nhẹ hơn)
+        bởi outlier vì μ, σ chịu tác động của giá trị cực.
+
+--- (b) Min-Max Scaler (chuẩn hoá về [0,1]) ---
+  Công thức:        x' = (x - min) / (max - min)
+  Kết quả: mọi giá trị nằm gọn trong [0,1].
+  Ưu:   khoảng cố định, gọn; tốt khi cần đầu vào bị chặn (vd vài mạng
+        nơ-ron, xử lý ảnh).
+  Nhược: RẤT NHẠY OUTLIER — một giá trị cực lớn kéo max lên cao, ÉP toàn
+        bộ phần còn lại dồn về gần 0 (xem 9.3).
+
+--- (c) RobustScaler (theo trung vị / IQR) ---
+  Công thức:        x' = (x - median) / IQR     (IQR = Q3 - Q1)
+  Ưu:   BỀN với outlier vì dùng median & IQR (không dùng mean/σ vốn nhạy
+        giá trị cực).
+  Nhược: không chuẩn hoá về μ=0 σ=1; ít "tự nhiên" cho giả định phân
+        phối chuẩn của một số mô hình tuyến tính.
+
+--- (d) Normalizer (chuẩn hoá theo DÒNG) ---
+  Cách làm: chuẩn hoá MỖI DÒNG (mỗi mẫu) về vector độ dài 1 (chia cho
+  norm của dòng), KHÁC hẳn ba cái trên (chuẩn hoá theo CỘT).
+  Ưu:   hữu ích khi chỉ HƯỚNG của vector mẫu mới quan trọng (vd tf-idf
+        văn bản, cosine similarity).
+  Nhược: không phù hợp dữ liệu bảng dạng đặc trưng-độc-lập như của ta;
+        làm méo ý nghĩa từng đặc trưng.
+
+
+------------------------------------------------------------------------
+9.3  [WHY] Vì sao chọn StandardScaler (không Min-Max)
+------------------------------------------------------------------------
+
+Hai lý do chính:
+
+(1) Min-Max RẤT NHẠY OUTLIER. Giả sử cột "số click" hầu hết nằm 0–500,
+    nhưng có một sinh viên cá biệt 5000 lần (ví dụ minh hoạ). Min-Max
+    lấy max = 5000, nên mọi người bình thường bị nén xuống 0–0.1, dồn
+    cục sát 0 và gần như không phân biệt được nhau — đúng vùng dữ liệu
+    ta CẦN phân biệt nhất. StandardScaler dùng μ và σ nên không bị một
+    giá trị cực ÉP DẸP toàn bộ phần còn lại như vậy.
+
+(2) Ta ĐÃ áp log1p cho các biến đếm ở bước làm sạch (Tập 3). log1p kéo
+    cái đuôi dài (skew) của biến đếm lại gần phân phối cân đối hơn. Sau
+    bước đó, z-score (StandardScaler) trở nên ỔN ĐỊNH và TỰ NHIÊN: phân
+    phối đã gần đối xứng nên μ/σ mô tả nó tốt, và z-score ăn khớp với
+    giả định của mô hình tuyến tính.
+
+(3) DIỄN GIẢI: z-score nói thẳng "giá trị này cao hơn/thấp hơn trung
+    bình bao nhiêu độ lệch chuẩn" — một đơn vị có ý nghĩa thống kê rõ,
+    rất hợp với SHAP (đóng góp của một đặc trưng đo theo độ lệch khỏi
+    trung bình thì dễ kể thành câu chuyện cho người đọc).
+
+  [WHY] Gộp lại: log1p (đã làm) + StandardScaler là một cặp ăn ý —
+  log1p lo phần lệch nặng, z-score lo phần đồng nhất thang đo, và cả
+  hai cùng phục vụ mục tiêu mô hình ổn định + giải thích được.
+
+
+------------------------------------------------------------------------
+9.4  [ĐN] Mô hình nào CẦN scale, mô hình nào KHÔNG nhạy
+------------------------------------------------------------------------
+
+CẦN scale (nhạy với thang đo):
+  - Hồi quy tuyến tính / Logistic (Linear/Logistic Regression) — nhất là
+    khi có regularization L1/L2 (phạt phụ thuộc độ lớn hệ số → phải scale
+    để phạt công bằng).
+  - SVM (máy vector hỗ trợ) — dựa trên khoảng cách/biên.
+  - KNN (k láng giềng) — thuần khoảng cách.
+  - Mạng nơ-ron (ANN) — học bằng gradient, scale giúp hội tụ.
+  - Nói chung: MỌI mô hình dựa KHOẢNG CÁCH hoặc GRADIENT.
+
+KHÔNG nhạy scale (bất biến với phép co giãn đơn điệu từng biến):
+  - Cây quyết định (Decision Tree), Rừng ngẫu nhiên (Random Forest),
+    boosting (XGBoost, LightGBM).
+  - Vì cây chỉ hỏi "x > ngưỡng?" — co giãn x không đổi THỨ TỰ nên không
+    đổi điểm cắt; scale hay không, cây chia y như nhau.
+
+  [WHY] Vậy sao vẫn scale TẤT CẢ dù sẽ thử cả cây? Hai lý do:
+  (1) ĐỒNG NHẤT PIPELINE: một ma trận 49 cột duy nhất dùng cho MỌI mô
+      hình → so sánh công bằng, code gọn, ít lỗi. Scale không hại cây
+      (cây bỏ qua nó), nhưng cần cho LR/SVM/KNN/ANN.
+  (2) DIỄN GIẢI nhất quán: SHAP trên thang z-score cho mọi mô hình giúp
+      cùng một "ngôn ngữ" giải thích (độ lệch chuẩn), dễ so sánh.
+
+
+------------------------------------------------------------------------
+9.5  [WHY/EVAL] TRÌNH TỰ tiền xử lý đúng = CHỐNG RÒ RỈ (data leakage)
+------------------------------------------------------------------------
+
+Đây là điểm KỸ THUẬT QUAN TRỌNG NHẤT của tập này. Trình tự đúng (vẽ ở
+reports/figures/preprocessing_sequence.png):
+
+  Bước 1: TÁCH train / test trước (split first).
+  Bước 2: FIT bộ biến đổi (scaler, encoder) CHỈ trên TRAIN — tức tính
+          μ, σ, danh sách nhãn one-hot, thứ tự ordinal... CHỈ từ train.
+  Bước 3: TRANSFORM cả train VÀ test bằng các tham số đã học ở bước 2.
+
+  Sơ đồ:
+     [Dữ liệu] --split--> [TRAIN] --fit--> (μ, σ, nhãn) ---+
+                              |                            |
+                              +--transform-----------------+
+                          [TEST] ----transform (DÙNG μ,σ của train)
+
+  [WHY] Vì sao FIT-CẢ-TẬP là SAI? Nếu tính μ, σ (hay min/max, danh sách
+  nhãn) trên TOÀN BỘ dữ liệu rồi mới chia, thì THỐNG KÊ CỦA TEST đã RÒ
+  vào quá trình biến đổi train. Test lẽ ra phải đóng vai "dữ liệu tương
+  lai chưa từng thấy"; nếu μ/σ đã "ngó" qua test thì điểm đánh giá trên
+  test bị LẠC QUAN GIẢ (optimistic) — ta tưởng mô hình giỏi hơn thực
+  tế. Đó là RÒ RỈ DỮ LIỆU (data leakage). Quy tắc vàng: test KHÔNG được
+  đóng góp một bit nào vào việc fit bất kỳ bộ biến đổi nào.
+
+  Lưu ý: test có thể chứa nhãn lạ (không có trong train) — chính vì FIT
+  chỉ trên train. Đó là lý do ta cần handle_unknown='ignore' và ordinal
+  → -1 ở Chương 8: chúng là hệ quả TRỰC TIẾP của trình tự chống rò rỉ
+  này.
+
+  (CÁCH chia train/test cụ thể — tỉ lệ, cắt theo thời gian, vì sao không
+   chia ngẫu nhiên thuần — thuộc TẬP 5. Ở đây ta chỉ nhấn TRÌNH TỰ
+   fit-trên-train / transform-cả-hai.)
+
+
+------------------------------------------------------------------------
+9.6  [EVAL] Kiểm tra sau biến đổi
+------------------------------------------------------------------------
+
+Sau khi chạy xong pipeline biến đổi, ta KIỂM ĐỊNH ma trận đầu ra:
+
+  [✓] 0 NaN — không còn ô trống nào (mọi thiếu đã xử lý từ Tập 3, các bộ
+      mã hoá/scaler không tạo NaN mới).
+  [✓] MỌI cột là SỐ — không còn cột chữ; mô hình "ăn" được toàn bộ.
+  [✓] Các biến NUMERIC có μ ≈ 0 và σ ≈ 1 (hệ quả trực tiếp của
+      StandardScaler trên train).
+  [✓] Biến ĐẾM gần phân phối chuẩn hơn trước (nhờ log1p + z-score) —
+      bớt lệch, bớt đuôi dài.
+  [✓] Đúng 49 cột (khớp phép cộng 19+3+2+1+13+7+4 = 49 ở mục 8.8).
+
+  ★ Q: "μ ≈ 0 σ ≈ 1 đúng trên TRAIN, thế còn TEST?"
+  A: Trên test, μ/σ không nhất thiết đúng bằng 0/1 — vì ta transform
+     test bằng μ,σ HỌC TỪ TRAIN (không fit lại trên test). Test chỉ
+     "gần" 0/1 nếu phân phối test giống train. Điều này là ĐÚNG và MONG
+     MUỐN: nó tôn trọng quy tắc chống rò rỉ (mục 9.5).
+
+
+------------------------------------------------------------------------
+9.7  [NEXT] Đầu ra: ma trận 49 cột là đầu vào mô hình
+------------------------------------------------------------------------
+
+Kết thúc bước biến đổi, ta có một MA TRẬN ĐẶC TRƯNG 49 cột, toàn số,
+không NaN, đã chuẩn hoá và mã hoá đúng kiểu — đây chính là đầu vào
+(input X) cho khâu huấn luyện mô hình.
+
+Tập 5 sẽ bàn cách CHIA dữ liệu (train/validation/test, cắt theo thời
+gian để tránh nhìn trộm tương lai) — phần ta chỉ "nhấn trình tự" ở mục
+9.5. Tập 6 sẽ trình bày các biểu đồ EDA. Còn việc khớp đặc trưng đã
+chuẩn hoá này với SHAP/LIME để GIẢI THÍCH từng dự đoán là mục tiêu xuyên
+suốt mà mọi quyết định mã hoá ở Tập 4 đã phục vụ.
+
+
+------------------------------------------------------------------------
+9.8  ★ Q/A phản biện — Chương 9
+------------------------------------------------------------------------
+
+★ Q: "Cây không cần scale, sao vẫn scale cho cây?"
+A: Để có MỘT ma trận duy nhất cho mọi mô hình (đồng nhất pipeline, so
+   sánh công bằng) và một thang diễn giải SHAP nhất quán. Scale không
+   làm hại cây vì cây bất biến với co giãn đơn điệu từng biến.
+
+★ Q: "Sao không Min-Max cho gọn về [0,1]?"
+A: Min-Max rất nhạy outlier — một giá trị cực lớn nén toàn bộ phần còn
+   lại sát 0, làm mất khả năng phân biệt. Sau log1p, z-score
+   (StandardScaler) ổn định và tự nhiên hơn, lại dễ diễn giải. Xem 9.3.
+
+★ Q: "Nếu fit scaler trên cả train+test cho 'đủ dữ liệu' thì sao?"
+A: SAI — đó là rò rỉ dữ liệu. Thống kê test rò vào biến đổi train, điểm
+   test thành lạc quan giả. Phải fit CHỈ trên train. Xem 9.5.
+
+★ Q: "log1p và StandardScaler có trùng việc không?"
+A: Không. log1p xử lý ĐỘ LỆCH (skew) của phân phối; StandardScaler xử
+   lý THANG ĐO (đưa về μ=0 σ=1). Hai việc khác nhau, bổ trợ nhau, theo
+   thứ tự log1p trước (Tập 3) rồi scale sau (Tập 4).
+
+★ Q: "Vì sao test sau scale không có μ=0 σ=1?"
+A: Vì ta dùng μ,σ của TRAIN để transform test (không fit lại). Đó là
+   đúng quy tắc chống rò rỉ; test chỉ gần 0/1 nếu phân phối giống train.
+
+
+========================================================================
+TÓM TẮT TẬP 4
+========================================================================
+
+- Mã hoá: 28 đặc trưng chia 5 kiểu (numeric/ordinal/nominal/binary/
+  indicator), mỗi kiểu một bộ biến đổi, ra 49 cột (19+3+2+1+13+7+4).
+  Quyết định phản biện cốt lõi: OneHot drop=None (giữ đủ cột) vì
+  Explainable AI cần SHAP/LIME thấy được MỌI nhãn; handle_unknown=
+  ignore và ordinal→-1 để bền với giá trị lạ.
+- Scaling: StandardScaler (z-score, không Min-Max vì Min-Max nhạy
+  outlier; sau log1p thì z-score ổn định + dễ diễn giải). Trình tự
+  chống rò rỉ: split → fit CHỈ trên train → transform cả hai. Kết quả:
+  ma trận 49 cột, 0 NaN, toàn số, numeric μ≈0 σ≈1 — đầu vào mô hình.

@@ -1,0 +1,498 @@
+TẬP 8 — PHỤ LỤC
+
+
+===========================================================================
+LỜI MỞ ĐẦU CỦA TẬP 8
+===========================================================================
+
+Bảy tập trước là phần "đọc để hiểu": chúng đi tuần tự theo dòng chảy của dữ
+liệu và giải thích VÌ SAO ở mỗi bước. Tập 8 thì khác — đây là TẬP TRA CỨU.
+Bạn không cần đọc một mạch; hãy giở đúng phần mình cần khi đang ôn bài, đang
+làm slide, hay đang đứng trước giáo viên mà cần nhớ ngay một con số, một
+ngưỡng, hay một định nghĩa.
+
+Tập 8 gồm năm phụ lục:
+
+   A. TỪ ĐIỂN THUẬT NGỮ — tra nhanh "từ này nghĩa là gì".
+   B. BẢNG TRA "DỮ LIỆU KIỂU GÌ → BIỂU ĐỒ NÀO" — chọn biểu đồ không cãi được.
+   C. BẢNG TRA THỐNG KÊ — các ngưỡng (effect size, tương quan, phân phối).
+   D. BẢNG TỔNG HỢP MỌI CON SỐ ĐÃ KIỂM CHỨNG — một chỗ duy nhất chứa số thật.
+   E. LỆNH TÁI LẬP TOÀN BỘ & DANH MỤC ĐỌC THÊM.
+
+Mọi con số trong phụ lục D đều trích từ reports/eda_findings.json và
+reports/data_understanding/verified_numbers.json, nên nói ra là kiểm chứng
+được. Số thập phân dùng DẤU PHẨY theo quy ước Việt.
+
+
+===========================================================================
+PHỤ LỤC A — TỪ ĐIỂN THUẬT NGỮ
+===========================================================================
+
+Mỗi mục theo khuôn: "Thuật ngữ — định nghĩa ngắn gọn dễ hiểu".
+
+at-risk (có nguy cơ) — Nhãn nhị phân ta cần dự đoán. Một sinh viên-môn-kỳ bị
+   coi là at-risk nếu kết quả cuối là Fail hoặc Withdrawn (trượt hoặc bỏ học);
+   ngược lại Pass/Distinction là không nguy cơ. Tỉ lệ at-risk toàn bộ = 52,8%.
+
+grain (độ mịn / đơn vị dòng) — Mỗi dòng trong bảng đại diện cho cái gì. Grain
+   của ta là "một sinh viên × một lượt mở môn" (student–module-presentation):
+   32.593 dòng. Xác định grain trước tiên là bắt buộc, vì mọi phép đếm và tổng
+   hợp đều phải nhất quán với grain.
+
+module-presentation (lượt mở môn) — Một lần một môn học được mở trong một kỳ
+   (ví dụ môn "AAA" kỳ "2013J"). Dữ liệu có 22 lượt mở môn. Mỗi lượt có độ dài
+   riêng (234–269 ngày), nên cùng một mốc % lại ra số ngày khác nhau.
+
+checkpoint (mốc thời gian) — Một thời điểm trong khoá học mà tại đó ta "đóng
+   băng đồng hồ" và chỉ dùng dữ liệu đã xảy ra trước đó. Dự án dùng 6 mốc:
+   10/20/40/60/80/100% tiến độ.
+
+cutoff_day (ngày giới hạn) — Số ngày tương ứng với một mốc % cho một môn-kỳ
+   cụ thể: cutoff_day = round(độ_dài_môn × t/100). Khi tạo đặc trưng, chỉ giữ
+   sự kiện có date <= cutoff_day.
+
+temporal leakage (rò rỉ thời gian) — Lỗi để mô hình dùng thông tin của TƯƠNG
+   LAI (so với mốc dự đoán) — thứ mà lúc triển khai thật chưa tồn tại. Chặn
+   bằng bộ lọc date <= cutoff_day.
+
+group leakage (rò rỉ nhóm) — Lỗi để các dòng của CÙNG một sinh viên rơi vào
+   cả train lẫn test, khiến mô hình "quen mặt" rồi gặp lại ở test → điểm cao
+   giả. Chặn bằng group split theo id_student.
+
+preprocessing leakage (rò rỉ tiền xử lý) — Lỗi để thống kê học từ dữ liệu
+   (median, μ/σ, ngưỡng winsorize, encoder) được tính trên CẢ train+test, làm
+   thông tin test ngấm vào pipeline. Chặn bằng "fit chỉ trên train".
+
+fit vs transform (học vs áp) — "fit" là HỌC tham số từ dữ liệu (vd: tính
+   median, μ, σ). "transform" là ÁP tham số đã học để biến đổi dữ liệu. Quy
+   tắc vàng: chỉ fit trên train, rồi transform lên test.
+
+hold-out (tập giữ riêng) — Phần dữ liệu cố tình không cho mô hình thấy lúc
+   học, để chấm điểm cuối cùng một cách trung thực. Dự án giữ riêng 20%.
+
+stratified (phân tầng) — Cách chia giữ cho tỉ lệ nhãn (at-risk) ở train và
+   test gần bằng nhau và bằng tổng thể, để đánh giá không bị lệch phân bố.
+
+group split (chia theo nhóm) — Chia dữ liệu theo NHÓM (group = một sinh viên)
+   chứ không theo dòng, bảo đảm mọi dòng của một người nằm gọn một phía.
+
+StratifiedGroupKFold — Biến thể cross-validation giữ ĐỒNG THỜI hai tính chất:
+   chia theo nhóm (id_student) VÀ cân bằng phân tầng (at_risk). Dùng cho CV
+   bên trong tập train.
+
+cross-validation (kiểm định chéo, CV) — Chia train thành K mảnh (fold); xoay
+   vòng lấy K-1 mảnh học, 1 mảnh kiểm, K lần rồi trung bình. Cho ước lượng
+   hiệu năng ổn định mà không "đốt" tập test.
+
+overfitting (quá khớp / học vẹt) — Mô hình thuộc lòng cả nhiễu của dữ liệu đã
+   thấy thay vì học quy luật chung; đẹp trên dữ liệu cũ, tệ trên dữ liệu mới.
+
+generalization (tổng quát hoá) — Năng lực mô hình chạy tốt trên dữ liệu CHƯA
+   TỪNG THẤY. Đây mới là thứ thật sự cần đo.
+
+Cohen's d (cỡ hiệu ứng) — Đo khoảng cách giữa trung bình hai nhóm theo đơn vị
+   độ lệch chuẩn: d = |m1−m0| / sqrt((s1²+s0²)/2). Càng lớn, hai nhóm tách
+   càng rõ. Tín hiệu mạnh nhất của dự án: days_since_last_activity, d = 2,546.
+
+p-value (giá trị p) — Xác suất quan sát được hiệu ứng mạnh như đã thấy NẾU
+   thực ra không có hiệu ứng nào (giả thuyết không đúng). p nhỏ (vd < 0,05) →
+   khó là ngẫu nhiên. p KHÔNG đo độ lớn hiệu ứng — đó là việc của Cohen's d.
+
+Benjamini-Hochberg (BH) — Thủ tục hiệu chỉnh p-value khi kiểm NHIỀU biến cùng
+   lúc, kiểm soát tỉ lệ phát hiện sai (FDR). Cần thiết vì test càng nhiều thì
+   càng dễ có "trúng số ngẫu nhiên". Cột p_adj_bh trong eda_findings là p đã
+   hiệu chỉnh.
+
+Cramér's V — Đo độ liên hệ giữa hai biến PHÂN LOẠI (0 = không liên hệ, 1 =
+   liên hệ hoàn toàn), suy ra từ kiểm định chi-bình phương. Biến phân loại
+   mạnh nhất của ta: highest_education, V = 0,15.
+
+Pearson r — Hệ số tương quan TUYẾN TÍNH giữa hai biến định lượng, trong
+   [−1; 1]. Nhạy với quan hệ thẳng và với ngoại lai.
+
+Spearman r — Tương quan theo HẠNG (rank): bắt quan hệ đơn điệu kể cả phi
+   tuyến, bền hơn với ngoại lai. Dùng khi dữ liệu lệch mạnh hoặc quan hệ cong.
+
+đa cộng tuyến (multicollinearity) — Hiện tượng hai/nhiều đặc trưng tương quan
+   rất cao với nhau (|r| >= 0,8), gây dư thừa và làm hệ số mô hình tuyến tính
+   khó diễn giải. Dự án có 2 cặp như vậy (xem phụ lục D).
+
+skew (độ lệch) — Đo phân phối lệch về một phía. Skew dương = đuôi dài bên
+   phải. clicks_resource lệch cực mạnh: skew = 34,71.
+
+kurtosis (độ nhọn) — Đo độ "nhọn đỉnh + đuôi dày" của phân phối. Cao = nhiều
+   giá trị cực đoan. clicks_resource: kurtosis = 2125,45.
+
+log1p — Phép biến đổi log(1+x), dùng để "ép" phân phối lệch phải về gần đối
+   xứng; cộng 1 để xử lý được giá trị 0. Hợp cho các cột click lệch mạnh.
+
+winsorize — Cắt bớt đuôi: kéo các giá trị cực đoan về một ngưỡng (vd phân vị
+   1% và 99%) thay vì xoá, để giảm ảnh hưởng ngoại lai mà không mất dòng.
+
+IQR (khoảng tứ phân vị) — Q3 − Q1 (phân vị 75% trừ 25%). Dùng định nghĩa
+   ngoại lai theo quy tắc 1,5×IQR và vẽ hộp (box plot).
+
+one-hot encoding — Biến một cột phân loại danh nghĩa thành nhiều cột nhị phân
+   0/1, mỗi mức một cột. Dùng cho biến không có thứ tự (vd region).
+
+ordinal encoding — Mã hoá biến phân loại CÓ THỨ TỰ thành số nguyên giữ đúng
+   thứ tự (vd highest_education, age_band). Dự án có 3 biến ordinal.
+
+binary encoding — Mã hoá biến chỉ hai mức thành 0/1 (vd gender, disability).
+   Dự án có 2 biến binary.
+
+StandardScaler — Chuẩn hoá mỗi cột về trung bình 0, độ lệch chuẩn 1:
+   z = (x − μ)/σ. μ và σ phải fit CHỈ trên train.
+
+class imbalance (mất cân bằng lớp) — Khi một nhãn áp đảo nhãn kia. Của ta chỉ
+   mất cân bằng NHẸ (tỉ số 1,118), nên chưa cần can thiệp mạnh.
+
+SMOTE — Kỹ thuật sinh thêm mẫu thiểu số nhân tạo bằng nội suy giữa các điểm
+   lân cận, để cân bằng lớp. Vì mất cân bằng của ta nhẹ nên SMOTE không bắt
+   buộc; nếu dùng, chỉ áp trên train sau khi split.
+
+parquet — Định dạng lưu trữ dạng CỘT (columnar), nén tốt, đọc nhanh phần cột
+   cần. studentVle 432,8MB CSV → 21,9MB parquet (nén 19,8 lần).
+
+columnar engine / ClickHouse — Bộ máy xử lý dữ liệu theo cột, đọc và quét cực
+   nhanh trên dữ liệu lớn. Dự án dùng clickhouse-local để quét 10,6 triệu dòng.
+
+idempotent (luỹ đẳng) — Chạy lại script cho cùng kết quả, không tạo dữ liệu
+   trùng/khác. Chạy 2 lần = chạy 1 lần.
+
+atomic write (ghi nguyên tử) — Ghi ra file tạm rồi đổi tên thành file chính,
+   nên bị kill giữa lúc ghi cũng không làm hỏng file cũ.
+
+manifest / MD5 — manifest là bản kê file đầu ra kèm checksum (MD5) để kiểm
+   tính toàn vẹn và phát hiện thay đổi ngoài ý muốn; cùng một dữ liệu phải cho
+   cùng một MD5.
+
+master_raw / master table — Bảng lớn gộp 7 bảng OULAD về grain sinh viên-môn-
+   kỳ, kích thước 32.593 × 33, là điểm xuất phát để cắt checkpoint.
+
+feature matrix (ma trận đặc trưng X) — Bảng số cuối cùng đưa vào mô hình. Từ
+   28 đặc trưng gốc nở ra 49 cột sau khi mã hoá.
+
+resume (nối tiếp) — Khả năng script đọc tiến độ đã lưu và chỉ làm tiếp phần
+   còn thiếu khi bị ngắt giữa chừng, thay vì chạy lại từ đầu.
+
+
+===========================================================================
+PHỤ LỤC B — BẢNG TRA "DỮ LIỆU KIỂU GÌ → BIỂU ĐỒ NÀO"
+===========================================================================
+
+Quy tắc cốt lõi: biểu đồ phải KHỚP với KIỂU dữ liệu và CÂU HỎI. Cột "tránh
+gì" giúp bạn không dùng sai.
+
++-----------------------------+----------------+--------------------------------+
+| Dữ liệu / câu hỏi           | Biểu đồ chọn   | Khi nào dùng / Tránh gì        |
++-----------------------------+----------------+--------------------------------+
+| 1 biến ĐỊNH LƯỢNG           | histogram      | Xem hình dạng phân phối, lệch, |
+| (vd total_clicks)           | + box plot     | nhiều đỉnh. Tránh: bar cho biến|
+|                             |                | liên tục; bin quá to/nhỏ.      |
++-----------------------------+----------------+--------------------------------+
+| 1 biến PHÂN LOẠI            | bar chart      | So tần suất các mức. Tránh: pie|
+| (vd final_result, region)   | (cột)          | khi >4 mức hoặc giá trị sát    |
+|                             |                | nhau (mắt khó so góc quạt).    |
++-----------------------------+----------------+--------------------------------+
+| ĐỊNH LƯỢNG × NHÃN           | box / violin   | So phân phối một biến số giữa  |
+| (vd idle theo at_risk)      | theo nhóm      | hai nhóm nhãn; kèm Cohen's d.  |
+|                             |                | Tránh: chỉ so trung bình trần. |
++-----------------------------+----------------+--------------------------------+
+| PHÂN LOẠI × NHÃN            | stacked /      | Xem tỉ lệ at-risk đổi theo mức;|
+| (vd highest_education ×     | grouped bar    | kèm Cramér's V. Tránh: chỉ đếm |
+|  at_risk)                   | + Cramér's V   | thô mà bỏ chuẩn hoá theo nhóm. |
++-----------------------------+----------------+--------------------------------+
+| ĐỊNH LƯỢNG × ĐỊNH LƯỢNG     | scatter        | Xem quan hệ, cụm, ngoại lai.   |
+| (vd n_days_active ×         | (điểm)         | Tránh: scatter khi quá đông    |
+|  total_clicks)              |                | điểm chồng — dùng hexbin/alpha.|
++-----------------------------+----------------+--------------------------------+
+| MA TRẬN TƯƠNG QUAN          | heatmap        | Nhìn toàn cảnh |r| nhiều biến, |
+| (nhiều biến số)             | (nhiệt)        | phát hiện đa cộng tuyến. Tránh:|
+|                             |                | heatmap khi quá ít biến.       |
++-----------------------------+----------------+--------------------------------+
+| THEO THỜI GIAN / TIẾN ĐỘ    | line /         | Vẽ đường cong d theo mốc t%    |
+| (vd Cohen's d theo mốc)     | đường cong     | (RQ1). Tránh: bar rời cho dữ   |
+|                             |                | liệu vốn liên tục theo thời gian.|
++-----------------------------+----------------+--------------------------------+
+
+
+===========================================================================
+PHỤ LỤC C — BẢNG TRA THỐNG KÊ
+===========================================================================
+
+C.1 — NGƯỠNG COHEN'S d (cỡ hiệu ứng, chênh trung bình hai nhóm)
+
+      +-------------+----------------+-----------------------------------+
+      | |d|         | Mức           | Đọc                               |
+      +-------------+----------------+-----------------------------------+
+      | ~ 0,2       | NHỎ           | Khác biệt yếu, khó nhìn bằng mắt. |
+      | ~ 0,5       | VỪA           | Khác biệt thấy rõ.                |
+      | >= 0,8      | LỚN           | Hai nhóm tách rất rõ.             |
+      +-------------+----------------+-----------------------------------+
+      Trong dự án: idle d=2,546 vượt xa mốc "lớn"; ta lấy d>=0,8 làm ngưỡng
+      "tín hiệu đáng dùng để dự đoán sớm".
+
+C.2 — NGƯỠNG |r| PEARSON (tương quan tuyến tính, biến số × biến số)
+
+      +-------------+----------------+-----------------------------------+
+      | |r|         | Mức           | Đọc                               |
+      +-------------+----------------+-----------------------------------+
+      | ~ 0,1       | YẾU           | Gần như không liên hệ tuyến tính. |
+      | ~ 0,3       | VỪA           | Có xu hướng nhưng phân tán.       |
+      | >= 0,5      | MẠNH          | Liên hệ rõ.                       |
+      | >= 0,8      | RẤT MẠNH      | Cảnh báo ĐA CỘNG TUYẾN.           |
+      +-------------+----------------+-----------------------------------+
+
+C.3 — NGƯỠNG CRAMÉR'S V (liên hệ hai biến phân loại)
+
+      +-------------+----------------+-----------------------------------+
+      | V           | Mức           | Đọc                               |
+      +-------------+----------------+-----------------------------------+
+      | ~ 0,1       | YẾU           | Liên hệ nhẹ.                      |
+      | ~ 0,3       | VỪA           | Liên hệ trung bình.               |
+      | >= 0,5      | MẠNH          | Liên hệ mạnh.                     |
+      +-------------+----------------+-----------------------------------+
+      Của ta cao nhất là highest_education V=0,15 — chỉ ở mức yếu; vì vậy biến
+      nhân khẩu KHÔNG phải tín hiệu chính, hành vi học mới là chính.
+
+C.4 — p-VALUE & VÌ SAO HIỆU CHỈNH BENJAMINI-HOCHBERG
+
+   - p-value đo "khả năng hiệu ứng này chỉ là ngẫu nhiên". Quy ước p < 0,05 là
+     "có ý nghĩa thống kê". NHƯNG p KHÔNG nói hiệu ứng LỚN hay nhỏ — luôn đọc
+     kèm cỡ hiệu ứng (Cohen's d, |r|, V).
+   - Khi kiểm NHIỀU biến cùng lúc (dự án kiểm 19 biến số vs nhãn), xác suất có
+     ít nhất một "trúng số ngẫu nhiên" tăng vọt. BH hiệu chỉnh p để kiểm soát
+     tỉ lệ phát hiện sai. Sau hiệu chỉnh, 19/19 biến vẫn có ý nghĩa (p_adj=0,0).
+
+C.5 — NGƯỠNG SKEW / KURTOSIS ("lệch mạnh", "nhọn mạnh")
+
+      +---------------------+--------------------------------------------+
+      | Chỉ số              | Ngưỡng tham chiếu                          |
+      +---------------------+--------------------------------------------+
+      | |skew| < 0,5        | Gần đối xứng.                              |
+      | 0,5 <= |skew| < 1   | Lệch vừa.                                  |
+      | |skew| >= 1         | LỆCH MẠNH → cân nhắc log1p/winsorize.      |
+      | kurtosis (dư) > 3   | Đuôi dày, nhiều cực đoan.                  |
+      +---------------------+--------------------------------------------+
+      Của ta clicks_resource skew=34,71 & kurtosis=2125,45 → lệch và nhọn cực
+      mạnh, là lý do dùng log1p cho các cột click.
+
+
+===========================================================================
+PHỤ LỤC D — BẢNG TỔNG HỢP MỌI CON SỐ ĐÃ KIỂM CHỨNG
+===========================================================================
+
+Tất cả số dưới đây trích từ verified_numbers.json và eda_findings.json.
+
+D.1 — QUY MÔ & HIỆU NĂNG ENGINE CỘT (bảng studentVle)
+
+      +-------------------------------------+----------------------------+
+      | Chỉ số                              | Giá trị                    |
+      +-------------------------------------+----------------------------+
+      | Số dòng clickstream (studentVle)    | 10.655.280 dòng            |
+      | CSV gốc                             | 432,8 MB                   |
+      | Sau nén parquet                     | 21,9 MB                    |
+      | Tỉ lệ nén                           | 19,8 lần                   |
+      | Thời gian quét CSV                  | 14,6 giây                  |
+      | Thời gian quét parquet              | 0,55 giây                  |
+      | Tăng tốc                            | 26 lần                     |
+      +-------------------------------------+----------------------------+
+
+D.2 — BẢNG MASTER & ĐỐI TƯỢNG
+
+      +-------------------------------------+----------------------------+
+      | Chỉ số                              | Giá trị                    |
+      +-------------------------------------+----------------------------+
+      | Kích thước master_raw               | 32.593 × 33                |
+      | Số sinh viên (distinct)             | 28.785                     |
+      | Số lượt mở môn (module-presentation)| 22                         |
+      | Độ dài môn-kỳ (min–avg–max ngày)    | 234 – 255,5 – 269          |
+      | Số dòng 0 click                     | 3.365                      |
+      +-------------------------------------+----------------------------+
+
+D.3 — PHÂN BỐ NHÃN
+
+      +-------------------------------------+----------------------------+
+      | final_result                        | Số lượng                   |
+      +-------------------------------------+----------------------------+
+      | Pass                                | 12.361                     |
+      | Withdrawn                           | 10.156                     |
+      | Fail                                | 7.052                      |
+      | Distinction                         | 3.024                      |
+      +-------------------------------------+----------------------------+
+      | at-risk (n)                         | 17.208                     |
+      | Tỉ lệ at-risk                       | 52,8%                      |
+      | Tỉ số mất cân bằng                  | 1,118                      |
+      +-------------------------------------+----------------------------+
+
+D.4 — DỮ LIỆU THIẾU
+
+      +-------------------------------------+----------------------------+
+      | Cột                                 | Thiếu                      |
+      +-------------------------------------+----------------------------+
+      | date_unregistration                 | 22.521 (69,1%)             |
+      | imd_band                            | 1.111 (3,41%)              |
+      | date_registration                   | 45 (0,14%)                 |
+      +-------------------------------------+----------------------------+
+
+D.5 — BIẾN ĐỔI & MÃ HOÁ
+
+      +-------------------------------------+----------------------------+
+      | Chỉ số                              | Giá trị                    |
+      +-------------------------------------+----------------------------+
+      | Số đặc trưng gốc                    | 28                         |
+      |   - numeric                         | 19                         |
+      |   - ordinal                         | 3                          |
+      |   - nominal                         | 3                          |
+      |   - binary                          | 2                          |
+      |   - indicator                       | 1                          |
+      | Số cột ma trận sau mã hoá           | 49                         |
+      +-------------------------------------+----------------------------+
+
+D.6 — CHIA TRAIN/TEST
+
+      +-------------------------------------+----------------------------+
+      | Chỉ số                              | Giá trị                    |
+      +-------------------------------------+----------------------------+
+      | Tỉ lệ hold-out (seed=42)            | 20%                        |
+      | Số dòng train                       | 26.104                     |
+      | Số dòng test                        | 6.489                      |
+      | Số sinh viên trong test             | 5.756                      |
+      | Tỉ lệ at-risk train                 | 0,53                       |
+      | Tỉ lệ at-risk test                  | 0,52                       |
+      | Sinh viên trùng train ∩ test        | 0                          |
+      | Test leakage (PASS/tổng)            | 19/19                      |
+      +-------------------------------------+----------------------------+
+
+D.7 — TOP COHEN'S d (biến số vs nhãn, trên master)
+
+      +-------------------------------+-----------+----------------------+
+      | Đặc trưng                     | Cohen's d | p_adj_bh             |
+      +-------------------------------+-----------+----------------------+
+      | days_since_last_activity      | 2,546     | 0,0                  |
+      | n_assessments_submitted       | 2,054     | 0,0                  |
+      | weighted_score_to_date        | 1,964     | 0,0                  |
+      | n_days_active                 | 1,584     | 0,0                  |
+      | mean_score_to_date            | 1,578     | 0,0                  |
+      | total_clicks                  | 1,064     | 0,0                  |
+      +-------------------------------+-----------+----------------------+
+      (số biến có ý nghĩa sau BH: 19/19)
+
+D.8 — TƯƠNG QUAN VỚI NHÃN & CÁC CẶP MẠNH
+
+      +-------------------------------------+----------------------------+
+      | Tương quan với at_risk (|r|)        | r                          |
+      +-------------------------------------+----------------------------+
+      | days_since_last_activity            | 0,778                      |
+      | n_assessments_submitted             | 0,716                      |
+      | weighted_score_to_date              | 0,706                      |
+      | n_days_active                       | 0,626                      |
+      | mean_score_to_date                  | 0,610                      |
+      | total_clicks                        | 0,477                      |
+      +-------------------------------------+----------------------------+
+      | ĐA CỘNG TUYẾN (|r| >= 0,8)          | r                          |
+      +-------------------------------------+----------------------------+
+      | n_days_active ↔ total_clicks        | 0,837                      |
+      | idle ↔ n_assessments_submitted      | −0,828                     |
+      +-------------------------------------+----------------------------+
+
+D.9 — BIẾN PHÂN LOẠI vs NHÃN (Cramér's V)
+
+      +-------------------------------------+----------------------------+
+      | Biến                                | V                          |
+      +-------------------------------------+----------------------------+
+      | highest_education                   | 0,15                       |
+      | imd_band                            | 0,149                      |
+      | region                              | 0,081                      |
+      | age_band                            | 0,069                      |
+      | disability                          | 0,059                      |
+      | gender                              | 0,022                      |
+      +-------------------------------------+----------------------------+
+
+D.10 — TÍN HIỆU THEO THỜI GIAN (Cohen's d theo mốc t%)
+
+      +-----------------------------+------+------+------+------+------+------+
+      | Đặc trưng                   | 10%  | 20%  | 40%  | 60%  | 80%  |100%  |
+      +-----------------------------+------+------+------+------+------+------+
+      | days_since_last_activity    | 0,906|1,173 |1,563 |1,923 |2,296 |2,546 |
+      | mean_score_to_date          | 0,798|1,113 |1,492 |1,559 |1,573 |1,578 |
+      | n_assessments_submitted     | 0,669|0,919 |1,233 |1,652 |1,879 |2,054 |
+      | n_days_active               | 0,834|0,991 |1,165 |1,367 |1,500 |1,584 |
+      | weighted_score_to_date      | 0,606|1,058 |1,379 |1,820 |2,106 |1,964 |
+      | total_clicks                | 0,616|0,688 |0,780 |0,913 |0,994 |1,064 |
+      +-----------------------------+------+------+------+------+------+------+
+      Mốc sớm nhất đạt d>=0,8: idle=10%, n_days_active=10%, mean_score=20%,
+      n_assessments=20%, weighted_score=20%, total_clicks=60%.
+
+D.11 — IDLE TRUNG VỊ THEO KẾT QUẢ (số ngày kể từ hoạt động cuối)
+
+      +-------------+--------+--------+--------+------------+
+      | Distinction | Pass   | Fail   |Withdrawn| (master)  |
+      +-------------+--------+--------+--------+------------+
+      | 8           | 12     | 116    | 232    |            |
+      +-------------+--------+--------+--------+------------+
+      Trung bình nhóm idle: không nguy cơ 14,2 ngày vs at-risk 171,1 ngày.
+
+
+===========================================================================
+PHỤ LỤC E — LỆNH TÁI LẬP TOÀN BỘ & DANH MỤC ĐỌC THÊM
+===========================================================================
+
+E.1 — CHẠY LẠI TOÀN BỘ PIPELINE (theo đúng thứ tự dòng chảy dữ liệu)
+
+   Bước 1 — Dựng đặc trưng tương tác (engagement) từ clickstream:
+       python -m src.data.build_engagement_features
+
+   Bước 2 — Dựng bảng master (gộp 7 bảng về grain sinh viên-môn-kỳ):
+       python -m src.data.build_master_table
+
+   Bước 3 — Cắt theo 6 mốc thời gian (tạo checkpoint, idempotent + resume):
+       python -m src.data.make_checkpoints
+
+   Bước 4 — Chia train/test (group + stratified, seed=42, hold-out 20%):
+       python -m src.evaluation.make_split
+
+   Bước 5 — Chạy bộ kiểm thử chống rò rỉ (phải PASS 19/19):
+       pytest tests/test_leakage.py -q
+
+   Ghi chú: các script nặng (bước 1 và 3) viết theo nguyên tắc ghi tiến độ
+   tăng dần (checkpoint), nối tiếp được (resume) và ghi atomic; chạy lại
+   không làm lại từ đầu mà bỏ qua phần đã xong.
+
+E.2 — FILE TRA CỨU & SỐ THẬT
+
+   - reports/eda_findings.json — kết quả EDA (skew, Cohen's d, tương quan...).
+   - reports/data_understanding/verified_numbers.json — nguồn chân lý mọi con
+     số (scale, master, split, leakage_tests...).
+   - data/checkpoint_map.csv — bảng cutoff_day cho mỗi môn-kỳ × mốc.
+   - data/splits/test_student_ids.csv — danh sách sinh viên test (cố định).
+   - notebooks/00_data_understanding.ipynb — nơi tái lập các số kiểm chứng.
+
+E.3 — DANH MỤC ĐỌC THÊM
+
+   - CRISP-DM: quy trình chuẩn 6 pha cho dự án khai phá dữ liệu — khung tư duy
+     cho toàn bộ Task này.
+   - Kuzilek, Hlosta & Zdrahal (2017), "Open University Learning Analytics
+     dataset" — bài báo gốc mô tả 7 bảng OULAD, lược đồ và ý nghĩa các cột.
+   - Tài liệu sklearn StratifiedGroupKFold — cơ chế chia fold giữ đồng thời
+     group và stratify, dùng cho CV ở giai đoạn mô hình.
+   - SHAP & LIME — hai phương pháp giải thích mô hình (explainable AI) dùng ở
+     giai đoạn sau, phục vụ trục "giải thích được" của đề tài.
+
+
+===========================================================================
+LỜI CHỐT CẢ BỘ GIÁO TRÌNH
+===========================================================================
+
+Tám tập vừa rồi không dạy bạn "bấm nút gì", mà dạy bạn LẬP LUẬN: mỗi con số,
+mỗi biểu đồ, mỗi dòng code đều bắt nguồn từ một BẰNG CHỨNG quan sát được, phục
+vụ một MỤC TIÊU rõ ràng (phát hiện sớm · giải thích được · không rò rỉ), và
+được KIỂM CHỨNG bằng số thật cùng unit test. Nắm vững mạch đó — và giở Tập 8
+mỗi khi cần tra cứu — bạn không chỉ làm được dự án, bạn BẢO VỆ được từng quyết
+định nhỏ nhất trước bất kỳ câu hỏi nào.
+
+
+-- HẾT TẬP 8 --
+"Dữ liệu không tự nói; người hiểu nó mới nói thay nó được — một cách trung
+thực, kiểm chứng được, và không bao giờ nhìn lén tương lai."
