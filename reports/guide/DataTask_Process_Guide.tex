@@ -1,0 +1,488 @@
+% =====================================================================
+%  DSP391m · Nhóm 1 — HƯỚNG DẪN CHI TIẾT QUY TRÌNH DATA TASK trên OULAD
+%  "Hiểu dữ liệu lớn (10,6 triệu dòng) bằng ClickHouse, rồi làm các task"
+%  Biên dịch bằng Tectonic (XeTeX):  tectonic DataTask_Process_Guide.tex
+%  Mọi con số lấy từ reports/data_understanding/verified_numbers.json,
+%  tái lập được bằng notebooks/00_data_understanding.ipynb.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{fontspec}
+\usepackage[a4paper,margin=2.3cm]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+% ---- colours (matched to the Beamer beaver theme) ----
+\definecolor{themecol}{HTML}{800000}
+\definecolor{rowtint}{HTML}{F3E9E9}
+\definecolor{codebg}{HTML}{F6F4F0}
+\definecolor{cgreen}{HTML}{2E7D32}
+\definecolor{cgrey}{HTML}{6B6B6B}
+
+\hypersetup{linkcolor=themecol,urlcolor=themecol,colorlinks=true}
+
+% ---- section styling ----
+\titleformat{\section}{\Large\bfseries\color{themecol}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.5em}
+
+% ---- header / footer ----
+\pagestyle{fancy}\fancyhf{}
+\lhead{\small\color{cgrey}DSP391m · Nhóm 1}
+\rhead{\small\color{cgrey}Quy trình Data Task — OULAD}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% ---- code listings ----
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  frame=leftline, framerule=2pt, rulecolor=\color{themecol},
+  xleftmargin=10pt, framexleftmargin=8pt,
+  keywordstyle=\color{themecol}\bfseries,
+  commentstyle=\color{cgreen}\itshape,
+  showstringspaces=false,
+  aboveskip=0.6em, belowskip=0.6em,
+}
+\lstdefinelanguage{ch}{
+  keywords={SELECT,FROM,WHERE,GROUP,BY,ORDER,JOIN,INNER,LEFT,USING,AS,count,uniqExact,avg,min,max,round,sum,countIf,avgIf,if,INSERT,INTO,FUNCTION,WITH,quantileExact,skewPop,corr,arrayJoin,stddevSampIf,DESCRIBE,FORMAT,SETTINGS},
+  sensitive=false, morecomment=[l]{--}, morestring=[b]'
+}
+
+% ---- helper macros ----
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\takeaway}[1]{\par\smallskip{\color{themecol}$\Rightarrow$\,}\textit{#1}\par\smallskip}
+\newenvironment{whybox}{%
+  \par\smallskip\noindent\begin{tabular}{@{}p{0.985\linewidth}@{}}
+  \arrayrulecolor{themecol}\hline\rule{0pt}{1.1em}\textbf{\color{themecol}Vì sao bước này?}\ \ignorespaces}{%
+  \\\hline\end{tabular}\par\smallskip}
+
+\newcommand{\bignum}[1]{{\color{themecol}\textbf{#1}}}
+
+% ---- title ----
+\title{\vspace{-1.2cm}\textbf{\color{themecol}Hướng dẫn chi tiết: Quy trình Data Task trên OULAD}\\[4pt]
+\large Hiểu dữ liệu lớn \textbf{10,6 triệu dòng} bằng \textbf{ClickHouse} — rồi làm sạch, biến đổi, chia tập và phân tích}
+\author{DSP391m · Nhóm 1 · FPT University \\ \small Đề tài: Học máy giải thích được, nhận biết theo thời gian, phát hiện sớm sinh viên nguy cơ (OULAD)}
+\date{Báo cáo 2 — Data Tasks}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\begin{whybox}
+Tài liệu này để \textbf{đọc và hiểu toàn bộ tiến trình} của phần Data Task — đặc biệt là
+\textit{cách thật sự hiểu một bảng 10,6 triệu dòng} mà không thể mở bằng Excel hay nạp hết vào
+pandas. Mỗi bước đều có \textbf{lệnh chạy được} và \textbf{con số thật}; bản chạy tay từng bước
+nằm ở \texttt{notebooks/00\_data\_understanding.ipynb}. Mọi con số trong tài liệu khớp với
+\texttt{reports/data\_understanding/verified\_numbers.json} và tái lập được.
+\end{whybox}
+
+\tableofcontents
+\vspace{0.5em}
+
+% =====================================================================
+\section{Bức tranh tổng thể: data task gồm những gì?}
+% =====================================================================
+Phần Data Task của đồ án không phải một việc, mà là một \textbf{chuỗi sáu việc} nối tiếp, biến
+bảy file CSV thô của OULAD thành dữ liệu sẵn sàng cho mô hình:
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Dữ liệu cần thiết} — xác định cần bảng nào, cột nào, vì sao.
+  \item \textbf{Thu thập} — vì sao chọn dữ liệu công khai OULAD (tái lập, so sánh được).
+  \item \textbf{Làm sạch} — trùng lặp, giá trị thiếu, ngoại lai.
+  \item \textbf{Biến đổi \& chuẩn hoá} — mã hoá, scale, đưa về ma trận số.
+  \item \textbf{Chia tập \& chống rò rỉ} — train/test theo nhóm, phân tầng, theo thời gian.
+  \item \textbf{Phân tích khám phá (EDA)} — dữ liệu \textit{nói} gì, dẫn đường cho mô hình.
+\end{enumerate}
+
+\noindent\textbf{Đường đi của dữ liệu (pipeline):}
+\begin{center}\small\ttfamily
+7 CSV thô $\rightarrow$ [gộp + làm sạch] $\rightarrow$ master\_raw (32.593$\times$33)
+$\rightarrow$ [cắt theo thời gian] $\rightarrow$ 6 checkpoint
+$\rightarrow$ [tiền xử lý + chia tập] $\rightarrow$ ma trận 49 cột
+\end{center}
+
+\noindent Hai khái niệm xuyên suốt cần nắm trước:
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Hạt dữ liệu (grain):} mỗi dòng cuối cùng = \textbf{một sinh viên trong một lượt mở môn}
+        \big(khoá \code{(code_module, code_presentation, id_student)}\big). Cho ra \bignum{32.593} dòng,
+        \bignum{28.785} sinh viên, \bignum{22} lượt mở môn.
+  \item \textbf{Nhãn (label):} \code{at_risk = 1} nếu \code{final_result} $\in$ \{Fail, Withdrawn\},
+        ngược lại 0. Cố định ở mọi mốc thời gian.
+\end{itemize}
+
+\takeaway{Hiểu hạt dữ liệu và nhãn trước, rồi mọi bước sau mới có nghĩa.}
+
+% =====================================================================
+\section{Vì sao phải dùng một ``engine'' cho dữ liệu lớn}
+% =====================================================================
+Bảng nặng nhất, \code{studentVle} (clickstream — log mỗi lần sinh viên bấm vào một tài nguyên),
+có \bignum{10.655.280 dòng} $\approx$ \bignum{433 MB}. Đây là chỗ trực giác hay sai.
+
+\subsection{Vấn đề: không thể ``nạp hết vào RAM'' mỗi lần hỏi}
+Mở bằng Excel: bất khả thi (Excel trần ~1 triệu dòng). Còn \code{pandas.read_csv} cả file thì
+mỗi câu hỏi nhỏ cũng phải đọc lại 433 MB và phình ra nhiều lần thế trong RAM. Đọc thử 500.000
+dòng đầu rồi ngoại suy (ô đầu tiên trong notebook) cho thấy: nạp toàn bộ tốn hàng chục giây và
+\textbf{nhiều GB RAM} \textit{cho mỗi lần thử}. Khi khám phá dữ liệu ta hỏi hàng chục câu — cách
+này sụp đổ.
+
+\subsection{Giải pháp: để dữ liệu nằm yên, đẩy câu hỏi (SQL) xuống engine}
+Công cụ phân tích dữ liệu lớn được sinh ra cho đúng việc này. Ý tưởng chung: \textbf{dữ liệu ở
+trên đĩa theo định dạng cột, ta gửi một câu SQL xuống, engine quét có chọn lọc và chỉ trả về
+kết quả đã tóm tắt} (vài dòng). Python không bao giờ phải giữ 10 triệu dòng.
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}lXl@{}}
+\toprule
+\rowcolor{rowtint}\textbf{Cách làm} & \textbf{Đặc điểm} & \textbf{Phù hợp?} \\
+\midrule
+pandas (nạp cả file) & Đơn giản nhưng tốn RAM, đọc lại mỗi lần & Không, với 10,6M dòng \\
+\textbf{ClickHouse-local} & 1 file thực thi, không cần server, SQL thẳng trên CSV/Parquet, cực nhanh & \textbf{Có — ta chọn cái này} \\
+Apache Spark & Mạnh cho phân tán nhiều máy; nặng, khởi động chậm & Quá mức cho 1 laptop \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\noindent Nhóm chọn \textbf{ClickHouse-local}: nó là một engine cột (OLAP) chạy SQL chuẩn,
+không cần dựng server, đọc trực tiếp CSV/Parquet, và xử lý 10,6 triệu dòng trong \textit{dưới một
+giây} sau khi đã chuyển sang Parquet. SQL cũng dễ trình bày trên slide.
+
+\subsection{Cài đặt và cầu nối Python (một lần)}
+ClickHouse chạy trên Linux; trên Windows ta dùng \textbf{WSL} (Ubuntu). Cài bằng một dòng:
+\begin{lstlisting}[language=bash]
+# In WSL Ubuntu -- download a single self-contained binary into home:
+curl https://clickhouse.com/ | sh                # creates ~/clickhouse
+~/clickhouse local --query "SELECT version()"     # check: 26.6.x
+\end{lstlisting}
+
+\noindent Từ notebook (kernel \texttt{dsp} trên Windows) ta gọi sang WSL bằng một hàm nhỏ:
+ghi câu SQL ra file, chạy \code{clickhouse local}, lấy kết quả CSV nạp vào pandas để hiển thị.
+Điểm cốt lõi: \textbf{Python chỉ gửi câu hỏi và nhận về vài dòng kết quả} (xem ô ``Thiết lập''
+trong notebook).
+
+\begin{whybox}
+Đây chính là câu trả lời cho thắc mắc ban đầu: ``data 10 triệu dòng thì phải làm sao?''. Câu trả
+lời là \textbf{query}, không phải mở file. Toàn bộ phần sau là minh hoạ cách query để thực sự
+hiểu dữ liệu.
+\end{whybox}
+
+% =====================================================================
+\section{Hiểu dữ liệu — 11 bước thực hành bằng ClickHouse}
+% =====================================================================
+Mỗi bước dưới đây: \textit{mục đích} $\to$ \textit{lệnh} $\to$ \textit{kết quả thật} $\to$
+\textit{ý nghĩa}. Đây là phần ``show cách làm'' để ai cũng tự kiểm chứng được.
+
+\subsection{Bước 1 — Tiếp xúc đầu tiên \& cái bẫy kiểu dữ liệu}
+Việc đầu tiên với một file lạ: hỏi ``các cột kiểu gì?''. Vì CSV để giá trị trong ngoặc kép,
+ClickHouse \textbf{đoán mọi cột là chuỗi (\code{String})}.
+\begin{lstlisting}[language=ch]
+DESCRIBE file('studentVle.csv', 'CSVWithNames');
+-- => every column is inferred as Nullable(String)!
+SELECT min(date) AS min_str, max(date) AS max_str
+FROM file('studentVle.csv', 'CSVWithNames');
+-- => max = "99"  (WRONG: lexicographic compare, "99" > "269" since '9' > '2')
+\end{lstlisting}
+
+\takeaway{Bài học \#1: với dữ liệu lớn, đừng tin suy đoán kiểu mặc định. \code{max(date)} ra ``99''
+là vô lý — phải khai báo kiểu.}
+
+\subsection{Bước 2 — Khai báo kiểu tường minh $\to$ con số đúng}
+Khai báo schema ngay trong hàm \code{file()}:
+\begin{lstlisting}[language=ch]
+SELECT count() AS rows, uniqExact(id_student) AS students,
+       min(date) AS min_day, max(date) AS max_day, round(avg(sum_click),3) AS avg_click
+FROM file('studentVle.csv', 'CSVWithNames',
+   'code_module String, code_presentation String, id_student Int32,
+    id_site Int32, date Int16, sum_click Int32');
+\end{lstlisting}
+\noindent Kết quả thật: \bignum{10.655.280} dòng, \bignum{26.074} sinh viên, \code{date} chạy từ
+\bignum{-25} (trước khai giảng) tới \bignum{269} (độ dài môn), trung bình \bignum{3,72} click/sự kiện.
+
+\subsection{Bước 3 — Tăng tốc: CSV $\rightarrow$ Parquet có kiểu (một lần)}
+CSV phải phân tích lại 433 MB văn bản mỗi lần. \textbf{Parquet} là định dạng cột, có kiểu, nén
+sẵn. Chuyển một lần:
+\begin{lstlisting}[language=ch]
+INSERT INTO FUNCTION file('studentVle.parquet', 'Parquet')
+SELECT * FROM file('studentVle.csv','CSVWithNames','...schema...')
+SETTINGS engine_file_truncate_on_insert=1;
+\end{lstlisting}
+\noindent Hiệu quả đo được:
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+\rowcolor{rowtint} & \textbf{Kích thước} & \textbf{Thời gian đếm \code{count()}} \\
+\midrule
+CSV       & 433 MB  & $\approx$ 14,6 s \\
+Parquet   & 22,9 MB & $\approx$ 0,55 s \\
+\midrule
+\textbf{Cải thiện} & \bignum{nhỏ hơn $\sim$20$\times$} & \bignum{nhanh hơn $\sim$26$\times$} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\takeaway{Đây là bước ``ai làm dữ liệu lớn cũng làm'': chuyển sang định dạng cột để truy vấn lặp
+lại tức thì. Ô chuyển đổi là idempotent — đã có thì bỏ qua (quy tắc checkpoint của dự án).}
+
+\subsection{Bước 4 — Hồ sơ \code{studentVle}}
+Dữ liệu này trông như thế nào? \bignum{6.268} loại tài nguyên (\code{id_site}), \bignum{22} lượt mở
+môn. Quan trọng: chỉ \bignum{26.074} sinh viên có click — ít hơn 28.785 sinh viên trong
+\code{studentInfo}, nghĩa là \textbf{một số sinh viên không hề bấm gì} (tín hiệu nguy cơ!).
+
+\subsection{Bước 5 — Phân phối click \& độ lệch phải $\to$ vì sao \code{log1p}}
+Gộp clickstream về hạt (môn, kỳ, sinh viên) để có \code{total_clicks}. So sánh \textbf{trung bình
+với trung vị}:
+\begin{lstlisting}[language=ch]
+WITH agg AS (
+  SELECT id_student, sum(sum_click) AS total_clicks
+  FROM file('studentVle.parquet','Parquet')
+  GROUP BY code_module, code_presentation, id_student)
+SELECT round(avg(total_clicks),0) AS mean, quantileExact(0.5)(total_clicks) AS median,
+       round(skewPop(total_clicks),2) AS skew, max(total_clicks) AS max_v FROM agg;
+\end{lstlisting}
+\noindent Kết quả: mean \bignum{1.355} nhưng median chỉ \bignum{740}; skew \bignum{2,94}; max
+\bignum{24.139}. Mean $\gg$ median và skew $>0$ là dấu vân tay của \textbf{lệch phải nặng}: vài
+sinh viên siêu hoạt động kéo đuôi rất dài.
+\takeaway{Đây là bằng chứng số cho quyết định \code{log1p} ở bước làm sạch — nén đuôi mà vẫn giữ
+thứ hạng, không xoá dòng nào.}
+
+\subsection{Bước 6 — Nhãn \& cân bằng lớp}
+Đếm trực tiếp \code{final_result} trên \code{studentInfo}:
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+\rowcolor{rowtint}\textbf{final\_result} & \textbf{Số SV} & \textbf{Nhãn} \\
+\midrule
+Pass        & 12.361 & không nguy cơ (0) \\
+Withdrawn   & 10.156 & \textbf{nguy cơ (1)} \\
+Fail        &  7.052 & \textbf{nguy cơ (1)} \\
+Distinction &  3.024 & không nguy cơ (0) \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent Tỉ lệ nguy cơ = \bignum{52,8\%} (tỉ số mất cân bằng chỉ 1,12 — lệch \textit{nhẹ}). Đây là
+con số thật, không phải 68/32 như slide minh hoạ của môn. Lưu ý \textbf{Withdrawn} là lớp đơn lớn
+nhất — sẽ rất quan trọng ở phần EDA.
+
+\subsection{Bước 7 — Dữ liệu thiếu \& cơ chế thiếu}
+Thiếu không chỉ là ``đếm NaN'' mà phải hỏi \textbf{vì sao thiếu} (cơ chế quyết định cách xử lý).
+Trong CSV, ô thiếu hiện ra dưới dạng chuỗi rỗng nên ta đếm \code{= ''}:
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}lrX@{}}
+\toprule
+\rowcolor{rowtint}\textbf{Cột} & \textbf{\% thiếu} & \textbf{Cơ chế \& cách xử lý} \\
+\midrule
+date\_unregistration & 69,1\% & Thiếu \textbf{cấu trúc} — chỉ tồn tại nếu sinh viên rút môn $\Rightarrow$ bỏ, không phải đặc trưng. \\
+imd\_band            & 3,41\% & MAR/MCAR $\Rightarrow$ thêm hạng ``Unknown'' (không bịa mức thiệt thòi). \\
+date\_registration   & 0,14\% (45 dòng) & MCAR $\Rightarrow$ điền median \textbf{của tập train}. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Bước 8 — Các bảng nhỏ còn lại (một câu mỗi bảng)}
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+  \item \code{courses}: \bignum{22} lượt mở môn, độ dài \bignum{234--269} ngày (dùng để quy ngày $\to$ \% tiến độ).
+  \item \code{assessments}: \bignum{206} bài (TMA 106, CMA 76, Exam 24); 11 bài Exam không có hạn nộp.
+  \item \code{studentAssessment}: \bignum{173.912} lượt nộp; 173 điểm thiếu.
+  \item \code{vle}: \bignum{6.364} tài nguyên thuộc 20 loại hoạt động (nhóm giữ 8 loại chính).
+\end{itemize}
+
+\subsection{Bước 9 — Ghép về hạt master ngay trong SQL}
+Câu hỏi quan trọng nhất: ghép \code{studentInfo} với clickstream đã gộp để ra hạt master.
+\begin{lstlisting}[language=ch]
+WITH agg AS (
+  SELECT code_module, code_presentation, id_student, sum(sum_click) AS total_clicks
+  FROM file('studentVle.parquet','Parquet') GROUP BY 1,2,3)
+SELECT count() AS master_rows,
+       countIf(a.total_clicks = 0 OR a.total_clicks IS NULL) AS zero_click_rows,
+       round(avg(ifNull(a.total_clicks,0)),1) AS mean_total_clicks
+FROM file('studentInfo.csv','CSVWithNames','...') AS si
+LEFT JOIN agg AS a USING (code_module, code_presentation, id_student);
+\end{lstlisting}
+\noindent Kết quả: đúng \bignum{32.593} dòng, trong đó \bignum{3.365} dòng có \textbf{0 click} (sinh
+viên không hề hoạt động) $\Rightarrow$ sẽ được điền 0 ở bước làm sạch; trung bình
+\code{total_clicks} = 1.215,1 (khớp tuyệt đối với bảng master của pipeline).
+
+\subsection{Bước 10 — Cắt theo thời gian: trái tim của chống rò rỉ}
+Bài toán là \textbf{dự đoán sớm}: ở mốc \textit{t\%} khoá học ta chỉ được biết những gì xảy ra
+\textbf{trước} ngày cắt \code{cutoff = round(độ_dài_môn × t/100)}. Đếm số sự kiện còn lại ở mỗi mốc:
+
+\begin{center}\small
+\begin{tabular}{lrrrrrr}
+\toprule
+\rowcolor{rowtint}\textbf{Mốc t\%} & 10 & 20 & 40 & 60 & 80 & 100 \\
+\midrule
+Triệu sự kiện $\le$ cutoff & 2,72 & 4,12 & 5,96 & 7,93 & 9,43 & 10,66 \\
+\% toàn bộ & 25,5 & 38,7 & 56,0 & 74,4 & 88,5 & \textbf{100} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\takeaway{Số sự kiện \textbf{chỉ tăng} theo t và mốc 100\% giữ \textbf{trọn} 10,66 triệu — đúng như bộ
+test rò rỉ yêu cầu (không bản ghi nào vượt cutoff, số lượng không giảm theo t).}
+
+\subsection{Bước 11 — Tín hiệu: yếu tố nào phân biệt nguy cơ, và \emph{sớm tới đâu}?}
+Dùng bảng master đã dựng để đo \textbf{Cohen's d} — khoảng cách hai nhóm tính theo độ lệch chuẩn,
+công thức dự án dùng: $d = |m_1-m_0| / \sqrt{(s_1^2+s_0^2)/2}$.
+
+\begin{center}\small
+\begin{tabular}{lrrr}
+\toprule
+\rowcolor{rowtint}\textbf{Đặc trưng} & \textbf{TB không nguy cơ} & \textbf{TB nguy cơ} & \textbf{Cohen's d} \\
+\midrule
+days\_since\_last\_activity & 14,2 & 171,1 & \bignum{2,55} \\
+n\_assessments\_submitted   & 8,6  & 2,3   & 2,05 \\
+weighted\_score\_to\_date    & 84,9 & 15,1  & 1,96 \\
+n\_days\_active              & 91,6 & 23,2  & 1,58 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent Tương quan kiểm rò rỉ: idle$\leftrightarrow$nhãn \bignum{0,78}; active$\leftrightarrow$clicks
+0,84; idle$\leftrightarrow$số bài nộp $-0,83$ — \textbf{không cặp nào $\ge 0,95$} nên không có đặc
+trưng rò rỉ nhãn. \textbf{Tín hiệu sớm} (Cohen's d theo mốc, cùng 32.593 sinh viên ở mọi mốc):
+
+\begin{center}\small
+\begin{tabular}{lrrrrrr}
+\toprule
+\rowcolor{rowtint}\textbf{Mốc t\%} & 10 & 20 & 40 & 60 & 80 & 100 \\
+\midrule
+n\_days\_active            & \bignum{0,83} & 0,99 & 1,17 & 1,37 & 1,50 & 1,58 \\
+mean\_score\_to\_date       & 0,80 & 1,11 & 1,49 & 1,56 & 1,57 & 1,58 \\
+days\_since\_last\_activity & 0,91 & 1,17 & 1,56 & 1,92 & 2,30 & 2,55 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\takeaway{\code{n_days_active} \emph{và} \code{days_since_last_activity} đều đạt hiệu ứng \emph{lớn}
+(d $\ge$ 0,8) \textbf{ngay ở mốc 10\%}; nhóm điểm ở 20\%. Tín hiệu hữu ích tồn tại \emph{rất sớm} —
+đó là cơ sở khoa học cho can thiệp sớm.}
+
+% =====================================================================
+\section{Từ dữ liệu đã hiểu $\rightarrow$ hoàn thành các task còn lại}
+% =====================================================================
+Sau khi đã \textit{hiểu} dữ liệu, các task còn lại không còn là ``làm theo công thức'' mà là
+\textbf{hệ quả tự nhiên} của những gì vừa thấy.
+
+\subsection{Làm sạch (Task 3)}
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Trùng lặp:} 0 dòng trùng trên khoá tổng hợp (kiểm bằng \code{drop_duplicates}).
+  \item \textbf{Giá trị thiếu:} đúng theo cơ chế ở Bước 7 — ``Unknown'' cho \code{imd_band}; điền 0 + cờ
+        \code{not_submitted} cho điểm; median train cho \code{date_registration}. Sau xử lý: \textbf{0 NaN}
+        ở mọi cột đặc trưng.
+  \item \textbf{Ngoại lai:} \textbf{không xoá dòng nào}. \code{log1p} cho mọi biến đếm click (vì lệch phải
+        nặng, Bước 5); winsorize 1\% cho biến có chặn (điểm, tín chỉ, số lần thi lại); để nguyên biến
+        không có outlier thật (vd \code{mean_score_to_date}: biên IQR vượt cả 100 nên không có outlier).
+\end{itemize}
+\begin{whybox}
+Mọi ngưỡng (median, giới hạn winsorize, scaler) đều \textbf{học chỉ trên tập train} rồi áp lên test —
+nguyên tắc vàng chống rò rỉ.
+\end{whybox}
+
+\subsection{Biến đổi \& chuẩn hoá (Tasks 16--20)}
+28 đặc trưng được chia \textbf{5 kiểu}, vì kiểu biến quyết định cách mã hoá:
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}lrX@{}}
+\toprule
+\rowcolor{rowtint}\textbf{Kiểu} & \textbf{Số biến} & \textbf{Bộ mã hoá / scaler} \\
+\midrule
+Định lượng (numeric) & 19 & StandardScaler (TB 0, ĐLC 1) \\
+Thứ bậc (ordinal)    & 3  & OrdinalEncoder (giữ thứ tự; giá trị lạ $\to -1$) \\
+Danh định (nominal)  & 3  & OneHotEncoder (\code{drop=None}, \code{handle_unknown=ignore}) \\
+Nhị phân (binary)    & 2  & BinaryEncoder (M/Y $\to$ 1) \\
+Chỉ báo (indicator)  & 1  & passthrough (đã là 0/1) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\noindent One-hot mở rộng 3 biến danh định thành nhiều cột (region \bignum{13} + module \bignum{7} +
+kỳ \bignum{4}). Tổng cộng: $19+3+2+1+13+7+4 = $ \bignum{49 cột} đặc, không NaN.
+\takeaway{\code{drop=None} (giữ mọi cột one-hot) là chủ ý: đây là đồ án \emph{giải thích được} —
+bỏ một hạng tham chiếu sẽ giấu nó khỏi SHAP/LIME.}
+
+\subsection{Chia tập \& chống rò rỉ (Tasks 7, 8, 15, 22)}
+Việc chia tập tôn trọng \textbf{ba} tính chất của dữ liệu cùng lúc:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt]
+  \item \textbf{Theo nhóm} — một sinh viên có thể xuất hiện ở nhiều lượt mở môn $\Rightarrow$ chia theo
+        \code{id_student} (nếu không, cùng một người rơi vào cả train lẫn test = rò rỉ nhóm).
+  \item \textbf{Phân tầng} — giữ tỉ lệ nguy cơ 52,8\% ở cả hai tập.
+  \item \textbf{Theo thời gian} — test \textbf{giống hệt} ở mọi mốc để so sánh công bằng.
+\end{enumerate}
+\noindent Kết quả (hold-out 20\%, seed 42): \bignum{26.104} train / \bignum{6.489} test /
+\bignum{5.756} sinh viên test; tỉ lệ nguy cơ 0,53 vs 0,52; \bignum{0} sinh viên trùng. Và chống rò rỉ
+\textbf{được kiểm thử tự động}: \code{tests/test_leakage.py} chạy \bignum{19/19 test pass} — gồm test train-only cho điền khuyết/winsorize, test allow-list chống đưa cột rò rỉ vào X, và test khớp idle ở t=100\% với master.
+
+\subsection{Phân tích khám phá — EDA (Tasks 27--38)}
+Những phát hiện chính (đã định lượng ở Bước 5--11):
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+  \item Phân bố lệch phải mạnh $\Rightarrow$ \code{log1p}; \code{days_since_last_activity} \textbf{lưỡng đỉnh} —
+        chữ ký của mất gắn kết (median nhàn rỗi: Pass 12, Fail 116, Withdrawn 232 ngày).
+  \item \textbf{Hành vi áp đảo nhân khẩu}: Cohen's d tới 2,55 so với Cramér's V $\le$ 0,15.
+  \item Có 2 cặp cộng tuyến ($\ge 0,8$) nhưng không cặp nào $\ge 0,95$ $\Rightarrow$ không rò rỉ.
+  \item Giả thuyết cho mô hình: \emph{mới ngừng hoạt động gần đây + nộp ít bài} là dấu hiệu nguy cơ sớm
+        và đáng tin nhất.
+\end{itemize}
+
+% =====================================================================
+\section{Tái lập toàn bộ (chạy lại từ đầu)}
+% =====================================================================
+\begin{lstlisting}[language=bash]
+# 0) Understand the data (this notebook -- ClickHouse, run step by step):
+#    open notebooks/00_data_understanding.ipynb, Run All (kernel dsp)
+
+# 1) Build the master table + 6 checkpoints from the 7 raw CSVs:
+python -m src.data.build_master_table
+python -m src.data.make_checkpoints          # idempotent, resumable
+
+# 2) Fixed train/test split + anti-leakage report:
+python -m src.evaluation.make_split
+
+# 3) Leakage tests (must show 16 passed):
+pytest tests/test_leakage.py -q
+
+# 4) Generate EDA figures + tables, then notebooks 01/02:
+python -m src.eda.eda
+python tools/build_notebooks.py
+
+# 5) Compile the documents (Tectonic):
+tectonic reports/guide/DataTask_Process_Guide.tex
+tectonic reports/slides/DataTasks_Slides.tex
+\end{lstlisting}
+
+% =====================================================================
+\section*{Phụ lục — Bảng tổng hợp con số (đã kiểm chứng)}
+\addcontentsline{toc}{section}{Phụ lục — Bảng tổng hợp con số}
+% =====================================================================
+\small
+\begin{tabularx}{\linewidth}{@{}Xl@{}}
+\toprule
+\rowcolor{rowtint}\textbf{Hạng mục} & \textbf{Giá trị} \\
+\midrule
+studentVle (clickstream) & 10.655.280 dòng · 433 MB · 26.074 SV có click \\
+Parquet (sau chuyển) & 22,9 MB · truy vấn $<$ 1 s \\
+Hạt master & 32.593 dòng · 28.785 SV · 22 lượt mở môn · 33 cột \\
+Nhãn nguy cơ & 52,8\% (tỉ số 1,12) · Pass 12.361 / Withdrawn 10.156 / Fail 7.052 / Dist. 3.024 \\
+Thiếu & imd\_band 3,41\% · date\_registration 0,14\% · date\_unregistration 69,1\% \\
+Lệch phải & total\_clicks skew 3,0 · max\_clicks\_single\_day skew $\approx$11 \\
+Ma trận đặc trưng & 28 đặc trưng (5 kiểu) $\to$ 49 cột \\
+Chia tập & 26.104 train / 6.489 test / 5.756 SV test · 0 trùng · 19/19 test rò rỉ \\
+Hiệu ứng mạnh nhất & days\_since\_last\_activity Cohen's d = 2,55 · sớm từ mốc 10\% \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+\vspace{0.8em}
+\noindent\textbf{Tài liệu tham khảo.}
+[1] Kuzilek, Hlosta, Zdrahal, \textit{Open University Learning Analytics Dataset}, Scientific Data 4:170171, 2017.
+[2] Adnan et al., \textit{IEEE Access} 9:7519--7539, 2021.
+[3] Tomasevic, Gvozdenovic, Vranes, \textit{Computers \& Education} 143:103676, 2020.
+
+\end{document}

@@ -165,12 +165,12 @@
   "time_aware": {
     "discrimination_by_checkpoint": {
       "days_since_last_activity": {
-        "10": 0.407,
-        "20": 0.688,
-        "40": 1.022,
-        "60": 1.281,
-        "80": 1.495,
-        "100": 1.562
+        "10": 0.906,
+        "20": 1.173,
+        "40": 1.563,
+        "60": 1.923,
+        "80": 2.296,
+        "100": 2.546
       },
       "mean_score_to_date": {
         "10": 0.798,
@@ -218,7 +218,7 @@
       "n_days_active": 10,
       "mean_score_to_date": 20,
       "n_assessments_submitted": 20,
-      "days_since_last_activity": 40,
+      "days_since_last_activity": 10,
       "weighted_score_to_date": 20
     }
   },

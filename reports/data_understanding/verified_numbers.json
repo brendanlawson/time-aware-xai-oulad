@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "purpose": "Single source of truth for every number in the Data-Task guide, slides and script. All values reproduced from the raw OULAD CSVs and the project's interim/checkpoint parquets with clickhouse-local (see notebooks/00_data_understanding.ipynb). Cohen's d uses the project formula |m1-m0|/sqrt((s1^2+s0^2)/2), ddof=1 (src/eda/eda.py).",
+    "engine": "clickhouse-local 26.6.1 (WSL Ubuntu)",
+    "date_collected": "2026-06-17"
+  },
+  "scale": {
+    "studentVle_csv_bytes": 453836331,
+    "studentVle_csv_mb": 432.8,
+    "studentVle_rows": 10655280,
+    "studentVle_parquet_bytes": 22933166,
+    "studentVle_parquet_mb": 21.9,
+    "parquet_compression_x": 19.8,
+    "csv_scan_seconds": 14.6,
+    "parquet_scan_seconds": 0.55,
+    "speedup_x": 26
+  },
+  "studentVle": {
+    "rows": 10655280, "distinct_students": 26074, "distinct_sites": 6268,
+    "presentations": 22, "date_min": -25, "date_max": 269,
+    "sum_click_per_event": {"mean": 3.717, "median": 2, "max": 6977, "skew": 122.9},
+    "total_clicks_active": {"n_student_pres": 29228, "mean": 1355, "median": 740, "skew": 2.94, "max": 24139, "mean_days_active": 61.9},
+    "max_clicks_single_day_active": {"mean": 122.5, "median": 84, "max": 6988, "skew": 10.9}
+  },
+  "studentInfo": {
+    "rows": 32593, "distinct_students": 28785, "module_presentations": 22,
+    "final_result": {"Pass": 12361, "Withdrawn": 10156, "Fail": 7052, "Distinction": 3024},
+    "at_risk_n": 17208, "at_risk_pct": 52.8, "imbalance_ratio": 1.118,
+    "imd_band_missing": 1111, "imd_band_missing_pct": 3.41,
+    "n_levels": {"highest_education": 5, "region": 13, "age_band": 3}
+  },
+  "studentRegistration": {
+    "rows": 32593,
+    "date_registration_missing": 45, "date_registration_missing_pct": 0.14,
+    "date_unregistration_missing": 22521, "date_unregistration_missing_pct": 69.1
+  },
+  "courses": {"module_presentations": 22, "length_min": 234, "length_max": 269, "length_avg": 255.5},
+  "studentAssessment": {"rows": 173912, "score_missing": 173, "date_submitted_min": -11, "date_submitted_max": 608},
+  "assessments": {"rows": 206, "TMA": 106, "CMA": 76, "Exam": 24, "exam_deadline_missing": 11},
+  "vle": {"rows": 6364, "activity_types": 20, "distinct_sites": 6364, "canonical_types_kept": 8},
+  "master_raw": {
+    "rows": 32593, "at_risk_rate": 0.528, "zero_click_rows": 3365,
+    "total_clicks": {"mean": 1215.1, "median": 609, "skew": 3.03, "max": 24139},
+    "mean_score_to_date": {"mean": 57.0, "median": 70.5, "skew": -0.85},
+    "cohens_d": {
+      "days_since_last_activity": 2.546, "n_assessments_submitted": 2.054,
+      "weighted_score_to_date": 1.964, "n_days_active": 1.584, "total_clicks": 1.064
+    },
+    "group_means": {
+      "days_since_last_activity": {"not_at_risk": 14.2, "at_risk": 171.1},
+      "n_days_active": {"not_at_risk": 91.6, "at_risk": 23.2},
+      "n_assessments_submitted": {"not_at_risk": 8.6, "at_risk": 2.3},
+      "weighted_score_to_date": {"not_at_risk": 84.9, "at_risk": 15.1}
+    },
+    "median_idle_by_result": {"Distinction": 8, "Pass": 12, "Fail": 116, "Withdrawn": 232},
+    "correlations": {"idle_vs_label": 0.778, "active_vs_clicks": 0.837, "idle_vs_submits": -0.828, "clicks_vs_label": -0.477}
+  },
+  "checkpoints": {
+    "at_risk_rate_all_t": 0.528, "n_rows_all_t": 32593,
+    "cohens_d_by_t": {
+      "t10":  {"n_days_active": 0.834, "total_clicks": 0.616, "idle": 0.906, "mean_score": 0.798},
+      "t20":  {"n_days_active": 0.991, "total_clicks": 0.688, "idle": 1.173, "mean_score": 1.113},
+      "t40":  {"n_days_active": 1.165, "total_clicks": 0.780, "idle": 1.563, "mean_score": 1.492},
+      "t60":  {"n_days_active": 1.367, "total_clicks": 0.913, "idle": 1.923, "mean_score": 1.559},
+      "t80":  {"n_days_active": 1.500, "total_clicks": 0.994, "idle": 2.296, "mean_score": 1.573},
+      "t100": {"n_days_active": 1.584, "total_clicks": 1.064, "idle": 2.546, "mean_score": 1.578}
+    },
+    "_note_idle_fix": "days_since_last_activity (idle) recomputed after the make_checkpoints fill fix; t100 now equals master (2.546) and idle reaches d>=0.8 at t=10.",
+    "earliest_t_d_ge_0.8": {"n_days_active": 10, "mean_score": 20, "idle": 10, "total_clicks": 60}
+  },
+  "transform": {
+    "n_features": 28, "numeric": 19, "ordinal": 3, "nominal": 3, "binary": 2, "indicator": 1,
+    "n_modules": 7, "n_presentations": 4, "n_regions": 13, "matrix_cols": 49
+  },
+  "split": {
+    "test_size": 0.2, "seed": 42, "grouped_by": "id_student", "stratified_by": "at_risk",
+    "n_train": 26104, "n_test": 6489, "n_test_students": 5756,
+    "test_at_risk_rate": 0.52, "train_at_risk_rate": 0.53, "student_overlap": 0
+  },
+  "leakage_tests": {"total": 19, "passed": 19}
+}
