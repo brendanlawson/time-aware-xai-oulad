@@ -108,11 +108,22 @@ def _assemble_checkpoint(
         validate="many_to_one",
     )
 
-    engagement_fill = [c for c in engagement.columns if c not in GROUP_COLS]
+    # Fill engagement gaps with 0 for students absent from studentVle -- EXCEPT
+    # days_since_last_activity, whose "no activity" value is NOT 0 (that would read as
+    # "just active"). A student with zero activity has been idle for the whole observed
+    # window, so fill it with the checkpoint's cutoff_day. At t=100 cutoff_day equals
+    # module_presentation_length, so this reproduces master_raw exactly.
+    engagement_fill = [
+        c
+        for c in engagement.columns
+        if c not in GROUP_COLS and c != "days_since_last_activity"
+    ]
     master_t[engagement_fill] = master_t[engagement_fill].fillna(0)
+    master_t = master_t.merge(cutoff_t, on=PRESENTATION_KEY, how="left")
     master_t["days_since_last_activity"] = master_t["days_since_last_activity"].fillna(
-        master_t["module_presentation_length"]
+        master_t["cutoff_day"]
     )
+    master_t = master_t.drop(columns=["cutoff_day"])
     master_t.insert(0, "t_percent", t)
     return master_t
 

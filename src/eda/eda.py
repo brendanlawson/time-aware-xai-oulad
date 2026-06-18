@@ -29,7 +29,13 @@ from scipy import stats  # noqa: E402
 
 from src.data.io_utils import CHECKPOINTS_DIR, INTERIM_DIR  # noqa: E402
 from src.data.time_utils import CHECKPOINTS  # noqa: E402
-from src.eda.plot_style import CLASS_COLOURS, CLASS_LABELS, apply_style, savefig  # noqa: E402
+from src.eda.plot_style import (  # noqa: E402
+    CLASS_COLOURS,
+    CLASS_LABELS,
+    apply_style,
+    savefig,
+    tidy_axis,
+)
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports"
 TABLES_DIR = REPORTS_DIR / "tables"
@@ -84,8 +90,8 @@ GROUP_OF = {
     **{c: "Performance" for c in PERFORMANCE_NUM},
 }
 GROUP_COLOUR = {
-    "Demographic": "#999999",
-    "Engagement": "#D6604D",
+    "Demographic": "#7F8C8D",
+    "Engagement": "#C0392B",
     "Performance": "#2166AC",
 }
 
@@ -193,19 +199,41 @@ def univariate(master: pd.DataFrame) -> dict:
         _save_table(freq, f"freq_{col}", index=False)
 
     # Histograms + KDE for the main numeric features, coloured by group.
-    fig, axes = plt.subplots(2, 5, figsize=(20, 8))
+    fig, axes = plt.subplots(2, 5, figsize=(20, 8.6), constrained_layout=True)
     for ax, col in zip(axes.ravel(), NUMERIC_MAIN):
-        sns.histplot(master[col], kde=True, ax=ax, color=GROUP_COLOUR[GROUP_OF[col]])
-        ax.set_title(f"{col}\n(skew={master[col].skew():.2f})", fontsize=10)
+        sns.histplot(
+            master[col],
+            kde=True,
+            ax=ax,
+            color=GROUP_COLOUR[GROUP_OF[col]],
+            edgecolor="white",
+            linewidth=0.3,
+            alpha=0.9,
+        )
+        ax.set_title(col, fontsize=11)
         ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.text(
+            0.95,
+            0.93,
+            f"skew {master[col].skew():.1f}",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=8.5,
+            color="#555555",
+            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#CCCCCC", lw=0.6),
+        )
+        tidy_axis(ax, nbins=4)
     fig.suptitle(
-        "Univariate distributions (histogram + KDE); colour = feature group",
+        "Univariate distributions of numeric features (histogram + KDE)\n"
+        "colour = feature group — Engagement (red) · Performance (blue) · Demographic (grey)",
         fontweight="bold",
     )
     savefig(fig, "univariate_hist_kde")
     plt.close(fig)
 
-    fig, axes = plt.subplots(2, 5, figsize=(20, 8))
+    fig, axes = plt.subplots(2, 5, figsize=(20, 8.6), constrained_layout=True)
     for ax, col in zip(axes.ravel(), NUMERIC_MAIN):
         sns.boxplot(y=master[col], ax=ax, color=GROUP_COLOUR[GROUP_OF[col]])
         ax.set_title(col, fontsize=10)
@@ -215,11 +243,13 @@ def univariate(master: pd.DataFrame) -> dict:
     plt.close(fig)
 
     # Categorical frequency grid.
-    fig, axes = plt.subplots(2, 3, figsize=(18, 9))
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10.5), constrained_layout=True)
     for ax, col in zip(axes.ravel(), CATEGORICAL_MAIN):
         vc = master[col].value_counts().sort_values()
         ax.barh(vc.index.astype(str), vc.values, color="#4D4D4D")
         ax.set_title(f"{col} ({master[col].nunique()} levels)")
+        ax.tick_params(axis="y", labelsize=8)
+        sns.despine(ax=ax)
     fig.suptitle("Categorical frequency distributions", fontweight="bold")
     savefig(fig, "univariate_categorical_freq")
     plt.close(fig)
@@ -246,7 +276,7 @@ def target_distribution(master: pd.DataFrame) -> dict:
     apply_style()
     counts = master["final_result"].value_counts()
     rate = float(master["at_risk"].mean())
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), constrained_layout=True)
     order = ["Distinction", "Pass", "Fail", "Withdrawn"]
     axes[0].bar(
         order,
@@ -309,21 +339,39 @@ def numeric_vs_target(master: pd.DataFrame) -> dict:
     table = table.sort_values("cohens_d", ascending=False).reset_index(drop=True)
     _save_table(table, "bivariate_numeric_tests", index=False)
 
-    # Effect-size figure (ranked |Cohen's d|, coloured by group).
-    fig, ax = plt.subplots(figsize=(9, 7))
+    # Effect-size figure (ranked |Cohen's d|, coloured by group, values labelled).
+    fig, ax = plt.subplots(figsize=(9.5, 7))
     t = table.iloc[::-1]
-    ax.barh(t["feature"], t["cohens_d"], color=[GROUP_COLOUR[g] for g in t["group"]])
-    ax.axvline(0.2, color="grey", ls=":", lw=1)
-    ax.axvline(0.5, color="grey", ls="--", lw=1)
-    ax.axvline(0.8, color="grey", ls="-", lw=1)
+    bars = ax.barh(
+        t["feature"],
+        t["cohens_d"],
+        color=[GROUP_COLOUR[g] for g in t["group"]],
+        edgecolor="white",
+        linewidth=0.4,
+    )
+    ax.bar_label(bars, fmt="%.2f", padding=3, fontsize=8, color="#333333")
+    for x, ls in [(0.2, ":"), (0.5, "--"), (0.8, "-")]:
+        ax.axvline(x, color="grey", ls=ls, lw=1)
+    ax.set_xlim(0, float(t["cohens_d"].max()) * 1.12)
     ax.set_xlabel("|Cohen's d|  (dotted .2 small · dashed .5 medium · solid .8 large)")
     ax.set_title("Discriminative power of numeric features (at-risk vs not-at-risk)")
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, color=GROUP_COLOUR[g])
+        for g in ("Engagement", "Performance", "Demographic")
+    ]
+    ax.legend(
+        handles,
+        ("Engagement", "Performance", "Demographic"),
+        loc="lower right",
+        title="Feature group",
+    )
+    sns.despine(ax=ax)
     savefig(fig, "bivariate_effect_sizes")
     plt.close(fig)
 
     # Boxplots of the six strongest features.
     top = table.head(6)["feature"].tolist()
-    fig, axes = plt.subplots(2, 3, figsize=(16, 9))
+    fig, axes = plt.subplots(2, 3, figsize=(16, 9), constrained_layout=True)
     for ax, col in zip(axes.ravel(), top):
         sns.boxplot(
             x=master["at_risk"].map(CLASS_LABELS),
@@ -377,7 +425,7 @@ def categorical_vs_target(master: pd.DataFrame) -> dict:
     _save_table(table, "bivariate_categorical_tests", index=False)
 
     overall = master["at_risk"].mean()
-    fig, axes = plt.subplots(2, 3, figsize=(18, 9))
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10.5), constrained_layout=True)
     for ax, col in zip(axes.ravel(), CATEGORICAL_MAIN):
         rate = master.groupby(col)["at_risk"].mean().sort_values()
         v = table.loc[table["feature"] == col, "cramers_v"].iloc[0]
@@ -385,6 +433,8 @@ def categorical_vs_target(master: pd.DataFrame) -> dict:
         ax.axvline(overall, color="grey", ls="--", lw=1)
         ax.set_title(f"At-risk rate by {col}  (Cramer's V={v})")
         ax.set_xlabel("At-risk rate")
+        ax.tick_params(axis="y", labelsize=8)
+        sns.despine(ax=ax)
     fig.suptitle(
         "At-risk rate across categorical levels (dashed = overall 52.8%)",
         fontweight="bold",
@@ -402,17 +452,27 @@ def correlation(master: pd.DataFrame) -> dict:
     num = master[NUMERIC_MAIN + ["at_risk"]]
     for method, fname in [("pearson", "corr_pearson"), ("spearman", "corr_spearman")]:
         corr = num.corr(method=method)
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(10.5, 8.5))
         sns.heatmap(
             corr,
             annot=True,
             fmt=".2f",
-            cmap="vlag",
+            cmap="RdBu_r",
             center=0,
+            vmin=-1,
+            vmax=1,
+            square=True,
+            linewidths=0.5,
+            linecolor="white",
+            annot_kws={"size": 8},
+            cbar_kws={"label": f"{method.title()} r", "shrink": 0.82},
             ax=ax,
-            cbar_kws={"label": f"{method.title()} r"},
         )
-        ax.set_title(f"{method.title()} correlation matrix")
+        ax.set_title(
+            f"{method.title()} correlation of numeric features (incl. at_risk)", pad=12
+        )
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+        plt.setp(ax.get_yticklabels(), rotation=0)
         savefig(fig, fname)
         plt.close(fig)
 
@@ -475,7 +535,7 @@ def time_aware(checkpoints: pd.DataFrame | None) -> dict:
     ]
 
     # (a) Mean trajectory by class.
-    fig, axes = plt.subplots(1, 4, figsize=(22, 5))
+    fig, axes = plt.subplots(1, 4, figsize=(22, 5), constrained_layout=True)
     for ax, col in zip(axes, feats):
         grp = checkpoints.groupby(["t_percent", "at_risk"])[col].mean().unstack()
         for lab in (0, 1):
@@ -549,7 +609,7 @@ def withdrawn_analysis(master: pd.DataFrame) -> dict:
         "Withdrawn",
         np.where(m["at_risk"] == 1, "Fail", "Not-at-risk"),
     )
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
     sns.boxplot(
         x="status",
         y="days_since_last_activity",

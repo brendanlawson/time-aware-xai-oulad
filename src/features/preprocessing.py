@@ -15,8 +15,8 @@ Nhiệm vụ được bao phủ
 Nguyên tắc anti-leakage (Task 22)
 -----------------------------------
   [1] Phân chia train / test     ← thực hiện BÊN NGOÀI module này
-  [2] handle_missing(X_train)    → fit imputation logic trên train → transform cả hai
-  [3] handle_outliers(X_train)   → transform cả hai theo cùng quy tắc
+  [2] handle_missing(stats={})   → học median trên train (lưu vào stats) → áp cho test
+  [3] handle_outliers(stats={})  → học ngưỡng winsorize [p1,p99] trên train → áp cho test
   [4] ColumnTransformer.fit(X_train) → transform cả hai
          ├─ numeric  : StandardScaler
          ├─ ordinal  : OrdinalEncoder
@@ -68,7 +68,6 @@ from typing import Optional
 import joblib
 import numpy as np
 import pandas as pd
-from scipy.stats.mstats import winsorize
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
@@ -159,6 +158,39 @@ TARGET_COL = "at_risk"
 # Biến định danh (không dùng làm đặc trưng)
 ID_COLS: list[str] = ["id_student", "code_module", "code_presentation"]
 
+# ── Danh sách đặc trưng được phép (allow-list) & chống rò rỉ nhãn ──────────
+# FEATURE_COLUMNS là DUY NHẤT các cột mô hình được phép học. LEAKY_COLUMNS không
+# bao giờ được vào X: nhãn, nguồn thô của nhãn (final_result) và ngày rút môn
+# (date_unregistration — mã hoá trực tiếp kết quả Withdrawn).
+FEATURE_COLUMNS: list[str] = (
+    NUMERIC_FEATURES
+    + ORDINAL_FEATURES
+    + NOMINAL_FEATURES
+    + BINARY_FEATURES
+    + INDICATOR_FEATURES
+)
+LEAKY_COLUMNS: frozenset[str] = frozenset(
+    {TARGET_COL, "final_result", "date_unregistration"}
+)
+
+
+def make_X_y(df: pd.DataFrame) -> tuple[pd.DataFrame, "pd.Series | None"]:
+    """Tách an toàn (X, y) từ bảng master/checkpoint.
+
+    X chỉ chứa các cột trong FEATURE_COLUMNS (allow-list), nên các cột rò rỉ
+    (`final_result`, `date_unregistration`, nhãn `at_risk`) KHÔNG BAO GIỜ lọt vào
+    X — kể cả khi ai đó lỡ tay làm ``X = df.drop(columns=["at_risk"])``. ``y`` là
+    cột ``at_risk`` khi có mặt.
+    """
+    leaked = LEAKY_COLUMNS & set(FEATURE_COLUMNS)
+    assert not leaked, f"FEATURE_COLUMNS chứa cột rò rỉ: {sorted(leaked)}"
+    missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
+    if missing:
+        raise KeyError(f"Thiếu cột đặc trưng: {missing}")
+    X = df[FEATURE_COLUMNS].copy()
+    y = df[TARGET_COL].copy() if TARGET_COL in df.columns else None
+    return X, y
+
 
 # ════════════════════════════════════════════════════════════════════════
 # 1.  XỬ LÝ GIÁ TRỊ KHUYẾT  (Task 17)
@@ -180,7 +212,11 @@ def log_missing(df: pd.DataFrame) -> pd.DataFrame:
     return report
 
 
-def handle_missing(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataFrame:
+def handle_missing(
+    df: pd.DataFrame,
+    log_path: Optional[str] = None,
+    stats: Optional[dict] = None,
+) -> pd.DataFrame:
     """
     Xử lý giá trị khuyết theo từng biến:
 
@@ -199,6 +235,10 @@ def handle_missing(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataF
     -------
     df       : DataFrame (thường là X_train hoặc X_test SAU khi đã phân chia)
     log_path : nếu không None, ghi CSV nhật ký vào đường dẫn này
+    stats    : dict tham số học trên train (chống rò rỉ). Lần gọi đầu (train) để
+               trống → hàm TÍNH median và LƯU vào dict; lần gọi sau (test) truyền
+               lại dict → hàm DÙNG median train, KHÔNG tính median trên test.
+               Bỏ trống (None) → hành vi cũ: tính trên chính df.
 
     Trả về DataFrame đã xử lý.
     """
@@ -229,12 +269,18 @@ def handle_missing(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataF
             }
             df[col] = df[col].fillna(0.0)
 
-    # ── 3. date_registration ─────────────────────────────────────────
+    # ── 3. date_registration (median HỌC TRÊN TRAIN, áp cho cả test) ─
     col = "date_registration"
     if col in df.columns:
         n = int(df[col].isnull().sum())
-        if n > 0:
+        # FIT (train): tính & lưu median train. APPLY (test): dùng lại median train.
+        if stats is not None and "date_registration_median" in stats:
+            median_val = stats["date_registration_median"]
+        else:
             median_val = float(df[col].median())
+            if stats is not None:
+                stats["date_registration_median"] = median_val
+        if n > 0:
             log_dict[col] = {
                 "n_khuyết_trước": n,
                 "chiến_lược": f"fill median train ({median_val:.1f})",
@@ -349,22 +395,27 @@ def log_outliers(df: pd.DataFrame) -> pd.DataFrame:
     return report
 
 
-def handle_outliers(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.DataFrame:
+def handle_outliers(
+    df: pd.DataFrame,
+    log_path: Optional[str] = None,
+    stats: Optional[dict] = None,
+) -> pd.DataFrame:
     """
     Xử lý ngoại lai theo OUTLIER_STRATEGY.
 
     Quy tắc thiết kế:
     -  KHÔNG loại bỏ bản ghi: chỉ biến đổi giá trị (log1p / winsorize).
-    -  log1p   : x → log(1 + x).  Yêu cầu x ≥ 0; phù hợp click count.
-    -  winsorize: kéo điểm cực trị về ngưỡng [p1, p99] của tập đang xét.
-    -  Áp dụng độc lập trên từng tập (train và test) để tránh thông tin
-       rò rỉ; ngưỡng winsorize được học riêng từ train (gọi handle_outliers
-       cho train trước, sau đó gọi lại cho test với cùng hàm).
+    -  log1p   : x → log(1 + x).  Yêu cầu x ≥ 0; phù hợp click count (không cần fit).
+    -  winsorize: clip về ngưỡng [p1, p99] HỌC TRÊN TRAIN, rồi áp cho cả test —
+       qua tham số ``stats`` (chống rò rỉ). Không học lại ngưỡng trên test.
 
     Tham số
     -------
     df       : X_train hoặc X_test (sau handle_missing)
     log_path : nếu không None, ghi CSV bảng so sánh trước/sau
+    stats    : dict ngưỡng học trên train. Lần gọi đầu (train) để trống → hàm TÍNH
+               (p1, p99) cho từng biến và LƯU; lần gọi sau (test) truyền lại dict →
+               DÙNG ngưỡng train. Bỏ trống (None) → tính trên chính df (hành vi cũ).
 
     Trả về DataFrame đã xử lý.
     """
@@ -384,9 +435,20 @@ def handle_outliers(df: pd.DataFrame, log_path: Optional[str] = None) -> pd.Data
             df[col] = np.log1p(df[col].clip(lower=0))
             reason = "Phân phối lệch phải → log1p giảm độ lệch"
         elif strat == "winsorize":
-            arr = winsorize(df[col].values, limits=WINSORIZE_LIMITS)
-            df[col] = np.array(arr)
-            reason = f"Winsorize cắt {int(WINSORIZE_LIMITS[0]*100)}% hai đầu"
+            # Ngưỡng [p1, p99] HỌC TRÊN TRAIN rồi áp cho test (clip ≡ winsorize).
+            key = f"winsor_{col}"
+            if stats is not None and key in stats:
+                lo, hi = stats[key]
+            else:
+                lo = float(df[col].quantile(WINSORIZE_LIMITS[0]))
+                hi = float(df[col].quantile(1.0 - WINSORIZE_LIMITS[1]))
+                if stats is not None:
+                    stats[key] = (lo, hi)
+            df[col] = df[col].clip(lower=lo, upper=hi)
+            reason = (
+                f"Winsorize/clip tại [p{int(WINSORIZE_LIMITS[0]*100)}, "
+                f"p{int((1 - WINSORIZE_LIMITS[1]) * 100)}] (ngưỡng học trên train)"
+            )
         else:
             reason = "Không xử lý"
 
@@ -700,15 +762,21 @@ def preprocess(
 
     log.info("══ preprocess: bắt đầu ══")
 
-    # ── Bước 2: Xử lý giá trị khuyết ─────────────────────────────────
+    # ── Bước 2: Xử lý giá trị khuyết (median HỌC TRÊN TRAIN) ─────────
     log.info("── Bước 2: handle_missing ──")
-    X_train = handle_missing(X_train, log_path=missing_log_path)
-    X_test = handle_missing(X_test, log_path=None)  # dùng cùng quy tắc
+    missing_stats: dict = {}
+    X_train = handle_missing(X_train, log_path=missing_log_path, stats=missing_stats)
+    X_test = handle_missing(
+        X_test, log_path=None, stats=missing_stats
+    )  # áp tham số train
 
-    # ── Bước 3: Xử lý ngoại lai ───────────────────────────────────────
+    # ── Bước 3: Xử lý ngoại lai (ngưỡng winsorize HỌC TRÊN TRAIN) ────
     log.info("── Bước 3: handle_outliers ──")
-    X_train = handle_outliers(X_train, log_path=outlier_log_path)
-    X_test = handle_outliers(X_test, log_path=None)
+    outlier_stats: dict = {}
+    X_train = handle_outliers(X_train, log_path=outlier_log_path, stats=outlier_stats)
+    X_test = handle_outliers(
+        X_test, log_path=None, stats=outlier_stats
+    )  # áp ngưỡng train
 
     # ── Bước 4a: Fit & transform trên train ───────────────────────────
     log.info("── Bước 4a: fit_transform (train only) ──")

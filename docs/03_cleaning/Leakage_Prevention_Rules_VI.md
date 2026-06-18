@@ -28,7 +28,7 @@ Ngoài trục thời gian, mọi thành phần *học* từ dữ liệu (thống
 
 ## 4. Kiểm thử tự động
 
-`tests/test_leakage.py` khẳng định, cho cả sáu mốc, rằng không bản ghi đã cắt nào có ngày vượt ngày mốc, trên cả clickstream và bài nộp; số bản ghi không giảm theo *t*; và *t = 100%* giữ lại toàn bộ bản ghi có ngày. Đồng thời kiểm tra phân chia không trùng sinh viên và bảo toàn tỉ lệ lớp. **Kết quả: 16/16 kiểm thử đạt.**
+`tests/test_leakage.py` khẳng định, cho cả sáu mốc, rằng không bản ghi đã cắt nào có ngày vượt ngày mốc, trên cả clickstream và bài nộp; số bản ghi không giảm theo *t*; và *t = 100%* giữ lại toàn bộ bản ghi có ngày. Đồng thời kiểm tra phân chia không trùng sinh viên và bảo toàn tỉ lệ lớp, và một kiểm thử khẳng định median điền khuyết cùng ngưỡng winsorize **chỉ học trên train** rồi áp cho test, cùng một test allow-list (không cột rò rỉ nào lọt vào X) và một test khẳng định idle ở *t = 100%* khớp master. **Kết quả: 19/19 kiểm thử đạt.**
 
 ## 5. Ví dụ minh hoạ (`AAA / 2013J`, dài 268 ngày)
 

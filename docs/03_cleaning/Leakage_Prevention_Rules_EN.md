@@ -28,7 +28,7 @@ Beyond the time axis, any component that *learns* from data (imputation statisti
 
 ## 4. Automated enforcement
 
-`tests/test_leakage.py` asserts, for all six checkpoints, that no cut record has a date beyond its checkpoint day, on both the clickstream and the submissions; that record counts are non-decreasing in *t*; and that *t = 100%* retains all dated records. It also checks the split has no student overlap and preserves the class ratio. **Result: 16/16 tests pass.**
+`tests/test_leakage.py` asserts, for all six checkpoints, that no cut record has a date beyond its checkpoint day, on both the clickstream and the submissions; that record counts are non-decreasing in *t*; and that *t = 100%* retains all dated records. It also checks the split has no student overlap and preserves the class ratio, plus a test asserting the imputation median and winsorise thresholds are **learned on train only** and applied to test, plus a feature allow-list test (no leaky column reaches X) and a test that idle at *t = 100%* matches master. **Result: 19/19 tests pass.**
 
 ## 5. Worked example (`AAA / 2013J`, length 268 days)
 

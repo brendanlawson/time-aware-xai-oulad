@@ -1,8 +1,13 @@
-"""Generate the two deliverable notebooks as IEEE-style analytical reports.
+"""Generate the two deliverable notebooks (English).
 
-The notebooks are thin over the tested src/ modules (so code/figures never drift)
-but carry full narrative: abstract, numbered sections, interpretation after every
-result, and references — matching the schema-survey notebook's standard.
+* notebook 01 — reproducible build of the master table (Chapter 3).
+* notebook 02 — the canonical EDA report (English): executive summary, a
+  structure-first profile table, formatted result tables (no raw JSON dumps),
+  crisp interpretation after each section, and references. Both are thin over the
+  tested ``src/`` modules so the notebook and the committed code can never drift.
+
+The Vietnamese narration used when presenting lives in the speaker script
+(reports/Task3_Speaker_Script_Merged.docx), not in this notebook.
 
 Run:  python tools/build_notebooks.py
 """
@@ -15,7 +20,7 @@ from nbformat.v4 import new_code_cell, new_markdown_cell, new_raw_cell
 NB_DIR = Path(__file__).resolve().parents[1] / "notebooks"
 
 BOOT = (
-    "import sys, json\n"
+    "import sys\n"
     "from pathlib import Path\n"
     "import pandas as pd\n"
     "from IPython.display import Image, display\n"
@@ -23,6 +28,8 @@ BOOT = (
     "sys.path.insert(0, str(ROOT))\n"
     "TABLES = ROOT / 'reports' / 'tables'\n"
     "FIGS = ROOT / 'reports' / 'figures'\n"
+    "pd.set_option('display.max_columns', 40)\n"
+    "pd.set_option('display.width', 160)\n"
 )
 
 
@@ -67,9 +74,8 @@ nb01.cells = [
         "Predicting at-risk students early enables timely intervention but requires an "
         "analysis-ready table that integrates demographic, behavioural and assessment evidence "
         "without temporal or group leakage. This notebook builds that table from the seven raw "
-        "OULAD CSVs and is the executable counterpart of the Chapter-3 deliverables (data "
-        "specification, collection, cleaning). It calls the tested modules in `src/data` so the "
-        "notebook and the committed code cannot drift.\n\n"
+        "OULAD CSVs and is the executable counterpart of the Chapter-3 deliverables. It calls the "
+        "tested modules in `src/data` so the notebook and the committed code cannot drift.\n\n"
         "**Target definition (Step-0, Option A).** `at_risk = 1` if `final_result ∈ {Fail, "
         "Withdrawn}`, else `0`; the label is fixed across all checkpoints."
     ),
@@ -79,9 +85,8 @@ nb01.cells = [
     ),
     new_markdown_cell(
         "# Method: integration at the student-module-presentation grain\n\n"
-        "`studentInfo` is the base table (one row per `id_student × code_module × "
-        "code_presentation`). Registration, the aggregated engagement features (from the "
-        "10.6M-row `studentVle` clickstream) and the aggregated performance features (from "
+        "`studentInfo` is the base table. Registration, the aggregated engagement features (from "
+        "the 10.6M-row `studentVle` clickstream) and the aggregated performance features (from "
         "`studentAssessment`) are attached by **left joins**, each validated `many_to_one`. A "
         "before/after row-count log proves no duplication or loss."
     ),
@@ -90,220 +95,260 @@ nb01.cells = [
     ),
     new_markdown_cell(
         "# Join-integrity evidence\n\n"
-        "The join log below shows every step preserves exactly 32,593 records — confirming the "
-        "aggregation collapsed the one-to-many event tables to the student grain *before* "
-        "joining, so no row was duplicated."
+        "Every step preserves exactly 32,593 records — the aggregation collapsed the one-to-many "
+        "event tables to the student grain *before* joining, so no row was duplicated."
     ),
-    new_code_cell(
-        "# Table 1 — Join log (every step preserves 32,593 records)\ndisplay(pd.read_csv(INTERIM_DIR / 'master_join_log.csv'))"
-    ),
+    new_code_cell("display(pd.read_csv(INTERIM_DIR / 'master_join_log.csv'))"),
     new_markdown_cell(
         "# Cleaning: deduplication, consistency, missing values, outliers\n\n"
-        "Cleaning is applied per the cleaning-methods analysis (`docs/03_cleaning`): duplicate "
-        "composite keys are dropped (0 remain); categorical text is standardised; `imd_band` "
-        "gaps become `Unknown`; assessment gaps become 0 plus the informative `not_submitted` "
-        "flag; outliers are transformed (log1p / winsorize), never deleted. The cleaning log "
-        "records the categorical cardinalities."
+        "Duplicate composite keys are dropped (0 remain); categorical text is standardised; "
+        "`imd_band` gaps become `Unknown`; assessment gaps become 0 plus the informative "
+        "`not_submitted` flag; outliers are transformed (log1p / winsorize), never deleted."
     ),
     new_code_cell("display(pd.read_csv(INTERIM_DIR / 'master_cleaning_log.csv'))"),
     new_markdown_cell(
         "# Output validation\n\n"
-        "We confirm the population size, the absence of duplicate keys, and the fixed at-risk "
-        "rate, then preview the analysis-ready table."
+        "We confirm population size, absence of duplicate keys, and the fixed at-risk rate."
     ),
     new_code_cell(
         "print('rows:', len(master), '| columns:', master.shape[1])\n"
         "print('at_risk rate: {:.1%}'.format(master['at_risk'].mean()))\n"
         "key = ['code_module','code_presentation','id_student']\n"
         "assert len(master) == 32593 and master.duplicated(key).sum() == 0\n"
-        "print('OK — 32,593 unique student-module-presentation records, no duplicate keys')\n"
+        "print('OK — 32,593 unique records, no duplicate keys')\n"
         "master.head(3)"
     ),
     new_markdown_cell(
         "# Conclusion\n\n"
         "The master table (32,593 × 33) integrates the three feature groups and the fixed label "
-        "with audited integrity, and is the single input to the time-aware checkpoint generation "
-        "(`src/data/make_checkpoints`) and the EDA (notebook 02). *Restart & Run All* reproduces "
-        "it from the raw CSVs without manual steps."
+        "with audited integrity, and is the single input to the time-aware checkpoints "
+        "(`src/data/make_checkpoints`) and the EDA (notebook 02)."
     ),
 ]
 
 # =========================================================================== #
-# Notebook 02 — Exploratory Data Analysis (Chapter 4)
+# Notebook 02 — EDA (English) — canonical report
 # =========================================================================== #
-ABSTRACT_02 = (
-    "We present an exploratory analysis of the OULAD master table for early at-risk prediction. "
-    "Beyond visual summaries, every comparison is supported by an appropriate statistic: "
-    "Mann-Whitney U tests with Benjamini-Hochberg correction and Cohen's d for numeric features, "
-    "chi-square tests with Cramer's V for categorical features, and Pearson/Spearman correlation "
-    "with an explicit leakage check. A time-aware analysis tracks how class separability grows "
-    "across the six checkpoints, identifying the earliest reliable prediction point (RQ1). We "
-    "find that behavioural and performance features dominate (all 19 numeric features are "
-    "significant; the strongest reach Cohen's d > 2), demographic association is weak "
-    "(Cramer's V <= 0.15), no feature leaks the label (|r| < 0.95), and the at-risk signal is "
-    "already strong by 20-40% of course length."
-)
-
 nb02 = nbf.v4.new_notebook()
 nb02.cells = [
-    new_raw_cell(
-        quarto_header(
-            "Exploratory Data Analysis of the OULAD Master Table for Early At-Risk Prediction",
-            ABSTRACT_02,
-            "Report 2 · Chapter 4 · STT 27-28, 35-38",
-        )
+    new_markdown_cell(
+        "# Exploratory Data Analysis (EDA) — OULAD\n\n"
+        "**DSP391m · Group 1 · FPT University** · Topic: *Time-Aware Explainable ML for Early "
+        "At-Risk Student Detection (OULAD)*\n\n"
+        "> **Executable EDA**: every analysis is run through the tested `src/eda/eda.py` module, "
+        "so the figures & tables never drift from the code, and the numbers printed here are the "
+        "ones used on the slides. We use `master_raw` (t=100%) for univariate/bivariate/"
+        "correlation, and the six checkpoint datasets for the time-aware analysis.\n\n"
+        "> The Vietnamese narration for presenting lives in the speaker script "
+        "(`reports/Task3_Speaker_Script_Merged.docx`)."
     ),
     new_markdown_cell(
-        "# Introduction\n\n"
-        "Exploratory Data Analysis (EDA) characterises the data before modelling: its quality, "
-        "the shape of each variable, which variables separate at-risk from not-at-risk students, "
-        "how variables relate to one another, and — because this is a *time-aware* problem — when "
-        "the predictive signal emerges. These observations directly inform the three research "
-        "questions: the earliest reliable checkpoint and best algorithm (**RQ1**), the features "
-        "whose importance SHAP/LIME should later explain stably (**RQ2**), and the class balance "
-        "that motivates the imbalance study (**RQ3**)."
+        "## Executive summary\n\n"
+        "On the master table (**32,593** records, at-risk rate **52.8%**), five findings shape the "
+        "modelling plan:\n\n"
+        "1. **Behaviour dominates demographics.** Engagement & assessment features separate the "
+        "classes strongly (Cohen's *d* up to **2.55**; all **19/19** numeric features significant "
+        "at *q* < 0.05); demographic association is weak (Cramér's *V* ≤ **0.15**).\n"
+        "2. **Clickstream is strongly right-skewed** (skew up to ~35) → motivates the `log1p` "
+        "transform.\n"
+        "3. **`days_since_last_activity` is bimodal** — the structural signature of disengagement.\n"
+        "4. **No leakage:** no feature correlates ≥ 0.95 with the label; two engagement pairs are "
+        "multicollinear (|r| ≥ 0.8) and flagged for SHAP attribution.\n"
+        "5. **Signal is early:** `n_days_active` and `days_since_last_activity` reach a large "
+        "effect (*d* ≥ 0.8) by **10%** of course length, scores by **20%** — grounding the "
+        "early-intervention goal (RQ1)."
     ),
     new_markdown_cell(
-        "# Data and statistical method\n\n"
-        "The analysis uses the master table (t = 100%) for univariate, bivariate and correlation "
-        "analysis, and the six checkpoint datasets for the time-aware analysis. To move beyond "
-        "visual impression we apply: the **Mann-Whitney U** test (non-parametric, appropriate for "
-        "the right-skewed features) with **Benjamini-Hochberg** false-discovery-rate correction "
-        "and **Cohen's d** effect size for numeric-vs-target comparisons; the **chi-square** test "
-        "of independence with **Cramer's V** effect size for categorical-vs-target association; "
-        "and **Pearson/Spearman** correlation for multivariate structure. All charts follow the "
-        "team chart standard (`docs/standards`)."
+        "## 0. Objectives & statistical method\n\n"
+        "**What:** understand data quality and shape, find features that separate at-risk "
+        "students, check for leakage, and locate when the signal emerges over time.\n\n"
+        "**Why:** EDA is not decoration — each chart drives a decision (*feature selection* or "
+        "*proving no leakage*).\n\n"
+        "**Method:** Mann–Whitney U (non-parametric, fits the skewed features) + Benjamini–Hochberg "
+        "correction & **Cohen's d** for numeric features; **chi-square + Cramér's V** for "
+        "categorical features; **Pearson/Spearman** for multivariate structure. Figures follow the "
+        "team chart standard (`src/eda/plot_style.py`, 300 dpi, colour-blind safe)."
     ),
     new_code_cell(
-        BOOT
-        + "from src.eda import eda\nmaster = eda.load_master()\ncheckpoints = eda.load_checkpoints()\nprint('master:', master.shape, '| checkpoints stacked:', None if checkpoints is None else checkpoints.shape)"
+        BOOT + "from src.eda import eda\n"
+        "master = eda.load_master()\n"
+        "checkpoints = eda.load_checkpoints()\n"
+        "print('master:', master.shape,\n"
+        "      '| checkpoints stacked:', None if checkpoints is None else checkpoints.shape)"
     ),
     new_markdown_cell(
-        "# Data quality\n\n"
+        "## 1. Dataset profile (structure-first)\n\n"
+        "An analyst's first pass: for every column — its type, completeness, cardinality and "
+        "(for numeric features) distribution shape. This single table replaces guesswork and "
+        "flags exactly what cleaning must address (the few columns with gaps and the strongly "
+        "skewed clickstream features)."
+    ),
+    new_code_cell(
+        'num_cols = master.select_dtypes("number").columns\n'
+        "profile = pd.DataFrame({\n"
+        '    "dtype": master.dtypes.astype(str),\n'
+        '    "n_missing": master.isnull().sum(),\n'
+        '    "pct_missing": (master.isnull().mean() * 100).round(2),\n'
+        '    "n_unique": master.nunique(),\n'
+        '    "skew": master[num_cols].skew().round(2),\n'
+        '}).sort_values("pct_missing", ascending=False)\n'
+        'key = ["code_module", "code_presentation", "id_student"]\n'
+        'print(f"{len(master):,} rows x {master.shape[1]} columns  |  numeric = {len(num_cols)}  |  "\n'
+        '      f"duplicate composite keys = {master.duplicated(key).sum()}  |  "\n'
+        "      f\"at-risk rate = {master['at_risk'].mean():.1%}\")\n"
+        "display(profile)"
+    ),
+    new_markdown_cell(
+        "## 2. Data quality\n\n"
         "Only three columns contain missing values: `date_unregistration` (structurally absent "
-        "for students who never withdraw — not a feature), `imd_band` (1,111; filled `Unknown`), "
-        "and `date_registration` (45; train-median imputed). No feature column is materially "
-        "incomplete."
+        "for students who never withdraw — not a feature), `imd_band` (1,111 ≈ 3.4%; filled "
+        "`Unknown`), and `date_registration` (45 ≈ 0.14%; train-median imputed). After cleaning "
+        "there is **0 NaN** in any feature column."
     ),
     new_code_cell(
-        "print(json.dumps(eda.data_quality(master), indent=2))\n"
+        "_ = eda.data_quality(master)\n"
+        "display(pd.read_csv(TABLES / 'data_quality_profile.csv', index_col=0))\n"
         + show_fig("quality_missingness")
     ),
     new_markdown_cell(
-        "# Univariate analysis\n\n"
-        "Engagement (clickstream) features are strongly right-skewed and heavy-tailed "
-        "(`clicks_resource` skew ≈ 35, `max_clicks_single_day` ≈ 11), which justifies the "
-        "`log1p` transform applied during cleaning. Categorical features are well populated "
-        "across their levels."
+        "## 3. Univariate analysis\n\n"
+        "**What:** histogram + KDE and boxplots per numeric feature.\n\n"
+        "**Why:** most clickstream features are **strongly right-skewed** — the heavy tails are "
+        "*real* learning behaviour, so we use `log1p` rather than deleting rows.\n\n"
+        "**Result:** `clicks_resource` skew ≈ **34.7**, kurtosis ≈ **2,125** → evidence for "
+        "`log1p`; `days_since_last_activity` is **bimodal**. Non-normal ⇒ later steps use "
+        "**non-parametric** tests."
     ),
     new_code_cell(
-        "# Table — numeric descriptive statistics (with skew & kurtosis)\n"
-        "print(json.dumps(eda.univariate(master), indent=2, ensure_ascii=False))\n"
-        "display(pd.read_csv(TABLES / 'univariate_numeric.csv', index_col=0))"
+        "_ = eda.univariate(master)\n"
+        "num = pd.read_csv(TABLES / 'univariate_numeric.csv', index_col=0)\n"
+        "display(num[['mean','std','min','50%','max','skew','kurtosis']])\n"
+        + show_fig("univariate_hist_kde")
     ),
-    new_code_cell(show_fig("univariate_hist_kde")),
     new_code_cell(show_fig("univariate_boxplots")),
+    new_markdown_cell(
+        "**Categorical.** 83% of students hold A-Level or below; Post-Graduate / No-Formal are "
+        "rare (<1.1% each) — hence one-hot with `handle_unknown=ignore` rather than dropping rare "
+        "levels."
+    ),
     new_code_cell(show_fig("univariate_categorical_freq")),
     new_markdown_cell(
-        "# Target distribution and class imbalance (STT 27)\n\n"
+        "## 4. Target distribution & class imbalance\n\n"
         "The observed at-risk rate is **52.8%** (imbalance ratio 1.12): a *slight majority*, not "
-        "the 68/32 shown illustratively on the course slides. Imbalance is therefore mild — which "
-        "we report honestly and which frames **RQ3** (resampling may yield only modest gains). PR-AUC "
-        "and recall on the at-risk class remain the headline metrics because a missed at-risk "
-        "student is the costly error."
+        "a severe imbalance — the real figure, not 68/32. Because a missed at-risk student is the "
+        "costly error, PR-AUC and recall on the at-risk class are the headline metrics. "
+        "**Withdrawn** is the single largest class, which matters for the time-aware analysis."
     ),
     new_code_cell(
-        "print(json.dumps(eda.target_distribution(master), indent=2))\n"
-        + show_fig("target_distribution")
+        "_ = eda.target_distribution(master)\n"
+        "counts = master['final_result'].value_counts().rename_axis('final_result').reset_index(name='count')\n"
+        "counts['pct'] = (counts['count'] / len(master) * 100).round(1)\n"
+        "counts['label'] = counts['final_result'].isin(['Fail','Withdrawn']).map({True:'at-risk (1)', False:'not-at-risk (0)'})\n"
+        "display(counts)\n" + show_fig("target_distribution")
     ),
     new_markdown_cell(
-        "# Bivariate analysis — numeric features vs the target (STT 36)\n\n"
-        "For each numeric feature we test whether its distribution differs by class (Mann-Whitney "
-        "U, BH-corrected) and quantify the gap (Cohen's d). **All 19 features are significant** "
-        "(q < 0.05) — expected at n ≈ 32k — so effect size, not the p-value, is the discriminator. "
-        "The strongest are behavioural/performance: `days_since_last_activity` (d = 2.55), "
-        "`n_assessments_submitted` (2.05) and `weighted_score_to_date` (1.96). Demographic features "
-        "are weakest (`studied_credits` 0.28, `num_of_prev_attempts` 0.21), empirically reproducing "
-        "the prior-work finding that behaviour outweighs demographics."
+        "## 5. Bivariate — numeric features vs the target\n\n"
+        "**What:** for each numeric feature, **Cohen's d** + a Mann–Whitney U test (BH-corrected).\n\n"
+        "**Why:** at n≈32k almost every p-value is tiny → **rank by effect size**, not p.\n\n"
+        "**Result:** strongest are behavioural/performance — `days_since_last_activity` "
+        "(*d*=**2.55**, 171 vs 14 days), `n_assessments_submitted` (2.05, 2.3 vs 8.6), "
+        "`weighted_score_to_date` (1.96). **All 19/19 features significant**."
     ),
     new_code_cell(
-        "# Table — effect size + Mann-Whitney U (BH-corrected) per numeric feature\n"
-        "print(json.dumps(eda.numeric_vs_target(master), indent=2))\n"
-        "display(pd.read_csv(TABLES / 'bivariate_numeric_tests.csv'))"
+        "_ = eda.numeric_vs_target(master)\n"
+        "tb = pd.read_csv(TABLES / 'bivariate_numeric_tests.csv').sort_values('cohens_d', ascending=False)\n"
+        "display(tb[['feature','group','mean_not_at_risk','mean_at_risk','cohens_d','p_adj_bh','significant_(q<0.05)']].head(10))\n"
+        "print(f\"Significant features (q<0.05): {int(tb['significant_(q<0.05)'].sum())}/{len(tb)}\")\n"
+        + show_fig("bivariate_effect_sizes")
     ),
-    new_code_cell(show_fig("bivariate_effect_sizes")),
     new_code_cell(show_fig("bivariate_top_boxplots")),
     new_markdown_cell(
-        "# Bivariate analysis — categorical features vs the target\n\n"
-        "Chi-square tests are significant but the **Cramer's V** effect sizes are small: "
-        "`highest_education` (0.15) and `imd_band` (0.15) are the strongest demographic "
-        "associations, while `gender` (0.02) is negligible. This confirms demographics carry "
-        "limited standalone signal and are best retained for fairness analysis rather than "
-        "predictive reliance."
+        "## 6. Bivariate — categorical features vs the target (Cramér's V)\n\n"
+        "Chi-square tests are significant (large *n*), but **Cramér's V** effect sizes are small: "
+        "`highest_education` (0.15) and `imd_band` (0.15) lead, while `gender` (0.02) is "
+        "negligible. Demographics carry limited standalone signal and are best kept for "
+        "**fairness analysis** (watch deprivation and education, not gender), not prediction."
     ),
     new_code_cell(
-        "print(json.dumps(eda.categorical_vs_target(master), indent=2))\ndisplay(pd.read_csv(TABLES / 'bivariate_categorical_tests.csv'))\n"
+        "_ = eda.categorical_vs_target(master)\n"
+        "display(pd.read_csv(TABLES / 'bivariate_categorical_tests.csv'))\n"
         + show_fig("bivariate_categorical_rate")
     ),
     new_markdown_cell(
-        "# Multivariate analysis — correlation, multicollinearity, leakage (STT 37)\n\n"
-        "Pearson and Spearman matrices agree on the structure. Two pairs are multicollinear "
-        "(|r| ≥ 0.8): `n_days_active`–`total_clicks` (0.84) and `days_since_last_activity`–"
-        "`n_assessments_submitted` (−0.83); this is relevant to explanation stability (**RQ2**), "
-        "since SHAP/LIME may distribute importance among correlated features. Critically, **no "
-        "feature correlates ≥ 0.95 with the target**, so no leakage feature is present."
+        "## 7. Multivariate — correlation, multicollinearity, leakage\n\n"
+        "**What:** Pearson + Spearman matrices; correlation with the label; leakage check.\n\n"
+        "**Why:** leakage is a **mandatory** check — a feature with |r| ≥ 0.95 vs the label is "
+        "suspicious.\n\n"
+        "**Result:** top |r| with the label is `days_since_last_activity` **+0.78** (agreeing with "
+        "Cohen's d → two independent methods, same conclusion); **no feature |r| ≥ 0.95** ⇒ no "
+        "leakage; two multicollinear pairs ≥ 0.8 (flagged for RQ2/SHAP)."
     ),
-    new_code_cell("print(json.dumps(eda.correlation(master), indent=2))"),
-    new_code_cell(show_fig("corr_pearson")),
-    new_code_cell(show_fig("corr_spearman")),
+    new_code_cell(
+        "_ = eda.correlation(master)\n"
+        "print('Strong pairs (|r| >= 0.6):')\n"
+        "display(pd.read_csv(TABLES / 'correlation_strong_pairs.csv'))\n"
+        "print('Correlation with the target (top |r|):')\n"
+        "display(pd.read_csv(TABLES / 'correlation_with_target.csv', index_col=0))\n"
+        + show_fig("corr_pearson")
+    ),
     new_code_cell(show_fig("corr_with_target")),
     new_markdown_cell(
-        "# Time-aware analysis — when does the signal emerge? (STT 38, RQ1)\n\n"
-        "This is the analysis specific to a time-aware problem. The left panel shows the mean "
-        "trajectory of each feature by class across checkpoints; the right panel tracks "
-        "**|Cohen's d| per checkpoint** — i.e. how strongly each feature separates the classes as "
-        "the course progresses. `n_days_active` already exceeds the large-effect threshold "
-        "(d ≥ 0.8) at **10%**; `mean_score_to_date`, `n_assessments_submitted` and "
-        "`weighted_score_to_date` cross it by **20%**. The behavioural signal is therefore "
-        "actionable from ~20–40% of course length, grounding the RQ1 checkpoint schedule in "
-        "evidence rather than convention."
+        "## 8. Time-aware analysis — when does the signal emerge? (RQ1)\n\n"
+        "**What:** measure |Cohen's d| per feature at six checkpoints 10%→100%.\n\n"
+        "**Why:** the analysis specific to a time-aware problem — find the earliest reliable "
+        "checkpoint for prediction (RQ1).\n\n"
+        "**Result:** discrimination grows steadily; first to reach *d* ≥ 0.8: `n_days_active` "
+        "**and** `days_since_last_activity` from **10%**, scores/submissions from **20%** → early "
+        "prediction is feasible from **~10–20%** of course length.\n\n"
+        "> *Consistency note:* after fixing the no-activity fill for `days_since_last_activity`, "
+        "its *d* at t=100% (per-checkpoint table) equals **2.55**, matching the value computed on "
+        "`master_raw` in §5."
     ),
     new_code_cell(
-        "print(json.dumps(eda.time_aware(checkpoints), indent=2))\ndisplay(pd.read_csv(TABLES / 'discrimination_by_checkpoint.csv', index_col=0))"
+        "ta = eda.time_aware(checkpoints)\n"
+        "display(pd.read_csv(TABLES / 'discrimination_by_checkpoint.csv', index_col=0).round(3))\n"
+        "print('Earliest checkpoint reaching d>=0.8:', ta['earliest_checkpoint_d_ge_0.8'])\n"
+        + show_fig("time_discrimination_curve")
     ),
     new_code_cell(show_fig("time_mean_trajectory")),
-    new_code_cell(show_fig("time_discrimination_curve")),
     new_markdown_cell(
-        "# The Withdrawn early-warning signal (Step-0 Option A)\n\n"
-        "Under Option A, students who withdrew before a checkpoint are kept and labelled at-risk; "
-        "their features reflect only pre-withdrawal activity. The data confirms this is a genuine "
-        "signal rather than noise: median inactivity is 11 days for not-at-risk students, 116 for "
-        "Fail and **233 for Withdrawn**, while median total clicks fall from 1,425 (not-at-risk) "
-        "to 89 (Withdrawn). The activity collapse of withdrawing students is exactly what makes "
-        "early detection feasible."
+        "## 9. The Withdrawn early-warning signal (Step-0 Option A)\n\n"
+        "Withdrawal produces a **genuine signal**, not noise: median days-since-last-activity rises "
+        "from **11** (not-at-risk) → **116** (Fail) → **233** (Withdrawn); median total clicks "
+        "collapse from ~1,425 to ~89.\n\n"
+        "**Honest caveat:** because withdrawn students are near-inactive, they are *trivially* "
+        "separable at **late** checkpoints → late-checkpoint recall/PR-AUC can look optimistic; "
+        "the genuine test of the model is at the **early** checkpoints."
     ),
     new_code_cell(
-        "print(json.dumps(eda.withdrawn_analysis(master), indent=2))\n"
-        + show_fig("withdrawn_activity_decay")
+        "_ = eda.withdrawn_analysis(master)\n"
+        "import numpy as np\n"
+        "m = master.copy()\n"
+        "m['status'] = np.where(m['final_result'].eq('Withdrawn'), 'Withdrawn',\n"
+        "                       np.where(m['at_risk'].eq(1), 'Fail', 'Not-at-risk'))\n"
+        "summary = m.groupby('status').agg(\n"
+        "    median_days_idle=('days_since_last_activity', 'median'),\n"
+        "    median_total_clicks=('total_clicks', 'median'),\n"
+        "    n=('at_risk', 'size')).reindex(['Not-at-risk','Fail','Withdrawn'])\n"
+        "display(summary.round(1))\n" + show_fig("withdrawn_activity_decay")
     ),
     new_markdown_cell(
-        "# Findings and implications for modelling\n\n"
-        "1. **Early signal exists (RQ1).** Behavioural and performance features separate the "
-        "classes from 10–20% of course length and strengthen monotonically; 40–60% is a robust, "
-        "actionable window.\n"
-        "2. **Behaviour > demographics (RQ1/RQ2).** Engagement and assessment features dominate "
-        "(d up to 2.5); demographic association is small (V ≤ 0.15). Modelling should centre on "
-        "behavioural features; SHAP/LIME are expected to rank these highly.\n"
-        "3. **Mild imbalance (RQ3).** At 52.8% at-risk, aggressive resampling may add little; "
-        "RQ3 will quantify SMOTE/ADASYN/class-weight against this baseline using PR-AUC/recall.\n"
-        "4. **Correlated features (RQ2).** Multicollinear engagement features may make explanation "
+        "## 10. Findings & implications for modelling\n\n"
+        "1. **Early signal (RQ1).** Behavioural/performance features separate the classes from "
+        "10–20% of course length and strengthen monotonically; 40–60% is a robust, actionable "
+        "window.\n"
+        "2. **Behaviour ≫ demographics (RQ1/RQ2).** Engagement/assessment reach *d* > 2; "
+        "demographic association is small (Cramér's V ≤ 0.15) → SHAP/LIME are expected to rank "
+        "behavioural features highest.\n"
+        "3. **Mild imbalance (RQ3).** 52.8% at-risk → RQ3 quantifies SMOTE/ADASYN/class-weight "
+        "against this baseline using PR-AUC/recall.\n"
+        "4. **Correlated features (RQ2).** Two multicollinear pairs may make explanation "
         "importance unstable — a factor the stability metric must account for.\n"
         "5. **No leakage.** No feature is near-perfectly correlated with the label, and the "
-        "time-aware cut removes future events; held-out estimates should be trustworthy.\n\n"
-        "# References\n\n"
-        "[1] M. Adnan et al., *IEEE Access*, 9:7519–7539, 2021.  \n"
-        "[2] N. Tomasevic, N. Gvozdenovic, S. Vranes, *Computers & Education*, 143:103676, 2020.  \n"
-        "[3] J. Kuzilek, M. Hlosta, Z. Zdrahal, *Scientific Data*, 4:170171, 2017."
+        "time-aware cut removes future events → held-out estimates should be trustworthy.\n\n"
+        "**References.** [1] Kuzilek, Hlosta, Zdrahal, *Scientific Data* 4:170171, 2017. "
+        "[2] Adnan et al., *IEEE Access* 9:7519–7539, 2021. "
+        "[3] Tomasevic, Gvozdenovic, Vranes, *Computers & Education* 143:103676, 2020."
     ),
 ]
 

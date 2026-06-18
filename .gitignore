@@ -48,3 +48,8 @@ Thumbs.db
 
 # --- task ----
 task/
+
+# clickhouse-local binary (182MB tool, do not version)
+/clickhouse
+# MS Office lock temp files
+~$*

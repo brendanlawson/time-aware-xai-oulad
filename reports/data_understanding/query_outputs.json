@@ -1,0 +1,127 @@
+{
+  "studentVle_basic": {
+    "rows": 10655280.0,
+    "students": 26074.0,
+    "min_day": -25.0,
+    "max_day": 269.0,
+    "avg_click": 3.717,
+    "max_click": 6977.0
+  },
+  "scale": {
+    "csv_mb": 453.8,
+    "parquet_mb": 22.9
+  },
+  "studentVle_profile": {
+    "click_rows": 10655280,
+    "distinct_students": 26074,
+    "distinct_sites": 6268,
+    "presentations": 22,
+    "min_day": -25,
+    "max_day": 269
+  },
+  "total_clicks_active": {
+    "n_student_pres": 29228.0,
+    "mean": 1355.0,
+    "median": 740.0,
+    "skew": 2.94,
+    "max_v": 24139.0,
+    "mean_days_active": 61.9
+  },
+  "class_balance": {
+    "rows": 32593.0,
+    "students": 28785.0,
+    "presentations": 22.0,
+    "at_risk_n": 17208.0,
+    "at_risk_pct": 52.8
+  },
+  "missing": {
+    "rows": 32593.0,
+    "reg_missing": 45.0,
+    "reg_missing_pct": 0.14,
+    "unreg_missing": 22521.0,
+    "unreg_missing_pct": 69.1,
+    "imd_missing": 1111.0,
+    "imd_missing_pct": 3.41
+  },
+  "master_grain": {
+    "master_rows": 32593.0,
+    "zero_click_rows": 3365.0,
+    "mean_total_clicks": 1215.1
+  },
+  "cutoff_growth": {
+    "10": 2717876,
+    "20": 4118818,
+    "40": 5962333,
+    "60": 7928126,
+    "80": 9430438,
+    "100": 10655280
+  },
+  "cohens_d_master": {
+    "days_since_last_activity": 2.546,
+    "n_assessments_submitted": 2.054,
+    "weighted_score_to_date": 1.964,
+    "n_days_active": 1.584,
+    "total_clicks": 1.064
+  },
+  "correlations": {
+    "idle_vs_label": 0.778,
+    "active_vs_clicks": 0.837,
+    "idle_vs_submits": -0.828
+  },
+  "discrimination_by_t": [
+    {
+      "t_percent": 10,
+      "at_risk_rate": 0.528,
+      "n_rows": 32593,
+      "d_n_days_active": 0.834,
+      "d_total_clicks": 0.616,
+      "d_idle": 0.407,
+      "d_mean_score": 0.798
+    },
+    {
+      "t_percent": 20,
+      "at_risk_rate": 0.528,
+      "n_rows": 32593,
+      "d_n_days_active": 0.991,
+      "d_total_clicks": 0.688,
+      "d_idle": 0.688,
+      "d_mean_score": 1.113
+    },
+    {
+      "t_percent": 40,
+      "at_risk_rate": 0.528,
+      "n_rows": 32593,
+      "d_n_days_active": 1.165,
+      "d_total_clicks": 0.78,
+      "d_idle": 1.022,
+      "d_mean_score": 1.492
+    },
+    {
+      "t_percent": 60,
+      "at_risk_rate": 0.528,
+      "n_rows": 32593,
+      "d_n_days_active": 1.367,
+      "d_total_clicks": 0.913,
+      "d_idle": 1.281,
+      "d_mean_score": 1.559
+    },
+    {
+      "t_percent": 80,
+      "at_risk_rate": 0.528,
+      "n_rows": 32593,
+      "d_n_days_active": 1.5,
+      "d_total_clicks": 0.994,
+      "d_idle": 1.495,
+      "d_mean_score": 1.573
+    },
+    {
+      "t_percent": 100,
+      "at_risk_rate": 0.528,
+      "n_rows": 32593,
+      "d_n_days_active": 1.584,
+      "d_total_clicks": 1.064,
+      "d_idle": 1.562,
+      "d_mean_score": 1.578
+    }
+  ]
+}

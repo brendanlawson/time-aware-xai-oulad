@@ -1,8 +1,12 @@
 """Executable embodiment of the chart presentation standard (Task 39).
 
 Importing :func:`apply_style` configures matplotlib/seaborn so every EDA figure is
-visually consistent with docs/07_standards/Chart_Standards. The fixed class colours
-guarantee not-at-risk and at-risk always read the same across every chart.
+visually consistent, colour-blind safe and print-ready (300 dpi). The fixed class
+colours guarantee not-at-risk and at-risk always read the same across every chart.
+
+Design follows current publication-quality guidance: minimal chart-junk (top/right
+spines removed), a light grid drawn *below* the data, restrained typography, and
+de-cluttered numeric axes via :func:`tidy_axis`.
 """
 
 from __future__ import annotations
@@ -11,39 +15,79 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 
 FIGURES_DIR = Path(__file__).resolve().parents[2] / "reports" / "figures"
 
 # Fixed target-class colours, identical in every chart (Chart Standard section 2).
-CLASS_COLOURS = {0: "#2166AC", 1: "#D6604D"}  # 0 not-at-risk, 1 at-risk
+CLASS_COLOURS = {0: "#2166AC", 1: "#C0392B"}  # 0 not-at-risk (blue), 1 at-risk (red)
 CLASS_LABELS = {0: "Not-at-risk", 1: "At-risk"}
 
+# Feature-group palette (re-exported so eda.py and plots stay in sync).
+GROUP_COLOURS = {
+    "Demographic": "#7F8C8D",  # muted grey
+    "Engagement": "#C0392B",  # red (behavioural)
+    "Performance": "#2166AC",  # blue (assessment)
+}
+
 _RC = {
-    "font.family": "DejaVu Sans",
-    "font.size": 12,
-    "axes.titlesize": 13,
-    "axes.labelsize": 12,
-    "xtick.labelsize": 10,
-    "ytick.labelsize": 10,
-    "legend.fontsize": 10,
-    "figure.figsize": (8, 5),
-    "figure.dpi": 110,
-    "savefig.dpi": 150,
+    # resolution
+    "figure.dpi": 120,
+    "savefig.dpi": 300,
     "savefig.bbox": "tight",
+    "savefig.facecolor": "white",
+    "figure.facecolor": "white",
+    # typography
+    "font.family": "DejaVu Sans",
+    "font.size": 11,
+    "axes.titlesize": 12,
+    "axes.titleweight": "bold",
+    "axes.titlepad": 8,
+    "axes.labelsize": 10.5,
+    "axes.labelcolor": "#222222",
+    "xtick.labelsize": 9.5,
+    "ytick.labelsize": 9.5,
+    "xtick.color": "#444444",
+    "ytick.color": "#444444",
+    "legend.fontsize": 9.5,
+    "legend.frameon": False,
+    "figure.titlesize": 14,
+    "figure.titleweight": "bold",
+    # axes / spines / grid (less chart-junk)
+    "axes.edgecolor": "#888888",
+    "axes.linewidth": 0.8,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
     "axes.grid": True,
-    "grid.alpha": 0.3,
+    "axes.axisbelow": True,
+    "grid.color": "#E6E6E6",
+    "grid.linewidth": 0.7,
 }
 
 
 def apply_style() -> None:
     """Apply the team chart standard to the current matplotlib session."""
-    sns.set_theme(style="whitegrid", palette="colorblind")
+    sns.set_theme(style="whitegrid", context="notebook")
     plt.rcParams.update(_RC)
 
 
+_THOUSANDS = FuncFormatter(lambda x, _pos: f"{x:,.0f}")
+
+
+def tidy_axis(ax: plt.Axes, *, nbins: int = 5, integer: bool = False) -> None:
+    """De-clutter a numeric x-axis: few round ticks + thousands separators + despine.
+
+    Prevents the overlapping tick labels that plague wide-range count features
+    (e.g. ``total_clicks`` spanning 0–24,000).
+    """
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=nbins, integer=integer))
+    ax.xaxis.set_major_formatter(_THOUSANDS)
+    sns.despine(ax=ax)
+
+
 def savefig(fig: plt.Figure, name: str) -> Path:
-    """Save a figure to reports/figures/<name>.png at the standard DPI."""
+    """Save a figure to reports/figures/<name>.png at print resolution (300 dpi)."""
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     path = FIGURES_DIR / f"{name}.png"
-    fig.savefig(path, dpi=150, bbox_inches="tight")
+    fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
     return path
