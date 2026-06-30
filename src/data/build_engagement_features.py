@@ -1,43 +1,30 @@
-"""Aggregate the VLE clickstream (studentVle) into per-student engagement features.
+"""Aggregate the VLE clickstream (studentVle, ~10.6M rows) into per-student
+engagement features.
 
-Task 3 (Phuc). The heavy table studentVle (~10.6M rows) is collapsed to one row
-per (code_module, code_presentation, id_student) with the engagement features
-named per the group convention (Task 40) and the data dictionary:
-
+Output features (group naming convention + data dictionary):
     total_clicks, n_days_active,
     clicks_forumng, clicks_oucontent, clicks_resource, clicks_homepage,
     clicks_oucollaborate, clicks_quiz, clicks_subpage, clicks_url,
     max_clicks_single_day, mean_clicks_per_active_day,
-    last_active_day            (helper; days_since_last_activity is derived
-                                downstream once the reference/cutoff day is known)
+    last_active_day  (helper; days_since_last_activity derived downstream).
 
-`aggregate_engagement` is deliberately pure: it takes a clickstream DataFrame
-(full or already cut at a checkpoint) and returns the aggregated features. The
-checkpoint builder reuses it on time-sliced clickstreams, so the exact same
-aggregation logic runs at every checkpoint.
+`aggregate_engagement` MUST be pure: clickstream DataFrame in -> features out, so
+the checkpoint builder can reuse it on time-sliced clickstreams unchanged.
 
-CLI
-    python -m src.data.build_engagement_features            # writes parquet
-    python -m src.data.build_engagement_features --verbose
+CLI: python -m src.data.build_engagement_features [--verbose]
+
+See guide section "data/build_engagement_features.py".
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-import sys
-from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src.data.io_utils import (  # noqa: E402
-    CANONICAL_ACTIVITY_TYPES,
-    GROUP_COLS,
-    INTERIM_DIR,
-    RAW_DIR,
-    save_parquet_atomic,
-)
+from src.config import INTERIM_DATA_DIR, RAW_DATA_DIR
+from src.data.io_utils import CANONICAL_ACTIVITY_TYPES, GROUP_COLS, save_parquet_atomic
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +33,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+# Compact dtypes keep the ~10.6M-row table within a tight memory budget.
 _STUDENT_VLE_DTYPES = {
     "code_module": "string",
     "code_presentation": "string",
@@ -56,19 +44,18 @@ _STUDENT_VLE_DTYPES = {
 }
 
 
-def load_student_vle(raw_dir: Path = RAW_DIR, chunksize: int = 500_000) -> pd.DataFrame:
-    """Read studentVle.csv in chunks with simple dtypes.
+def load_student_vle(raw_dir=RAW_DATA_DIR, chunksize: int = 500_000) -> pd.DataFrame:
+    """Read studentVle.csv in chunks with compact dtypes.
 
-    Categorical conversion is done *after* the full frame is in memory; building a
-    category hash table during the C parse can spike memory on large files.
+    The file is large, so it is streamed in chunks and concatenated once. Any
+    categorical conversion is left to downstream callers; building a category
+    hash table during the C parse can spike memory on a file this size.
     """
     path = raw_dir / "studentVle.csv"
     if not path.exists():
         raise FileNotFoundError(path)
     log.info("Reading %s (chunksize=%d)", path.name, chunksize)
-    frames = [
-        c for c in pd.read_csv(path, dtype=_STUDENT_VLE_DTYPES, chunksize=chunksize)
-    ]
+    frames = [c for c in pd.read_csv(path, dtype=_STUDENT_VLE_DTYPES, chunksize=chunksize)]
     df = pd.concat(frames, ignore_index=True)
     log.info(
         "studentVle: %s rows, %.0f MB",
@@ -78,17 +65,17 @@ def load_student_vle(raw_dir: Path = RAW_DIR, chunksize: int = 500_000) -> pd.Da
     return df
 
 
-def attach_activity_type(
-    student_vle: pd.DataFrame, vle_meta: pd.DataFrame
-) -> pd.DataFrame:
-    """Map id_site -> activity_type via a lookup Series (avoids a 10M-row merge).
+def attach_activity_type(clickstream: pd.DataFrame, vle: pd.DataFrame) -> pd.DataFrame:
+    """Label each click's id_site with its activity_type via a lookup Series.
 
-    id_site is globally unique in vle.csv, so the lookup is unambiguous.
+    id_site is globally unique in vle.csv, so a map-by-site avoids a 10M-row merge
+    and stays unambiguous. Clicks whose id_site is absent from vle.csv get a NaN
+    activity_type (they still count toward total_clicks).
     """
-    if vle_meta["id_site"].duplicated().any():
+    if vle["id_site"].duplicated().any():
         raise ValueError("id_site is not unique in vle.csv; lookup-by-site is unsafe")
-    site_to_activity = vle_meta.set_index("id_site")["activity_type"]
-    out = student_vle.copy()
+    site_to_activity = vle.set_index("id_site")["activity_type"]
+    out = clickstream.copy()
     out["activity_type"] = out["id_site"].map(site_to_activity)
     n_missing = int(out["activity_type"].isna().sum())
     if n_missing:
@@ -103,7 +90,7 @@ def aggregate_engagement(clickstream: pd.DataFrame) -> pd.DataFrame:
     """Aggregate a (full or cut) clickstream into per-student engagement features.
 
     ``clickstream`` must contain GROUP_COLS plus ``date``, ``sum_click`` and
-    ``activity_type``. Returns one row per student-module-presentation.
+    ``activity_type``. Returns one flat row per student-module-presentation.
     """
     required = set(GROUP_COLS) | {"date", "sum_click", "activity_type"}
     missing = required - set(clickstream.columns)
@@ -138,7 +125,7 @@ def aggregate_engagement(clickstream: pd.DataFrame) -> pd.DataFrame:
     return base.reset_index()
 
 
-def build(raw_dir: Path = RAW_DIR, output_dir: Path = INTERIM_DIR) -> pd.DataFrame:
+def build(raw_dir=RAW_DATA_DIR, output_dir=INTERIM_DATA_DIR) -> pd.DataFrame:
     """Full pipeline for t=100%: load -> attach type -> aggregate -> verify -> save."""
     student_vle = load_student_vle(raw_dir)
     vle_meta = pd.read_csv(raw_dir / "vle.csv")
@@ -148,18 +135,12 @@ def build(raw_dir: Path = RAW_DIR, output_dir: Path = INTERIM_DIR) -> pd.DataFra
 
     n_students = len(student_vle[GROUP_COLS].drop_duplicates())
     if n_students != len(engagement):
-        log.error(
-            "Student count mismatch: raw=%d aggregated=%d", n_students, len(engagement)
-        )
+        log.error("Student count mismatch: raw=%d aggregated=%d", n_students, len(engagement))
     else:
-        log.info(
-            "Verified: %s students preserved through aggregation", f"{n_students:,}"
-        )
+        log.info("Verified: %s students preserved through aggregation", f"{n_students:,}")
 
     out = save_parquet_atomic(engagement, output_dir / "engagement_agg.parquet")
-    log.info(
-        "Wrote %s (%s rows, %d cols)", out, f"{len(engagement):,}", engagement.shape[1]
-    )
+    log.info("Wrote %s (%s rows, %d cols)", out, f"{len(engagement):,}", engagement.shape[1])
     return engagement
 
 
@@ -167,8 +148,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Aggregate OULAD VLE clickstream into engagement features."
     )
-    p.add_argument("--raw-dir", type=Path, default=RAW_DIR)
-    p.add_argument("--output-dir", type=Path, default=INTERIM_DIR)
     p.add_argument("--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -178,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.verbose:
         log.setLevel(logging.DEBUG)
     try:
-        build(args.raw_dir, args.output_dir)
+        build()
     except FileNotFoundError as e:
         log.error("Missing input file: %s", e)
         return 1
@@ -186,4 +165,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

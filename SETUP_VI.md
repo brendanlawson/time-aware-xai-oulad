@@ -153,7 +153,7 @@ data/splits/*.parquet                 ← dữ liệu cuối để train model (
 pytest tests/
 ```
 
-Bộ test rò rỉ dữ liệu (`tests/test_leakage.py`, 16 test) phải **PASS**. Nếu pass nghĩa là pipeline của bạn đã chạy đúng và dữ liệu khớp với cả nhóm.
+Bộ test rò rỉ dữ liệu (`tests/test_leakage.py`, 19 test) phải **PASS**. Nếu pass nghĩa là pipeline của bạn đã chạy đúng và dữ liệu khớp với cả nhóm.
 
 ### Kiểm tra nhanh bằng mắt (tùy chọn)
 

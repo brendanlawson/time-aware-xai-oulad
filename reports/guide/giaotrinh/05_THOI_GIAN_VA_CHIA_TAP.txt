@@ -1,0 +1,541 @@
+TẬP 5 — THỜI GIAN & CHIA TẬP
+
+
+===========================================================================
+LỜI MỞ ĐẦU CỦA TẬP 5
+===========================================================================
+
+Ở những tập trước, ta đã có một "bảng lớn" (master table) gồm các đặc trưng
+(feature) mô tả hành vi học tập và kết quả của sinh viên. Nhưng trước khi đưa
+bất kỳ con số nào vào mô hình (model), có HAI quyết định nền tảng quyết định
+toàn bộ độ tin cậy của dự án:
+
+  1) CẮT THEO THỜI GIAN (Ch.10): Vì mục tiêu của ta là DỰ ĐOÁN SỚM, ta phải
+     "giả vờ" mình đang đứng ở một thời điểm nào đó trong khoá học và chỉ
+     được dùng dữ liệu đã xảy ra TRƯỚC thời điểm đó.
+
+  2) CHIA TRAIN/TEST (Ch.11): Ta phải tách dữ liệu thành phần để HỌC và phần
+     để THI, theo cách bảo đảm điểm thi phản ánh đúng năng lực thật của mô
+     hình, không bị "gian lận" (rò rỉ — leakage).
+
+Cả hai quyết định này đều xoay quanh một kẻ thù chung: RÒ RỈ DỮ LIỆU (data
+leakage). Rò rỉ là khi mô hình vô tình "nhìn thấy" thông tin mà ở thực tế nó
+sẽ không bao giờ có vào lúc cần dự đoán. Hậu quả: lúc kiểm thử thì điểm đẹp,
+nhưng đem ra dùng thật thì sụp đổ. Tập này dạy bạn nhận diện và chặn đứng hai
+loại rò rỉ nguy hiểm nhất: RÒ RỈ THỜI GIAN (temporal leakage) và RÒ RỈ NHÓM /
+RÒ RỈ TIỀN XỬ LÝ (group / preprocessing leakage).
+
+Tập này được viết theo lối "luôn tự phản biện": với mỗi quyết định, ta hỏi
+"vì sao làm vậy?", "có cách khác không?", và "lấy gì chứng minh nó đúng?".
+
+
+===========================================================================
+CHƯƠNG 10 — CHECKPOINT THEO THỜI GIAN & RÒ RỈ THỜI GIAN
+===========================================================================
+
+
+---------------------------------------------------------------------------
+10.1 [ĐN] "DỰ ĐOÁN SỚM" NGHĨA LÀ GÌ, VÀ VÌ SAO NÓ BUỘC TA MÔ PHỎNG THỜI GIAN
+---------------------------------------------------------------------------
+
+Mục tiêu của dự án: dự đoán SỚM sinh viên có nguy cơ (at-risk) — tức là phát
+hiện sớm để còn kịp can thiệp, hỗ trợ. Hai chữ "sớm" này không phải là khẩu
+hiệu cho vui; nó định nghĩa lại toàn bộ luật chơi của dữ liệu.
+
+Hãy hình dung một khoá học kéo dài, ví dụ, 240 ngày. Nếu ta muốn dự đoán
+"sinh viên này có qua môn không?" thì điều đó chỉ thật sự HỮU ÍCH nếu ta đưa
+ra dự đoán khi khoá học MỚI ĐI ĐƯỢC 1/4 chặng đường — lúc giáo viên vẫn còn
+thời gian để gọi điện, nhắc nhở, phụ đạo. Nếu đến ngày cuối cùng mới "dự đoán"
+thì đã quá muộn, mà thật ra lúc đó ta gần như đã BIẾT kết quả rồi, dự đoán
+chẳng còn ý nghĩa.
+
+[ĐN] MÔ PHỎNG THỜI ĐIỂM (point-in-time simulation): để mô hình của ta có giá
+trị thực tế, ta phải HUẤN LUYỆN và ĐÁNH GIÁ nó trong đúng điều kiện mà nó sẽ
+gặp khi triển khai. Nếu khi triển khai mô hình chỉ có dữ liệu của 60 ngày đầu,
+thì khi huấn luyện và kiểm thử nó CŨNG chỉ được phép thấy dữ liệu 60 ngày đầu.
+Ta "đóng băng" đồng hồ tại một mốc, và xoá sạch tầm nhìn về tương lai.
+
+Vì sao đây là điều bắt buộc, không phải tuỳ chọn? Vì nếu ta cho mô hình học
+trên TOÀN BỘ dữ liệu cả khoá (gồm cả những gì xảy ra sau mốc dự đoán), thì:
+
+  - Lúc kiểm thử: điểm rất cao, vì mô hình đã "nhìn lén" được tương lai.
+  - Lúc dùng thật: ở ngày 60 làm gì có dữ liệu của ngày 200 mà dùng? Mô hình
+    mất đi chính những đặc trưng mạnh nhất nó đã quen dựa vào → sụp đổ.
+
+Khoảng cách giữa "điểm đẹp khi kiểm thử" và "thất bại khi dùng thật" chính là
+cái bẫy mà chương này dạy bạn tránh.
+
+
+---------------------------------------------------------------------------
+10.2 [ĐN] RÒ RỈ THỜI GIAN (TEMPORAL / LOOKAHEAD LEAKAGE)
+---------------------------------------------------------------------------
+
+[ĐN] RÒ RỈ THỜI GIAN (temporal leakage), còn gọi là RÒ RỈ NHÌN TRƯỚC
+(lookahead leakage): là việc mô hình sử dụng thông tin từ TƯƠNG LAI (so với
+thời điểm cần dự đoán) để dự đoán hiện tại. Vì ở thực tế thông tin tương lai
+chưa tồn tại tại thời điểm dự đoán, nên đó là một dạng "gian lận về thời gian".
+
+Ví dụ minh hoạ rất đời thường: bạn muốn dự đoán "ngày mai trời có mưa không"
+và bạn lén dùng đặc trưng "số người mang ô VÀO ngày mai". Đặc trưng đó tiên
+đoán mưa cực chính xác — nhưng ngày hôm nay bạn LÀM GÌ CÓ con số đó. Mô hình
+học được một quy luật vô dụng trong thực tế.
+
+Trong dự án của ta, các dạng rò rỉ thời gian điển hình cần chặn:
+
+  - Dùng số lần click ở tuần thứ 30 để dự đoán nguy cơ tại mốc ngày 60.
+  - Dùng điểm bài kiểm tra cuối kỳ để dự đoán nguy cơ ở giữa kỳ.
+  - Dùng "ngày sinh viên huỷ đăng ký" (date_unregistration) — một sự kiện
+    thường xảy ra SAU mốc — như một đặc trưng đầu vào.
+
+[WHY] Cách chặn của ta rất dứt khoát: tại mỗi mốc thời gian, MỌI đặc trưng
+engagement (tương tác) và performance (kết quả) CHỈ được tính trên những sự
+kiện có "ngày xảy ra" (date) NHỎ HƠN HOẶC BẰNG mốc đó (date <= cutoff_day).
+Bất cứ sự kiện nào xảy ra sau cutoff đều bị loại bỏ hoàn toàn khi tạo đặc
+trưng cho mốc ấy. Nói cách khác: ta dựng một "bức tường thời gian" tại mốc,
+và mô hình chỉ được nhìn về phía sau bức tường.
+
+
+---------------------------------------------------------------------------
+10.3 [DA] TÍNH CUTOFF_DAY THEO TỪNG MÔN-KỲ — VÀ VÌ SAO KHÔNG DÙNG MỘT MỐC
+     NGÀY CỐ ĐỊNH CHO MỌI MÔN
+---------------------------------------------------------------------------
+
+[DA] Ta không cắt theo mốc PHẦN TRĂM tiến độ (t%), chứ không phải mốc NGÀY
+tuyệt đối. Cụ thể, với mỗi mốc t%:
+
+      cutoff_day = round( module_presentation_length × t / 100 )
+
+Trong đó module_presentation_length là ĐỘ DÀI (số ngày) của riêng từng lượt
+mở môn (module-presentation). Mỗi lượt mở môn trong dữ liệu có độ dài KHÁC
+nhau, dao động trong khoảng 234–269 ngày.
+
+Vì độ dài khác nhau, nên cùng một mốc t% sẽ ra số ngày khác nhau cho từng
+môn-kỳ. Ví dụ minh hoạ:
+
+      +-------------------+----------------+-------------------+
+      | Lượt mở môn (vd)  | Độ dài (ngày)  | cutoff tại t=20%  |
+      +-------------------+----------------+-------------------+
+      | Môn A, kỳ X       | 240            | round(48)  = 48   |
+      | Môn B, kỳ Y       | 269            | round(53.8)= 54   |
+      | Môn C, kỳ Z       | 234            | round(46.8)= 47   |
+      +-------------------+----------------+-------------------+
+      (số ngày 240/269/234 là ví dụ minh hoạ trong khoảng thật 234–269)
+
+Vì mỗi môn-kỳ có cutoff riêng, ta tính trước TẤT CẢ và lưu vào một file tra
+cứu: data/checkpoint_map.csv. File này đóng vai trò "bảng giờ giới nghiêm":
+mỗi dòng cho biết "với môn-kỳ này, tại mốc t% này, bức tường thời gian đặt ở
+ngày nào". Khi tạo đặc trưng, ta chỉ việc tra bảng rồi lọc date <= cutoff_day.
+
+[WHY] VÌ SAO KHÔNG DÙNG MỘT MỐC NGÀY CỐ ĐỊNH (ví dụ "cứ ngày 50 cho mọi môn")?
+Vì các môn dài ngắn khác nhau, "ngày 50" mang ý nghĩa rất khác nhau:
+
+  - Với môn dài 234 ngày: ngày 50 ≈ 21% chặng đường — vẫn còn rất sớm.
+  - Với môn dài 269 ngày: ngày 50 ≈ 19% chặng đường — cũng sớm, nhưng lệch.
+
+Nếu ép một mốc ngày cố định, ta sẽ so sánh "21% của môn này" với "19% của môn
+kia" như thể chúng giống nhau — đó là so sánh táo với cam. Tệ hơn, ý nghĩa
+"dự đoán sớm" bị méo: cùng một câu hỏi nghiên cứu nhưng mỗi môn lại trả lời ở
+một vị trí tiến độ khác nhau. Dùng PHẦN TRĂM tiến độ chuẩn hoá mọi môn về cùng
+một thước đo "đã đi được bao nhiêu chặng đường", nên các mốc mới so sánh được
+với nhau một cách công bằng và có ý nghĩa nhất quán.
+
+
+---------------------------------------------------------------------------
+10.4 [WHY] VÌ SAO 6 MỐC, VÀ VÌ SAO CHỌN 10 / 20 / 40 / 60 / 80 / 100
+---------------------------------------------------------------------------
+
+Ta chọn 6 checkpoint (mốc): t = 10%, 20%, 40%, 60%, 80%, 100%.
+
+[WHY] Vì sao cần NHIỀU mốc chứ không chỉ một?
+Câu hỏi nghiên cứu RQ1 của dự án là: "Mô hình dự đoán tốt đến đâu khi ta đứng
+ở các thời điểm khác nhau của khoá học?" Để trả lời, ta cần một ĐƯỜNG CONG
+HIỆU NĂNG-THEO-THỜI-GIAN (performance-over-time curve): trục hoành là tiến độ
+khoá học (t%), trục tung là chất lượng dự đoán (ví dụ AUC). Một đường cong cần
+nhiều ĐIỂM mới vẽ được; mỗi mốc đóng góp một điểm. Một mốc duy nhất chỉ cho ta
+một con số trơ trọi, không kể được câu chuyện "càng về sau dự đoán càng tốt
+như thế nào, và tốt thêm với tốc độ ra sao".
+
+[WHY] Vì sao DÀY Ở ĐẦU (10, 20, rồi mới nhảy 40, 60, 80)?
+Vì GIÁ TRỊ THỰC TẾ của "dự đoán sớm" nằm Ở ĐẦU KỲ. Can thiệp ở ngày thứ 24
+(10%) hay ngày 48 (20%) thì còn cứu được sinh viên; can thiệp ở 80% thì gần
+như đã muộn. Do đó vùng đầu kỳ là vùng ta quan tâm NHẤT, cần lấy mẫu dày để
+nhìn rõ mô hình "ấm máy" nhanh đến đâu. Càng về cuối, độ phân giải dày không
+còn nhiều giá trị quyết định nên ta thưa dần (cách nhau 20%).
+
+[WHY] Vì sao có mốc 100%?
+Mốc 100% là MỐC THAM CHIẾU "BIẾT HẾT" (oracle / reference). Tại đây mô hình
+được dùng toàn bộ dữ liệu cả khoá. Nó cho ta cái "trần" — mức hiệu năng tối
+đa đạt được khi không thiếu thông tin gì. So các mốc sớm với mốc 100%, ta đo
+được "cái giá của việc dự đoán sớm": ở ngày 24 ta hy sinh bao nhiêu độ chính
+xác để đổi lấy việc biết sớm hơn 200 ngày. Đó chính là sự đánh đổi (trade-off)
+mà người ra quyết định cần thấy.
+
+[ALT] Có thể chọn mốc dày đều (10,20,30,...,100) không? Được, nhưng tốn gấp
+đôi chi phí tính toán mà phần thông tin tăng thêm ở nửa sau kỳ (40→100) là
+thấp — đường cong vùng đó thường khá phẳng. Bộ 6 mốc hiện tại là sự cân bằng:
+dày nơi quan trọng, thưa nơi ít biến động.
+
+
+---------------------------------------------------------------------------
+10.5 [EVAL] KIỂM TÍNH ĐÚNG: BẢNG SỐ SỰ KIỆN ĐƠN ĐIỆU TĂNG THEO MỐC
+---------------------------------------------------------------------------
+
+Một cách kiểm tra đơn giản mà cực kỳ thuyết phục cho thấy "bức tường thời
+gian" hoạt động đúng: đếm số sự kiện (event) còn lại sau khi lọc date <=
+cutoff_day, ở mỗi mốc. Nếu logic đúng, con số này phải ĐƠN ĐIỆU TĂNG theo mốc
+(mốc càng muộn, bức tường lùi càng xa về tương lai → giữ lại càng nhiều sự
+kiện), và mốc 100% phải giữ TRỌN VẸN toàn bộ dữ liệu.
+
+      +--------+--------------------------+----------------------+
+      | Mốc t% | Số sự kiện <= cutoff (tr) | % so với toàn bộ     |
+      +--------+--------------------------+----------------------+
+      |  10%   |        2,72              |        25,5%         |
+      |  20%   |        4,12              |        38,7%         |
+      |  40%   |        5,96              |        56,0%         |
+      |  60%   |        7,93              |        74,4%         |
+      |  80%   |        9,43              |        88,5%         |
+      | 100%   |       10,66              |       100,0%         |
+      +--------+--------------------------+----------------------+
+      (đơn vị: triệu sự kiện)
+
+Đọc bảng này, ta khẳng định được ba điều:
+
+  1) ĐƠN ĐIỆU TĂNG: 2,72 < 4,12 < 5,96 < 7,93 < 9,43 < 10,66. Không có mốc
+     muộn nào lại giữ ÍT sự kiện hơn mốc sớm — chứng tỏ không có sự kiện tương
+     lai nào "lọt ngược" vào mốc sớm.
+
+  2) MỐC 100% GIỮ TRỌN: tại 100% ta có đúng 10,66 triệu = 100,0% toàn bộ dữ
+     liệu. Không mất mát, cũng không có gì "dư ra" so với master table → mốc
+     tham chiếu khớp với dữ liệu gốc.
+
+  3) TỶ LỆ HỢP LÝ: chỉ ~25,5% sự kiện diễn ra trong 10% đầu chặng đường. Điều
+     này khớp trực giác — đầu kỳ sinh viên còn ít hoạt động, hoạt động dồn về
+     giữa và cuối. Một lần nữa cho thấy "dự đoán sớm" thật sự khó: ở mốc 10%
+     mô hình chỉ có 1/4 lượng tín hiệu so với khi biết hết.
+
+Lưu ý quan trọng: số sự kiện tăng dần KHÔNG có nghĩa là độ chính xác chắc chắn
+tăng dần; nó chỉ chứng minh bộ lọc thời gian đúng đắn. Việc nhiều dữ liệu hơn
+có giúp dự đoán tốt hơn hay không là câu chuyện của RQ1 ở phần mô hình.
+
+
+---------------------------------------------------------------------------
+10.6 [NEXT] CHECKPOINT SCRIPT PHẢI LÀ CODE "KỶ LUẬT": IDEMPOTENT, RESUME,
+     GHI ATOMIC
+---------------------------------------------------------------------------
+
+Việc tạo dữ liệu cho 6 mốc trên 10,66 triệu sự kiện là một tác vụ NẶNG và
+CHẠY LÂU. Theo nguyên tắc kỹ thuật tốt (và đây là thực hành bắt buộc với mọi
+script chạy lâu trong dự án), script tạo checkpoint phải:
+
+  - IDEMPOTENT (luỹ đẳng): chạy lại cho cùng kết quả, không tạo ra dữ liệu
+    trùng lặp hay khác đi. Chạy 2 lần = chạy 1 lần.
+
+  - RESUME (nối tiếp được): nếu bị ngắt giữa chừng (mất điện, lỗi), lần chạy
+    sau phải ĐỌC tiến độ đã lưu, BỎ QUA những mốc/môn đã hoàn tất, và chỉ làm
+    tiếp phần còn thiếu — không làm lại từ đầu.
+
+  - GHI ATOMIC (nguyên tử): ghi ra file tạm rồi mới đổi tên (rename) thành
+    file chính. Nhờ vậy, nếu bị kill ngay giữa lúc đang ghi, file checkpoint
+    cũ vẫn nguyên vẹn, không bị hỏng dở dang.
+
+  - GHI LOG RANH GIỚI LẦN CHẠY: in rõ mốc nào được BỎ QUA (vì đã có sẵn) và
+    mốc nào đang được XỬ LÝ MỚI, để người chạy theo dõi được.
+
+[WHY] Vì sao điều này liên quan đến tính đúng đắn, không chỉ là tiện lợi? Vì
+nếu một lần chạy bị ngắt rồi nối lại sai cách, ta có thể vô tình trộn dữ liệu
+của hai phiên bản logic khác nhau, hoặc bỏ sót một môn-kỳ → bảng đặc trưng bị
+khuyết hoặc mâu thuẫn mà không ai hay. Tính idempotent + resume + ghi atomic
+bảo đảm dữ liệu checkpoint LUÔN ở trạng thái nhất quán, dù quá trình chạy có
+bị gián đoạn bao nhiêu lần.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 10
+---------------------------------------------------------------------------
+
+★ Hỏi: "Vì sao lại 6 mốc? Sao không 1 mốc hay 100 mốc?"
+   Đáp: Vì ta cần VẼ một đường cong hiệu năng-theo-thời-gian (RQ1), mà đường
+   cong cần nhiều điểm — 1 mốc không vẽ được đường. Ta chọn 6 vì đó là cân
+   bằng giữa độ phân giải và chi phí: DÀY ở đầu kỳ (10, 20) nơi "dự đoán sớm"
+   có giá trị can thiệp cao nhất, THƯA dần về cuối (40, 60, 80) nơi đường cong
+   ít biến động, và MỐC 100% làm tham chiếu "biết hết". Trăm mốc thì tốn tài
+   nguyên gấp bội mà thông tin tăng thêm không đáng.
+
+★ Hỏi: "Rò rỉ thời gian là gì? Cho ví dụ dễ hiểu."
+   Đáp: Là khi mô hình dùng thông tin của TƯƠNG LAI để dự đoán hiện tại — thứ
+   mà lúc triển khai thật nó không thể có. Ví dụ: dự đoán "mai có mưa" bằng
+   "số người mang ô NGÀY MAI"; hay trong dự án: dùng điểm thi cuối kỳ hoặc
+   ngày huỷ đăng ký để dự đoán nguy cơ ở giữa kỳ. Ta chặn bằng cách tại mỗi
+   mốc chỉ giữ sự kiện có date <= cutoff_day.
+
+★ Hỏi: "Vì sao cutoff khác nhau giữa các môn?"
+   Đáp: Vì mỗi lượt mở môn dài ngắn khác nhau (234–269 ngày). Ta cắt theo
+   PHẦN TRĂM tiến độ (t%), nên cutoff_day = round(độ dài × t/100) tự nhiên ra
+   số ngày khác nhau cho từng môn. Nếu dùng một mốc ngày cố định cho mọi môn
+   thì "ngày 50" lại tương ứng các % tiến độ khác nhau → so sánh không công
+   bằng và ý nghĩa "sớm" bị méo. Mọi cutoff được tính sẵn và lưu ở
+   data/checkpoint_map.csv.
+
+
+===========================================================================
+CHƯƠNG 11 — CHIA TRAIN/TEST & QUY TẮC VÀNG
+===========================================================================
+
+
+---------------------------------------------------------------------------
+11.1 [ĐN] VÌ SAO PHẢI CHIA TRAIN/TEST: OVERFITTING, GENERALIZATION, HOLD-OUT
+---------------------------------------------------------------------------
+
+[ĐN] OVERFITTING (học vẹt / quá khớp): là khi mô hình "thuộc lòng" dữ liệu nó
+được học, kể cả những chi tiết nhiễu vô nghĩa, thay vì học quy luật chung. Ví
+dụ minh hoạ: một học sinh học thuộc đáp án của đúng bộ đề ôn — thi lại đúng đề
+đó thì điểm tuyệt đối, nhưng đổi đề khác thì rớt. Mô hình overfit cũng vậy:
+đẹp trên dữ liệu đã thấy, tệ trên dữ liệu mới.
+
+[ĐN] GENERALIZATION (khả năng tổng quát hoá): là năng lực mô hình hoạt động
+tốt trên dữ liệu CHƯA TỪNG THẤY. Đây mới là thứ ta thật sự cần — vì khi triển
+khai, mô hình luôn gặp sinh viên mới.
+
+[ĐN] HOLD-OUT (tập giữ riêng): để ĐO được khả năng tổng quát hoá một cách
+trung thực, ta GIỮ RIÊNG một phần dữ liệu, KHÔNG cho mô hình thấy trong lúc
+học. Phần này gọi là tập test (hay hold-out set). Nó đóng vai "đề thi kín":
+mô hình chỉ gặp nó đúng một lần, lúc chấm điểm cuối cùng. Trong dự án, ta giữ
+riêng 20% làm hold-out, với seed = 42 (để chia lặp lại được y hệt).
+
+Nếu ta đánh giá mô hình ngay trên chính dữ liệu nó đã học, ta sẽ nhận điểm
+"lạc quan giả" — cao một cách lừa dối, vì đó là "thi lại đúng đề ôn". Tập test
+tách biệt là cách duy nhất để có con số đáng tin.
+
+
+---------------------------------------------------------------------------
+11.2 [ĐN] BA LOẠI CHIA & BA LOẠI RÒ RỈ TƯƠNG ỨNG
+---------------------------------------------------------------------------
+
+Cách chia của dự án kết hợp BA nguyên tắc cùng lúc. Mỗi nguyên tắc chặn một
+loại rò rỉ. Bỏ sót bất kỳ cái nào cũng làm điểm test mất giá trị.
+
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+(1) GROUP SPLIT THEO id_student — CHẶN "RÒ RỈ NHÓM" (group leakage)
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+[WHY] Một sinh viên có thể xuất hiện trong NHIỀU lượt mở môn — nghĩa là cùng
+một id_student tạo ra NHIỀU DÒNG trong bảng. Ví dụ minh hoạ: sinh viên #777
+học môn A kỳ Xuân, rồi học lại môn A kỳ Thu, lại học thêm môn B — đó là 3 dòng
+cho cùng một người.
+
+Nếu ta chia NGẪU NHIÊN THEO DÒNG, thì dòng "môn A kỳ Xuân" của #777 có thể rơi
+vào train, còn dòng "môn B" của chính #777 rơi vào test. Lúc này mô hình đã
+"quen mặt" #777 từ tập train (học được thói quen học tập, nhịp độ click, đặc
+điểm cá nhân của bạn này), rồi gặp lại đúng bạn ấy ở test. Đây là RÒ RỈ NHÓM:
+thông tin về một cá nhân rò từ train sang test. Điểm test sẽ cao giả tạo, vì
+mô hình không thật sự dự đoán "người lạ" — nó đang nhận diện người quen.
+
+Khi triển khai thật, mô hình gặp sinh viên HOÀN TOÀN MỚI mà nó chưa từng thấy
+dòng nào. Để mô phỏng đúng tình huống đó, ta phải bảo đảm: TOÀN BỘ các dòng
+của một sinh viên nằm GỌN trong một phía — hoặc tất cả ở train, hoặc tất cả ở
+test, không bao giờ chia đôi một người. Đó chính là GROUP SPLIT theo
+id_student: ta chia theo NHÓM (group = một sinh viên), không chia theo dòng.
+
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+(2) STRATIFIED — CHẶN LỆCH PHÂN BỐ NHÃN
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+[WHY] Nhãn cần dự đoán là at_risk (có nguy cơ hay không), với tỉ lệ at-risk
+khoảng 52,8% trên toàn bộ. Nếu chia hoàn toàn ngẫu nhiên, có thể xui rủi mà
+train dồn nhiều ca at-risk còn test thì ít (hoặc ngược lại). Khi đó điểm test
+không phản ánh đúng năng lực, vì test có cơ cấu nhãn lệch khỏi thực tế.
+
+STRATIFIED (chia phân tầng) giữ cho TỈ LỆ at-risk ở train và test gần như BẰNG
+nhau và bằng tỉ lệ tổng thể. Nhờ vậy, tập test là một "bản thu nhỏ trung thực"
+của thực tế, và điểm đánh giá không bị thiên lệch (biased) vì cơ cấu nhãn méo.
+
+(Lưu ý kỹ thuật: vì ta chia theo nhóm sinh viên VÀ phân tầng theo nhãn cùng
+lúc, đây là bài toán "group + stratify" — phân tầng được áp ở cấp nhóm sinh
+viên, không phải cấp dòng.)
+
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+(3) TEST CỐ ĐỊNH GIỐNG HỆT Ở CẢ 6 MỐC — ĐỂ SO SÁNH CÔNG BẰNG
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+[WHY] Nhớ rằng ta có 6 mốc thời gian (Ch.10), mỗi mốc sẽ cho ra một bộ đặc
+trưng riêng và một điểm hiệu năng riêng. Để 6 điểm này so sánh được với nhau
+trên cùng một đường cong (RQ1), chúng phải được chấm trên CÙNG MỘT ĐỀ THI.
+
+Vì vậy ta CỐ ĐỊNH danh sách sinh viên test: cùng một tập sinh viên test được
+dùng y hệt ở cả 6 mốc. Chỉ có đặc trưng (vì cắt thời gian khác nhau) là thay
+đổi giữa các mốc; còn DANH TÍNH ai ở train, ai ở test thì BẤT BIẾN.
+
+Hãy hình dung phản ví dụ: nếu mỗi mốc lại bốc một tập test khác nhau, thì khi
+thấy "mốc 60% điểm cao hơn mốc 20%", ta không biết là do có thêm dữ liệu thời
+gian, hay chỉ vì tập test ở mốc 60% tình cờ "dễ" hơn. Hai biến số trộn lẫn,
+kết luận vô nghĩa. Cố định test loại bỏ biến nhiễu đó: khác biệt giữa các mốc
+giờ CHỈ còn do lượng thông tin thời gian — đúng thứ ta muốn đo.
+
+
+---------------------------------------------------------------------------
+11.3 [ĐN/WHY] QUY TẮC VÀNG CHỐNG RÒ RỈ QUA TIỀN XỬ LÝ
+---------------------------------------------------------------------------
+
+Đây là quy tắc quan trọng nhất của cả tập, được nhắc đi nhắc lại như câu thần
+chú trong dự án:
+
+      ┌─────────────────────────────────────────────────────────────┐
+      │  QUY TẮC VÀNG:                                               │
+      │  TÁCH train/test TRƯỚC.                                      │
+      │  Mọi thứ HỌC TỪ DỮ LIỆU — median để điền khuyết, ngưỡng     │
+      │  winsorize, μ/σ của scaler, bộ mã hoá (encoder) — phải FIT  │
+      │  (học) CHỈ TRÊN TRAIN, rồi đem TRANSFORM (áp) lên test.     │
+      └─────────────────────────────────────────────────────────────┘
+
+[ĐN] FIT vs TRANSFORM: "fit" là HỌC tham số từ dữ liệu (ví dụ tính ra median
+của một cột, hay μ và σ để chuẩn hoá). "transform" là ÁP tham số đã học đó để
+biến đổi dữ liệu. Quy tắc vàng nói: chỉ được fit trên train; test chỉ được
+transform bằng tham số học từ train, không bao giờ được góp phần vào việc học
+tham số đó.
+
+[WHY] VÌ SAO FIT TRÊN CẢ TẬP (gồm cả test) LÀ LỖI KINH ĐIỂN?
+Giả sử ta tính median của một cột để điền giá trị khuyết, NHƯNG tính median
+trên cả train + test gộp lại. Khi đó, median ấy đã "ngấm" thông tin từ test.
+Những giá trị test mà lẽ ra mô hình chưa được biết, nay đã rò vào bước tiền xử
+lý. Tương tự với μ/σ của scaler, với ngưỡng winsorize, với bộ mã hoá: nếu học
+từ cả tập, mọi thống kê của test đã rò ngược vào pipeline.
+
+Hệ quả: điểm test trông đẹp hơn thực tế — một dạng RÒ RỈ TIỀN XỬ LÝ
+(preprocessing leakage) dẫn tới ĐÁNH GIÁ LẠC QUAN GIẢ (optimistically biased
+evaluation). Nó nguy hiểm vì rất kín đáo: code chạy trơn tru, không báo lỗi,
+chỉ là con số test cao hơn năng lực thật một chút — đủ để ta tự lừa mình rằng
+mô hình tốt, đến khi triển khai mới vỡ lở.
+
+Ví dụ minh hoạ trực quan: chấm thi mà giám khảo lén xem trước bài của thí sinh
+để "căn" thang điểm cho vừa — thang điểm đó không còn khách quan nữa. Test phải
+là đề kín tuyệt đối; ngay cả thống kê mô tả của nó cũng không được rò ra ngoài.
+
+(Chi tiết cách tính median, ngưỡng winsorize, scaler, encoder thuộc về Tập 3 và
+Tập 4. Ở đây ta chỉ nhấn mạnh TRÌNH TỰ: split trước → fit trên train → transform
+test, áp cho MỌI bước biến đổi.)
+
+
+---------------------------------------------------------------------------
+11.4 [ĐN] CROSS-VALIDATION & VÌ SAO DÙNG StratifiedGroupKFold
+---------------------------------------------------------------------------
+
+[ĐN] CROSS-VALIDATION (kiểm định chéo, viết tắt CV): ở giai đoạn chọn và tinh
+chỉnh mô hình, ta không nên đụng vào tập test (để dành cho lần chấm cuối). Thay
+vào đó, ta chia phần TRAIN thành K mảnh (fold); lần lượt lấy K-1 mảnh để học,
+1 mảnh để kiểm, xoay vòng K lần rồi lấy trung bình. Cách này cho ước lượng hiệu
+năng ổn định hơn và không "đốt" tập test.
+
+[WHY] Vì sao dùng StratifiedGroupKFold mà không phải KFold thường? Vì khi chia
+train thành các fold, ta vẫn phải tôn trọng CHÍNH HAI nguyên tắc đã nói ở 11.2:
+
+  - GROUP: một sinh viên không được nằm cả ở fold-học lẫn fold-kiểm (nếu không
+    sẽ tái diễn rò rỉ nhóm ngay trong nội bộ CV).
+  - STRATIFIED: mỗi fold giữ đúng tỉ lệ at-risk, để mỗi lần kiểm không bị lệch
+    phân bố nhãn.
+
+StratifiedGroupKFold là biến thể giữ ĐỒNG THỜI cả hai tính chất: chia theo
+nhóm (group = id_student) VÀ cân bằng phân tầng (stratify theo at_risk). Đây
+là sự nhất quán: nguyên tắc ta dùng để chia train/test ngoài cùng cũng chính
+là nguyên tắc ta áp khi chia fold bên trong train.
+
+
+---------------------------------------------------------------------------
+11.5 [EVAL] KẾT QUẢ CHIA TẬP — VÀ BẰNG CHỨNG ĐƯỢC MÁY KIỂM CHỨNG
+---------------------------------------------------------------------------
+
+Cách chia ở trên không chỉ là lý thuyết; nó cho ra các con số cụ thể, và quan
+trọng hơn, được KIỂM CHỨNG TỰ ĐỘNG bằng unit test.
+
+KẾT QUẢ CHIA:
+
+      +-----------------------------------+----------------------+
+      | Chỉ số                            | Giá trị              |
+      +-----------------------------------+----------------------+
+      | Số dòng train                     | 26.104 dòng          |
+      | Số dòng test                      | 6.489 dòng           |
+      | Số sinh viên trong test           | 5.756 sinh viên      |
+      | Tỉ lệ hold-out                    | 20% (seed = 42)      |
+      | Tỉ lệ at-risk ở train             | 0,530                |
+      | Tỉ lệ at-risk ở test              | 0,520                |
+      | Số sinh viên trùng train ∩ test   | 0 (không trùng)      |
+      +-----------------------------------+----------------------+
+
+Đọc bảng:
+
+  - TỈ LỆ at-risk train (0,530) ≈ test (0,520): chênh nhỏ → stratify hoạt động,
+    cơ cấu nhãn hai tập cân nhau, đánh giá không thiên lệch.
+
+  - 0 SINH VIÊN TRÙNG giữa train và test: group split hoạt động tuyệt đối —
+    không một cá nhân nào "bắc cầu" hai tập, nên không có rò rỉ nhóm.
+
+  - DANH SÁCH id_student của test được COMMIT vào kho mã tại
+    data/splits/test_student_ids.csv. Nhờ vậy bất kỳ ai cũng tái lập được đúng
+    tập test, và 6 mốc bảo đảm dùng chung một test — tái lập (reproducible) và
+    so sánh công bằng.
+
+KIỂM THỬ TỰ ĐỘNG — RÒ RỈ ĐƯỢC MÁY KIỂM CHỨNG, KHÔNG PHẢI LỜI HỨA SUÔNG:
+File tests/test_leakage.py có 19 test và toàn bộ 19/19 PASS. Ba nhóm chính:
+
+  1) Test thống kê tiền xử lý CHỈ học từ train: kiểm rằng median/scaler/encoder
+     được fit trên train, không "ngấm" thông tin test (đúng quy tắc vàng).
+
+  2) Test danh sách-cho-phép (allow-list) chặn cột rò rỉ: chặn những cột nguy
+     hiểm — ví dụ date_unregistration (ngày huỷ đăng ký, thường xảy ra sau mốc)
+     — không được lọt vào ma trận đặc trưng X.
+
+  3) Test mốc 100% khớp master: kiểm dữ liệu tại mốc 100% trùng khớp với bảng
+     gốc (master), xác nhận mốc tham chiếu "biết hết" không sai lệch.
+
+[WHY] Vì sao có unit test lại đáng tin hơn lời cam kết? Vì con người dễ quên,
+dễ vô tình sửa code làm rò rỉ quay lại. Unit test biến quy tắc chống rò rỉ
+thành một CÁI CHỐT TỰ ĐỘNG: hễ ai đó vô ý để cột rò rỉ lọt vào, hay fit thống
+kê trên cả tập, test sẽ ĐỎ ngay. Chống rò rỉ trở thành thứ MÁY canh gác liên
+tục, không phụ thuộc trí nhớ của một người.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 11
+---------------------------------------------------------------------------
+
+★ Hỏi: "Làm sao chắc chắn không bị rò rỉ?"
+   Đáp: Ba lớp bảo vệ chồng lên nhau. (1) Quy trình: split TRƯỚC, mọi thống kê
+   fit chỉ trên train rồi transform test. (2) Bằng chứng số: 0 sinh viên trùng
+   giữa train/test, tỉ lệ at-risk hai tập gần nhau (0,530 vs 0,520), mốc 100%
+   khớp master. (3) Kiểm chứng máy: 19/19 unit test trong tests/test_leakage.py
+   PASS, gồm test allow-list chặn cột rò rỉ như date_unregistration. Rò rỉ ở
+   đây được MÁY canh, không phải chỉ lời hứa của con người.
+
+★ Hỏi: "Vì sao chia theo sinh viên (group) chứ không chia theo dòng?"
+   Đáp: Vì một sinh viên có nhiều dòng (học nhiều lượt mở môn). Chia theo dòng
+   khiến cùng một người vào cả train lẫn test → mô hình "quen mặt" người đó →
+   điểm test cao giả (rò rỉ nhóm — group leakage). Triển khai thật thì gặp
+   sinh viên hoàn toàn mới, nên ta phải giữ trọn mọi dòng của một người về
+   cùng một phía. Kết quả: 0 sinh viên trùng giữa hai tập.
+
+★ Hỏi: "Vì sao fit scaler (và median, encoder...) chỉ trên train?"
+   Đáp: Vì "fit" là HỌC tham số từ dữ liệu. Nếu fit trên cả train+test, thì
+   μ/σ (hay median, ngưỡng) đã ngấm thông tin của test — test bị rò vào tiền
+   xử lý → điểm test lạc quan giả (preprocessing leakage). Test phải là đề kín:
+   chỉ được transform bằng tham số học từ train, tuyệt đối không góp phần vào
+   việc học tham số đó.
+
+
+===========================================================================
+TÓM TẮT TẬP 5
+===========================================================================
+
+- THỜI GIAN: vì mục tiêu là dự đoán SỚM, ta mô phỏng đứng ở mốc t% và chỉ dùng
+  sự kiện có date <= cutoff_day. cutoff tính riêng từng môn-kỳ (theo % tiến độ,
+  vì môn dài 234–269 ngày khác nhau), lưu ở data/checkpoint_map.csv. Sáu mốc
+  10/20/40/60/80/100 dày ở đầu (nơi "sớm" có giá trị), 100% là tham chiếu "biết
+  hết". Bảng số sự kiện đơn điệu tăng (2,72 → 10,66 triệu) chứng minh bộ lọc
+  thời gian đúng và không rò từ tương lai.
+
+- CHIA TẬP: group split theo id_student (chặn rò rỉ nhóm) + stratify theo
+  at_risk (cân nhãn) + test cố định ở cả 6 mốc (so sánh công bằng). Quy tắc
+  vàng: split trước, fit mọi thống kê chỉ trên train rồi transform test. Kết
+  quả 26.104 train / 6.489 test / 5.756 sinh viên, at-risk 0,530 vs 0,520, 0
+  trùng; CV sau này dùng StratifiedGroupKFold; 19/19 unit test chống rò rỉ PASS.
+
+
+-- HẾT TẬP 5 --

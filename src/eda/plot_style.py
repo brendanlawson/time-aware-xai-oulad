@@ -1,4 +1,4 @@
-"""Executable embodiment of the chart presentation standard (Task 39).
+"""Executable embodiment of the chart presentation standard.
 
 Importing :func:`apply_style` configures matplotlib/seaborn so every EDA figure is
 visually consistent, colour-blind safe and print-ready (300 dpi). The fixed class
@@ -14,10 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 from matplotlib.ticker import FuncFormatter, MaxNLocator
+import seaborn as sns
 
-FIGURES_DIR = Path(__file__).resolve().parents[2] / "reports" / "figures"
+from src.config import FIGURES_DIR
 
 # Fixed target-class colours, identical in every chart (Chart Standard section 2).
 CLASS_COLOURS = {0: "#2166AC", 1: "#C0392B"}  # 0 not-at-risk (blue), 1 at-risk (red)
@@ -30,6 +30,7 @@ GROUP_COLOURS = {
     "Performance": "#2166AC",  # blue (assessment)
 }
 
+# matplotlib rcParams for the house style (resolution, typography, de-junked axes).
 _RC = {
     # resolution
     "figure.dpi": 120,
@@ -78,7 +79,7 @@ def tidy_axis(ax: plt.Axes, *, nbins: int = 5, integer: bool = False) -> None:
     """De-clutter a numeric x-axis: few round ticks + thousands separators + despine.
 
     Prevents the overlapping tick labels that plague wide-range count features
-    (e.g. ``total_clicks`` spanning 0–24,000).
+    (e.g. ``total_clicks`` spanning 0-24,000).
     """
     ax.xaxis.set_major_locator(MaxNLocator(nbins=nbins, integer=integer))
     ax.xaxis.set_major_formatter(_THOUSANDS)

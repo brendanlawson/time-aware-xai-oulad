@@ -1,0 +1,142 @@
+################################################################################
+#                                                                              #
+#      GIÁO TRÌNH DATA TASK — TỪ SỐ 0 ĐẾN BẢO VỆ ĐƯỢC MỌI QUYẾT ĐỊNH         #
+#                                                                              #
+#   Dự án DSP391m · Nhóm 1 · FPT University                                   #
+#   "Time-Aware Explainable ML for Early At-Risk Student Prediction on OULAD" #
+#   (Học máy giải thích được, nhận biết theo thời gian, phát hiện sớm          #
+#    sinh viên có nguy cơ học tập kém — trên bộ dữ liệu OULAD)                 #
+#                                                                              #
+################################################################################
+
+Tập 0 — DẪN NHẬP & MỤC LỤC
+
+--------------------------------------------------------------------------------
+0.1. CUỐN GIÁO TRÌNH NÀY DÀNH CHO AI, ĐỂ LÀM GÌ
+--------------------------------------------------------------------------------
+Dành cho: người làm Data Task của dự án nhưng CHƯA có nền tảng data science vững,
+cần (a) thật sự HIỂU mình đang làm gì, và (b) PHẢN BIỆN + BẢO VỆ được mọi quyết
+định trước giáo viên — kể cả quyết định nhỏ nhất như "vì sao chọn biểu đồ này".
+
+Triết lý xuyên suốt — học thuộc một câu này trước tiên:
+    "Trong khoa học dữ liệu, KHÔNG có hành động nào là 'mặc định' hay 'làm cho
+     có'. Mỗi hành động phải trả lời được BỐN câu hỏi:
+        (1) Mình làm GÌ?
+        (2) VÌ SAO làm thế (lý thuyết + bằng chứng)?
+        (3) Có cách KHÁC không, vì sao mình KHÔNG chọn cách đó?
+        (4) Làm sao biết cách mình chọn là HIỆU QUẢ (đánh giá)?"
+Nếu trả lời được bốn câu này cho từng bước, bạn không chỉ làm được — bạn bảo vệ
+được. Cả cuốn sách được viết theo đúng khuôn đó.
+
+--------------------------------------------------------------------------------
+0.2. CÁCH ĐỌC
+--------------------------------------------------------------------------------
+- Đọc TUẦN TỰ từ Tập 1 đến Tập 8. Mỗi tập là một file .txt riêng (xem mục lục).
+- Trong mỗi chương, các mục được đánh số. Các ký hiệu quy ước:
+      [ĐN]   Định nghĩa / lý thuyết nền.
+      [DA]   Áp dụng trong dự án của ta (kèm SỐ THẬT).
+      [WHY]  Lý do cốt lõi của quyết định.
+      [ALT]  Phương án khác và vì sao bị loại.
+      [EVAL] Cách đánh giá hiệu quả của quyết định.
+      [NEXT] Quyết định này phục vụ bước sau thế nào.
+      ★Q/A   Câu hỏi phản biện điển hình của giáo viên + câu trả lời mẫu.
+      →      Kết luận / hệ quả.
+- Mọi con số trong sách là SỐ THẬT của dự án (khớp reports/eda_findings.json và
+  reports/data_understanding/verified_numbers.json), nên nói ra là kiểm chứng
+  được. Khi có số chỉ để minh hoạ, sách ghi rõ "ví dụ minh hoạ".
+
+--------------------------------------------------------------------------------
+0.3. BỐN CON SỐ XƯƠNG SỐNG (thuộc lòng trước khi đọc tiếp)
+--------------------------------------------------------------------------------
+    32.593 dòng (1 sinh viên × 1 lượt mở môn)
+    28.785 sinh viên · 22 lượt mở môn (module-presentation)
+    Tỉ lệ at-risk = 52,8%  (mất cân bằng NHẸ, tỉ số 1,12)
+    days_since_last_activity: Cohen's d = 2,55 — tín hiệu mạnh nhất, có từ mốc 10%
+
+--------------------------------------------------------------------------------
+0.4. SƠ ĐỒ TỔNG: ĐƯỜNG ĐI CỦA DỮ LIỆU (vẽ lại được lên giấy)
+--------------------------------------------------------------------------------
+    7 file CSV thô (quan hệ, ~10,6 triệu dòng ở bảng clickstream)
+         │  gộp 7 bảng + tổng hợp về grain "sinh viên–môn–kỳ"
+         ▼
+    master_raw  (32.593 × 33)
+         │  cắt theo thời gian tại 6 mốc (10/20/40/60/80/100%)
+         ▼
+    6 bộ dữ liệu checkpoint
+         │  làm sạch → mã hoá → scale (fit CHỈ trên train) → chia train/test
+         ▼
+    Ma trận đặc trưng 49 cột  +  tập train/test cố định
+         ▼
+    (sẵn sàng cho giai đoạn Modeling — Task 4)
+
+--------------------------------------------------------------------------------
+0.5. MỤC LỤC TOÀN BỘ GIÁO TRÌNH
+--------------------------------------------------------------------------------
+Mỗi "Tập" là một file trong thư mục reports/guide/giaotrinh/ :
+
+  Tập 0 — Dẫn nhập & Mục lục .......... 00_GIOI_THIEU_VA_MUC_LUC.txt  (file này)
+
+  PHẦN I — NỀN TẢNG
+  Tập 1 — Nền tảng .................... 01_NEN_TANG.txt
+      Ch.1  Khoa học dữ liệu là gì & quy trình CRISP-DM
+      Ch.2  Bộ dữ liệu OULAD: 7 bảng quan hệ, lược đồ, khoá, grain
+      Ch.3  Định nghĩa bài toán & biến mục tiêu (nhị phân hoá nhãn)
+
+  PHẦN II — KỸ THUẬT DỮ LIỆU
+  Tập 2 — Data Engineering ........... 02_DATA_ENGINEERING.txt
+      Ch.4  Xử lý dữ liệu lớn: engine cột, ClickHouse, Parquet, đẩy SQL
+      Ch.5  Dựng bảng master: JOIN, tổng hợp, feature engineering
+
+  PHẦN III — LÀM SẠCH
+  Tập 3 — Làm sạch dữ liệu ........... 03_LAM_SACH.txt
+      Ch.6  Dữ liệu thiếu: MCAR/MAR/MNAR & các phép điền khuyết
+      Ch.7  Ngoại lai & phân phối: skew, kurtosis, log1p, winsorize
+
+  PHẦN IV — BIẾN ĐỔI & CHUẨN HOÁ
+  Tập 4 — Biến đổi dữ liệu ........... 04_BIEN_DOI.txt
+      Ch.8  Phân loại biến & mã hoá (one-hot, ordinal, binary, bẫy dummy)
+      Ch.9  Co giãn/chuẩn hoá (StandardScaler vs Min-Max vs Robust)
+
+  PHẦN V — THỜI GIAN & CHIA TẬP
+  Tập 5 — Thời gian & chia tập ....... 05_THOI_GIAN_VA_CHIA_TAP.txt
+      Ch.10 Checkpoint theo thời gian & rò rỉ thời gian (temporal leakage)
+      Ch.11 Chia train/test: group, stratified, quy tắc vàng fit-train-only
+
+  PHẦN VI — PHÂN TÍCH KHÁM PHÁ (EDA) — TRỌNG TÂM VỀ CHỌN BIỂU ĐỒ
+  Tập 6 — EDA ........................ 06_EDA.txt
+      Ch.12 Triết lý EDA & "ngữ pháp đồ hoạ"; LÝ THUYẾT CHỌN BIỂU ĐỒ
+      Ch.13 Phân tích đơn biến (univariate) — từng biểu đồ
+      Ch.14 Đơn biến vs nhãn (Cohen's d, p-value, Cramér's V)
+      Ch.15 Tương quan & đa cộng tuyến (Pearson/Spearman, heatmap)
+      Ch.16 EDA theo thời gian & kết quả "phát hiện sớm khả thi"
+
+  PHẦN VII — ĐÁNH GIÁ & BẢO VỆ
+  Tập 7 — Đánh giá & bảo vệ .......... 07_DANH_GIA_VA_BAO_VE.txt
+      Ch.17 Khung đánh giá chất lượng dữ liệu (6 chiều + 3 tầng phòng thủ)
+      Ch.18 Tổng hợp phát hiện → giả thuyết cho mô hình
+      Ch.19 Cẩm nang phản biện: ngân hàng câu hỏi & cách lập luận
+
+  PHẦN VIII — PHỤ LỤC
+  Tập 8 — Phụ lục .................... 08_PHU_LUC.txt
+      A. Từ điển thuật ngữ (giải thích kỹ)
+      B. Bảng tra "dữ liệu kiểu gì → biểu đồ nào"
+      C. Bảng tra thống kê (effect size, tương quan, phân phối)
+      D. Bảng tổng hợp mọi con số đã kiểm chứng
+      E. Lệnh tái lập toàn bộ & danh mục đọc thêm
+
+--------------------------------------------------------------------------------
+0.6. LỘ TRÌNH HỌC GỢI Ý (nếu gấp)
+--------------------------------------------------------------------------------
+- Muốn HIỂU bản chất: đọc đủ Tập 1 → 8 theo thứ tự.
+- Sắp bảo vệ trong 1–2 ngày: đọc Tập 0, rồi Ch.3, Ch.6–7, Ch.8, Ch.11, cả Tập 6
+  (EDA), rồi Ch.19 (ngân hàng câu hỏi) và Phụ lục B (chọn biểu đồ).
+- Chỉ cần "thuộc bài để nói": Tập 0 + Ch.19 + Phụ lục B & C.
+
+--------------------------------------------------------------------------------
+0.7. MỘT CÂU CHỐT ĐỂ MANG THEO
+--------------------------------------------------------------------------------
+"Mỗi hành động trong Task 3 bắt nguồn từ một BẰNG CHỨNG quan sát được, phục vụ
+một MỤC TIÊU rõ ràng (phát hiện sớm · giải thích được · không rò rỉ), và được
+KIỂM CHỨNG bằng số thật + unit test." Nắm mạch đó, bạn bảo vệ được mọi thứ.
+
+################################################################################

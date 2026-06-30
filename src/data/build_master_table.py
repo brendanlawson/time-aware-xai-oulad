@@ -1,36 +1,34 @@
-"""Build the OULAD master table (Tasks 4 and 5, Phuc).
+"""Build the OULAD master table (t=100%, full-course view).
 
-Joins the seven OULAD tables into one flat table - one row per student-module-
-presentation - carrying the three feature groups (demographic, engagement,
-performance), the fixed ``at_risk`` label (Step-0, Option A) and the module length
-used for checkpoint slicing.
+Joins the OULAD tables into one flat table — one row per student-module-
+presentation — carrying demographic + engagement + performance features, the
+fixed ``at_risk`` label (Step-0 Option A) and the module length used for
+checkpoint slicing.
 
-Task 4: left-join studentInfo <- registration <- engagement <- performance, with a
-        before/after row-count log proving no unexpected duplication or loss.
-Task 5: drop duplicate keys and standardise categorical text, with a cleaning log.
+  Join:  studentInfo <- registration <- engagement <- performance
+         (left joins; log before/after row counts to prove no dup/loss).
+  Clean: drop duplicate keys, standardise categorical text (log the cleaning).
 
-CLI
+CLI:
     python -m src.data.build_master_table              # uses cached engagement_agg
     python -m src.data.build_master_table --rebuild-engagement
+
+See guide section "data/build_master_table.py".
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-import sys
-from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src.data import build_engagement_features as eng  # noqa: E402
-from src.data.build_performance_features import aggregate_performance  # noqa: E402
-from src.data.io_utils import (  # noqa: E402
+from src.config import INTERIM_DATA_DIR, RAW_DATA_DIR
+from src.data import build_engagement_features as eng
+from src.data.build_performance_features import aggregate_performance
+from src.data.io_utils import (
     GROUP_COLS,
-    INTERIM_DIR,
     PRESENTATION_KEY,
-    RAW_DIR,
     add_at_risk_label,
     load_raw_tables,
     save_parquet_atomic,
@@ -43,8 +41,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# Categorical columns standardised in the consistency pass (Task 5). imd_band
-# values such as '10-20' are left verbatim: the ordinal encoder expects them.
+# Categorical columns standardised in the consistency pass. Leave imd_band values
+# (e.g. '10-20') verbatim — the ordinal encoder expects them.
 CATEGORICAL_COLS = [
     "gender",
     "region",
@@ -55,7 +53,8 @@ CATEGORICAL_COLS = [
 ]
 
 
-def _load_engagement(raw_dir: Path, output_dir: Path, rebuild: bool) -> pd.DataFrame:
+def _load_engagement(raw_dir, output_dir, rebuild: bool) -> pd.DataFrame:
+    """Load the cached engagement aggregation, or (re)build it from studentVle."""
     cache = output_dir / "engagement_agg.parquet"
     if cache.exists() and not rebuild:
         log.info("Loading cached engagement_agg: %s", cache)
@@ -65,11 +64,16 @@ def _load_engagement(raw_dir: Path, output_dir: Path, rebuild: bool) -> pd.DataF
 
 
 def build_master(
-    raw_dir: Path = RAW_DIR,
-    output_dir: Path = INTERIM_DIR,
-    rebuild_engagement: bool = False,
+    raw: dict[str, pd.DataFrame],
+    engagement: pd.DataFrame,
+    rebuild: bool = False,
 ) -> pd.DataFrame:
-    raw = load_raw_tables(raw_dir)
+    """Left-join the four sources into the master table; attach at_risk + length.
+
+    studentInfo is the roster (left side of every join), so no join may add rows:
+    each merge is ``validate="many_to_one"`` and logs its before/after row counts.
+    Returns the joined frame *before* the consistency clean (see :func:`_clean`).
+    """
     student_info = add_at_risk_label(raw["studentInfo"])
     courses = raw["courses"]
 
@@ -81,14 +85,11 @@ def build_master(
     performance = aggregate_performance(
         raw["studentAssessment"], raw["assessments"], cutoff_lookup, roster=student_info
     )
-    engagement = _load_engagement(raw_dir, output_dir, rebuild_engagement)
     registration = raw["studentRegistration"]
 
     join_log: list[dict] = []
 
-    def _merge(
-        left: pd.DataFrame, right: pd.DataFrame, cols, name: str
-    ) -> pd.DataFrame:
+    def _merge(left: pd.DataFrame, right: pd.DataFrame, cols, name: str) -> pd.DataFrame:
         before = len(left)
         merged = left.merge(right, on=cols, how="left", validate="many_to_one")
         join_log.append(
@@ -116,8 +117,7 @@ def build_master(
     master = _merge(
         master,
         registration[
-            PRESENTATION_KEY
-            + ["id_student", "date_registration", "date_unregistration"]
+            PRESENTATION_KEY + ["id_student", "date_registration", "date_unregistration"]
         ],
         GROUP_COLS,
         "registration",
@@ -132,6 +132,8 @@ def build_master(
     )
 
     # Derive days_since_last_activity from last_active_day (helper col), then drop it.
+    # A student absent from studentVle has last_active_day == NaN; their idle span is
+    # the whole window, so fill with module_presentation_length (NOT 0).
     master["days_since_last_activity"] = (
         master["module_presentation_length"] - master["last_active_day"]
     ).clip(lower=0)
@@ -146,24 +148,13 @@ def build_master(
     ]
     master[engagement_fill] = master[engagement_fill].fillna(0)
 
-    master, cleaning_log = _clean(master)
-
-    save_parquet_atomic(master, output_dir / "master_raw.parquet")
-    pd.DataFrame(join_log).to_csv(output_dir / "master_join_log.csv", index=False)
-    cleaning_log.to_csv(output_dir / "master_cleaning_log.csv", index=False)
-
-    log.info("master_raw: %s rows x %d cols", f"{len(master):,}", master.shape[1])
-    log.info("at_risk rate: %.1f%%", 100 * master["at_risk"].mean())
-    log.info(
-        "duplicated keys: %d | feature NaNs: %d",
-        _dup_count(master),
-        _feature_nans(master),
-    )
+    INTERIM_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(join_log).to_csv(INTERIM_DATA_DIR / "master_join_log.csv", index=False)
     return master
 
 
 def _clean(master: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Task 5: drop duplicate keys and standardise categorical text."""
+    """Drop duplicate keys + standardise categorical text; return (clean, log)."""
     rows = []
     n_dup = _dup_count(master)
     master = master.drop_duplicates(subset=GROUP_COLS).reset_index(drop=True)
@@ -172,9 +163,7 @@ def _clean(master: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     for col in CATEGORICAL_COLS:
         if col in master.columns and master[col].dtype == object:
             master[col] = master[col].str.strip()
-            rows.append(
-                {"item": f"{col}_n_unique", "value": master[col].nunique(dropna=True)}
-            )
+            rows.append({"item": f"{col}_n_unique", "value": master[col].nunique(dropna=True)})
 
     return master, pd.DataFrame(rows)
 
@@ -184,23 +173,37 @@ def _dup_count(df: pd.DataFrame) -> int:
 
 
 def _feature_nans(df: pd.DataFrame) -> int:
+    # imd_band and date_unregistration are legitimately missing for some students.
     cols = [c for c in df.columns if c not in ("imd_band", "date_unregistration")]
     return int(df[cols].isnull().sum().sum())
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build the OULAD master table.")
-    p.add_argument("--raw-dir", type=Path, default=RAW_DIR)
-    p.add_argument("--output-dir", type=Path, default=INTERIM_DIR)
     p.add_argument("--rebuild-engagement", action="store_true")
     return p.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    build_master(args.raw_dir, args.output_dir, args.rebuild_engagement)
+    raw = load_raw_tables(RAW_DATA_DIR)
+    engagement = _load_engagement(RAW_DATA_DIR, INTERIM_DATA_DIR, args.rebuild_engagement)
+
+    master = build_master(raw, engagement)
+    master, cleaning_log = _clean(master)
+
+    save_parquet_atomic(master, INTERIM_DATA_DIR / "master_raw.parquet")
+    cleaning_log.to_csv(INTERIM_DATA_DIR / "master_cleaning_log.csv", index=False)
+
+    log.info("master_raw: %s rows x %d cols", f"{len(master):,}", master.shape[1])
+    log.info("at_risk rate: %.1f%%", 100 * master["at_risk"].mean())
+    log.info(
+        "duplicated keys: %d | feature NaNs: %d",
+        _dup_count(master),
+        _feature_nans(master),
+    )
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

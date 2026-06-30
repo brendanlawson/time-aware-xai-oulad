@@ -1,0 +1,860 @@
+TẬP 6 — EDA: PHÂN TÍCH KHÁM PHÁ & NGHỆ THUẬT CHỌN BIỂU ĐỒ
+
+
+===========================================================================
+LỜI MỞ ĐẦU CỦA TẬP 6
+===========================================================================
+
+Tới đây, dữ liệu của ta đã sạch (Tập 3), đã được biến đổi và chuẩn hoá
+(Tập 4), đã được cắt theo thời gian và chia train/test đúng luật (Tập 5).
+Một câu hỏi tự nhiên nảy ra: vậy ta đã có thể "bấm nút" huấn luyện mô hình
+chưa? Câu trả lời là CHƯA — và Tập này giải thích vì sao.
+
+Trước khi giao dữ liệu cho thuật toán, người làm dữ liệu phải tự mình NHÌN
+vào dữ liệu, HIỂU hình dạng của nó, và RÚT RA giả thuyết về những gì mô hình
+sẽ học được. Công việc đó gọi là EDA — Exploratory Data Analysis (phân tích
+dữ liệu khám phá). EDA không phải bước "làm cho có" hay "vẽ vài cái biểu đồ
+cho đẹp slide". Nó là bước ta lắng nghe dữ liệu kể chuyện, để sau này không
+bị mô hình "lừa" bằng một con số AUC đẹp mà ta không hiểu vì sao có.
+
+Tập này có hai mạch song song:
+
+  1) MẠCH LÝ THUYẾT CHỌN BIỂU ĐỒ (Ch.12): mỗi biểu đồ là một "câu" trong
+     một thứ ngôn ngữ. Chọn sai biểu đồ là nói sai ngữ pháp — người xem hiểu
+     lầm, hoặc tệ hơn, chính ta hiểu lầm dữ liệu. Ta học cách chọn biểu đồ
+     theo KIỂU DỮ LIỆU và theo SỐ BIẾN, và bảo vệ được từng lựa chọn.
+
+  2) MẠCH PHÁT HIỆN THỰC TẾ (Ch.13 → Ch.16): ta áp lý thuyết đó lên đúng dữ
+     liệu dự án, đọc ra các con số thật — độ lệch của phân phối, sức phân
+     biệt của từng biến với nhãn, cấu trúc tương quan, và quan trọng nhất:
+     bằng chứng cho thấy "phát hiện sớm" là KHẢ THI.
+
+Như mọi tập, ta viết theo lối tự phản biện: làm GÌ, VÌ SAO, có cách KHÁC
+không, và lấy gì CHỨNG MINH. Mỗi con số nêu ra đều kiểm chứng được trong
+reports/eda_findings.json và reports/data_understanding/verified_numbers.json.
+
+
+===========================================================================
+CHƯƠNG 12 — TRIẾT LÝ EDA & "NGỮ PHÁP ĐỒ HOẠ": LÝ THUYẾT CHỌN BIỂU ĐỒ
+===========================================================================
+
+
+---------------------------------------------------------------------------
+12.1 [ĐN] EDA LÀ GÌ, VÀ VÌ SAO KHÔNG ĐƯỢC BỎ QUA
+---------------------------------------------------------------------------
+
+[ĐN] EDA (Exploratory Data Analysis — phân tích dữ liệu khám phá): là quá
+trình dùng tóm tắt thống kê và biểu đồ để HIỂU dữ liệu TRƯỚC khi mô hình
+hoá — nhận diện hình dạng phân phối, mối quan hệ giữa các biến, ngoại lai,
+giá trị bất thường, và những giả định cần kiểm.
+
+Khái niệm này do nhà thống kê John Tukey đặt nền (thập niên 1970). Tư tưởng
+cốt lõi: dữ liệu phải được "nhìn" trước khi bị "tính". Một con số tóm tắt
+(trung bình, độ lệch chuẩn) có thể che giấu sự thật; chỉ khi vẽ ra ta mới
+thấy phân phối lệch, hai cụm tách biệt, hay một hàng ngoại lai kéo lệch mọi
+thống kê.
+
+[WHY] Vì sao EDA là bắt buộc, không phải trang trí?
+
+  - PHÁT HIỆN VẤN ĐỀ SỚM: phân phối lệch mạnh, cột gần như hằng số, ngoại
+    lai cực đoan — nếu không thấy trước, chúng âm thầm phá mô hình về sau.
+
+  - CHỌN ĐÚNG CÔNG CỤ: biết một biến lệch phải mạnh thì mới biết cần log1p
+    hay winsorize (Tập 3); biết hai biến tương quan ~0,84 thì mới cảnh giác
+    đa cộng tuyến cho mô hình tuyến tính.
+
+  - SINH GIẢ THUYẾT: EDA cho ta giả thuyết "biến idle phân biệt rất mạnh"
+    để rồi mô hình kiểm chứng. Nếu mô hình cho kết quả ngược với những gì
+    EDA gợi ý, đó là tín hiệu CÓ LỖI ở đâu đó (rò rỉ, bug) — EDA là cái neo
+    để ta không tin mù quáng vào output.
+
+  - BẢO VỆ ĐƯỢC: trước hội đồng, "tôi đã nhìn dữ liệu và đây là bằng chứng"
+    mạnh hơn vạn lần "tôi cứ chạy mô hình rồi ra số này".
+
+→ EDA biến dữ liệu từ "hộp đen" thành "câu chuyện hiểu được". Đó là điều
+  kiện tiên quyết cho một dự án Explainable AI.
+
+
+---------------------------------------------------------------------------
+12.2 [ĐN] "NGỮ PHÁP ĐỒ HOẠ": BIỂU ĐỒ LÀ MỘT NGÔN NGỮ CÓ LUẬT
+---------------------------------------------------------------------------
+
+[ĐN] NGỮ PHÁP ĐỒ HOẠ (grammar of graphics): ý tưởng rằng mọi biểu đồ đều
+được tạo từ những thành phần cơ bản — DỮ LIỆU, phép ánh xạ biến vào KÊNH
+THỊ GIÁC (vị trí, chiều dài, màu, diện tích), HÌNH HỌC (cột, điểm, đường),
+và HỆ TOẠ ĐỘ. Chọn biểu đồ chính là chọn cách ánh xạ này.
+
+Nguyên tắc nền: con người đọc một số kênh thị giác CHÍNH XÁC hơn các kênh
+khác. Thứ tự độ chính xác (từ cao xuống thấp), theo nghiên cứu tri giác:
+
+      VỊ TRÍ trên trục chung  >  CHIỀU DÀI  >  GÓC/ĐỘ DỐC  >
+      DIỆN TÍCH  >  MÀU SẮC/ĐẬM NHẠT
+
+[WHY] Hệ quả thực hành: muốn người xem SO SÁNH chính xác các giá trị, hãy
+ánh xạ chúng vào VỊ TRÍ hoặc CHIỀU DÀI (vì thế bar chart, scatter mạnh hơn
+pie chart — vốn buộc mắt so sánh GÓC và DIỆN TÍCH, kém chính xác). Đây là
+lý do trong dự án ta gần như không dùng biểu đồ tròn.
+
+→ Chọn biểu đồ không phải chuyện thẩm mỹ cá nhân; nó là chuyện ÁNH XẠ dữ
+  liệu vào kênh mà mắt người đọc đúng nhất.
+
+
+---------------------------------------------------------------------------
+12.3 [ĐN] HAI CÂU HỎI QUYẾT ĐỊNH MỌI LỰA CHỌN BIỂU ĐỒ
+---------------------------------------------------------------------------
+
+Trước khi vẽ bất cứ thứ gì, trả lời ĐÚNG HAI câu hỏi:
+
+  CÂU 1 — KIỂU DỮ LIỆU của biến là gì?
+      • ĐỊNH LƯỢNG (numeric): số đo đếm được — clicks, điểm, số ngày.
+      • PHÂN LOẠI (categorical): nhãn rời rạc — region, gender, at_risk.
+
+  CÂU 2 — Tôi đang nhìn MẤY BIẾN cùng lúc?
+      • 1 biến (univariate): mô tả phân phối của riêng nó.
+      • 2 biến (bivariate): mô tả QUAN HỆ giữa hai biến.
+      • nhiều biến (multivariate): cấu trúc giữa nhiều biến cùng lúc.
+
+Bắt chéo hai câu hỏi này cho ta một BẢNG TRA quyết định — đây là "kim chỉ
+nam" của cả tập:
+
+  +------------------+--------------------------+---------------------------+
+  | Tình huống       | Biểu đồ nên dùng         | VÌ SAO                    |
+  +------------------+--------------------------+---------------------------+
+  | 1 biến định lượng| histogram, boxplot,      | xem hình dạng phân phối,  |
+  |                  | violin                   | độ lệch, ngoại lai        |
+  +------------------+--------------------------+---------------------------+
+  | 1 biến phân loại | bar chart (đếm tần suất) | so sánh số lượng theo     |
+  |                  |                          | nhóm bằng chiều dài cột   |
+  +------------------+--------------------------+---------------------------+
+  | định lượng ×     | boxplot/violin TÁCH theo | so sánh phân phối của một |
+  | phân loại        | nhóm                     | biến số giữa các nhóm     |
+  +------------------+--------------------------+---------------------------+
+  | định lượng ×     | scatter plot             | xem quan hệ, xu hướng,    |
+  | định lượng       |                          | cụm, ngoại lai 2 chiều    |
+  +------------------+--------------------------+---------------------------+
+  | phân loại ×      | bảng chéo / bar nhóm /   | xem liên hệ giữa hai biến |
+  | phân loại        | heatmap đếm              | nhãn rời rạc              |
+  +------------------+--------------------------+---------------------------+
+  | nhiều định lượng | heatmap tương quan       | nhìn toàn bộ ma trận quan |
+  |                  |                          | hệ trong một hình         |
+  +------------------+--------------------------+---------------------------+
+
+→ Mọi biểu đồ trong Ch.13–16 đều bắt nguồn từ đúng bảng tra này. Trước hội
+  đồng, hỏi "vì sao biểu đồ này?" → trả lời theo KIỂU DỮ LIỆU và SỐ BIẾN.
+
+
+---------------------------------------------------------------------------
+12.4 [WHY] TỪNG BIỂU ĐỒ DÙNG KHI NÀO VÀ VÌ SAO
+---------------------------------------------------------------------------
+
+HISTOGRAM (biểu đồ phân phối tần suất) — 1 biến định lượng.
+  Chia trục giá trị thành các khoảng (bin), đếm số quan sát rơi vào mỗi
+  khoảng. [WHY] Là cách trực tiếp nhất để THẤY HÌNH DẠNG phân phối: đối
+  xứng hay lệch, một đỉnh hay nhiều đỉnh, đuôi dài hay ngắn. Nhược: hình
+  phụ thuộc số bin — ít bin thì mất chi tiết, nhiều bin thì nhiễu.
+
+BOXPLOT (biểu đồ hộp) — 1 biến định lượng, hoặc định lượng × phân loại.
+  Hộp = khoảng tứ phân vị (Q1–Q3), vạch giữa = trung vị, "râu" kéo tới
+  1,5×IQR, điểm ngoài râu = nghi ngoại lai. [WHY] Tóm tắt phân phối bằng
+  5 con số và LÀM NỔI NGOẠI LAI; cực tiện để XẾP CẠNH NHAU nhiều nhóm so
+  sánh. Nhược: GIẤU hình dạng chi tiết (không thấy hai đỉnh).
+
+VIOLIN PLOT (biểu đồ vĩ cầm) — định lượng, thường tách theo nhóm.
+  Như boxplot nhưng bề rộng tại mỗi mức biểu diễn MẬT ĐỘ. [WHY] Khắc phục
+  nhược điểm boxplot: vừa thấy tóm tắt, vừa thấy HÌNH DẠNG (đa đỉnh, dồn
+  cụm). Dùng khi nghi phân phối không đơn giản.
+
+BAR CHART (biểu đồ cột) — 1 biến phân loại (đếm), hoặc giá trị theo nhóm.
+  [WHY] Ánh xạ số lượng vào CHIỀU DÀI cột — kênh thị giác mắt đọc rất
+  chính xác → so sánh giữa nhóm dễ và đáng tin. Trục giá trị PHẢI bắt đầu
+  từ 0, nếu không chiều dài cột nói dối.
+
+SCATTER PLOT (biểu đồ tán xạ) — 2 biến định lượng.
+  Mỗi điểm là một quan sát đặt theo (x, y). [WHY] Cách duy nhất thấy trực
+  tiếp QUAN HỆ hai biến số: tuyến tính hay cong, chặt hay lỏng, có cụm,
+  có ngoại lai 2 chiều. Là nền của phân tích tương quan.
+
+HEATMAP (bản đồ nhiệt) — ma trận nhiều biến định lượng (tương quan).
+  Lưới ô màu, mỗi ô là một giá trị (ví dụ hệ số tương quan), màu mã hoá
+  độ lớn/dấu. [WHY] Nén CẢ MA TRẬN quan hệ vào một hình; quét mắt là thấy
+  ngay cặp nào tương quan mạnh. Nhược: màu là kênh kém chính xác, nên
+  heatmap để PHÁT HIỆN cặp đáng chú ý, rồi xác nhận bằng con số.
+
+  ★ Vì sao TRÁNH pie chart? Vì nó buộc mắt so sánh GÓC và DIỆN TÍCH — hai
+    kênh kém chính xác nhất. Mọi việc pie làm được, bar làm tốt hơn.
+
+
+---------------------------------------------------------------------------
+12.5 [WHY] NGUYÊN TẮC TRỰC QUAN TỐT: CHART-JUNK, THANG ĐO, MÀU MÙ MÀU
+---------------------------------------------------------------------------
+
+Vẽ đúng loại biểu đồ vẫn chưa đủ; còn phải vẽ TRUNG THỰC và DỄ ĐỌC.
+
+  - CHART-JUNK (rác đồ hoạ): mọi yếu tố trang trí không mang thông tin —
+    nền 3D, bóng đổ, hoạ tiết loè loẹt. [WHY] Chúng làm loãng tín hiệu,
+    đánh lừa tri giác. Nguyên tắc Tufte: tối đa hoá "tỉ lệ mực-trên-dữ-
+    liệu" (data-ink ratio) — mỗi nét mực nên đại diện cho dữ liệu.
+
+  - THANG ĐO TRUNG THỰC: bar chart phải bắt đầu từ 0 (cắt gốc làm phóng
+    đại khác biệt). Với biến lệch phải cực mạnh (xem Ch.13), dùng THANG
+    LOG để nhìn được cả vùng dày lẫn đuôi dài — nhưng PHẢI ghi rõ "thang
+    log" để người xem không hiểu lầm khoảng cách.
+
+  - MÀU THÂN THIỆN MÙ MÀU (colorblind-safe): khoảng 8% nam giới khó phân
+    biệt đỏ–lục. [WHY] Tránh cặp đỏ–lục để mã thông tin sống còn; ưu tiên
+    bảng màu an toàn (vd lục–lam, hoặc tách bằng cả độ đậm/hình dạng, chứ
+    không chỉ màu). Trực quan tốt là trực quan AI CŨNG đọc được.
+
+→ Tiêu chí một biểu đồ tốt: đúng loại (12.3–12.4) + trung thực thang đo +
+  không rác + đọc được kể cả khi in trắng đen / mắt mù màu.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 12
+---------------------------------------------------------------------------
+
+★ Hỏi: "EDA để làm gì, sao không chạy thẳng mô hình cho nhanh?"
+   Đáp: Vì mô hình là hộp đen sẽ cho ra một con số mà ta không hiểu nguồn
+   gốc. EDA làm bốn việc: phát hiện vấn đề phân phối/ngoại lai sớm, chọn
+   đúng phép biến đổi (log1p/winsorize), sinh giả thuyết để đối chiếu với
+   output mô hình (nếu ngược nhau là có bug/rò rỉ), và tạo bằng chứng để
+   bảo vệ. Bỏ EDA là bay không có đồng hồ.
+
+★ Hỏi: "Vì sao chọn biểu đồ này mà không phải cái khác?"
+   Đáp: Tôi chọn theo hai câu hỏi: (1) biến là ĐỊNH LƯỢNG hay PHÂN LOẠI,
+   (2) tôi nhìn mấy biến cùng lúc. Một biến định lượng → histogram/boxplot
+   để thấy phân phối và ngoại lai; định lượng theo nhóm → boxplot/violin
+   tách nhóm; hai biến số → scatter; nhiều biến số → heatmap tương quan;
+   biến phân loại → bar chart. Đây là bảng tra ngữ pháp đồ hoạ ở mục 12.3.
+
+★ Hỏi: "Vì sao không dùng biểu đồ tròn?"
+   Đáp: Vì mắt người đọc GÓC và DIỆN TÍCH kém chính xác hơn nhiều so với
+   VỊ TRÍ và CHIỀU DÀI. Bar chart ánh xạ giá trị vào chiều dài cột nên so
+   sánh đáng tin hơn. Mọi việc pie làm được, bar làm tốt hơn.
+
+
+===========================================================================
+CHƯƠNG 13 — PHÂN TÍCH ĐƠN BIẾN (UNIVARIATE)
+===========================================================================
+
+
+---------------------------------------------------------------------------
+13.1 [ĐN] ĐƠN BIẾN LÀ GÌ, VÀ HAI THƯỚC ĐO HÌNH DẠNG: SKEW & KURTOSIS
+---------------------------------------------------------------------------
+
+[ĐN] PHÂN TÍCH ĐƠN BIẾN (univariate analysis): nhìn TỪNG biến một, mô tả
+phân phối của riêng nó — xu hướng trung tâm (mean, median), độ phân tán
+(độ lệch chuẩn, IQR), và HÌNH DẠNG.
+
+Hai con số mô tả hình dạng:
+
+[ĐN] SKEWNESS (độ lệch / độ xiên): đo phân phối lệch về phía nào.
+   - skew ≈ 0: đối xứng (vd phân phối chuẩn hình chuông).
+   - skew > 0: LỆCH PHẢI — đuôi dài kéo về phía giá trị LỚN; phần lớn quan
+     sát dồn ở giá trị nhỏ, một ít giá trị rất lớn kéo đuôi. Khi đó mean >
+     median.
+   - skew < 0: LỆCH TRÁI — đuôi dài về phía giá trị nhỏ; mean < median.
+
+[ĐN] KURTOSIS (độ nhọn): đo "đuôi nặng" và độ nhọn của đỉnh (ở đây dùng
+   excess kurtosis, chuẩn = 0). Kurtosis CAO nghĩa là phân phối có ĐUÔI
+   RẤT NẶNG — tức nhiều giá trị cực đoan (ngoại lai) hơn hẳn phân phối
+   chuẩn. Kurtosis cao luôn là tín hiệu CẢNH BÁO NGOẠI LAI.
+
+[WHY] Vì sao hình dạng quan trọng với việc tiền xử lý và mô hình? Vì nhiều
+phương pháp (đặc biệt mô hình tuyến tính, phép scale chuẩn) ngầm giả định
+phân phối tương đối đối xứng, không quá nhiều ngoại lai. Biến lệch phải
+mạnh + kurtosis khổng lồ vi phạm giả định đó → đây chính là cơ sở SỐ để
+quyết định dùng log1p / winsorize ở Tập 3.
+
+
+---------------------------------------------------------------------------
+13.2 [DA] CÁC BIẾN CLICK LỆCH PHẢI CỰC MẠNH — SỐ THẬT
+---------------------------------------------------------------------------
+
+Áp lý thuyết 13.1 lên các biến đếm số lần click trong dự án, ta thu được
+các con số (eda_findings.json → univariate):
+
+  +----------------------------+-----------+--------------------+
+  | Biến (đếm click)           | Skew      | Kurtosis (nhọn)    |
+  +----------------------------+-----------+--------------------+
+  | clicks_resource            | 34,71     | 2125,45            |
+  | clicks_url                 | 13,1      | 516,09             |
+  | max_clicks_single_day      | 10,56     | 320,18             |
+  | clicks_oucollaborate       | 7,83      | 104,01             |
+  | clicks_forumng             | 7,33      | 83,33              |
+  +----------------------------+-----------+--------------------+
+
+Đọc bảng: clicks_resource có skew = 34,71 và kurtosis = 2125,45 — những
+con số KHỔNG LỒ. Để dễ hình dung: phân phối chuẩn có skew 0 và excess
+kurtosis 0; ở đây skew lớn gấp hàng chục lần, kurtosis lớn gấp HÀNG NGHÌN
+lần. Nghĩa là: tuyệt đại đa số sinh viên click loại tài nguyên này rất ít
+(hoặc không click), nhưng một nhóm rất nhỏ click cực nhiều, kéo một cái
+đuôi cực dài về bên phải.
+
+[WHY] Trên biểu đồ: nếu vẽ histogram của clicks_resource theo thang
+TUYẾN TÍNH, ta sẽ chỉ thấy một cột cao chót vót sát trục 0 và mặt phẳng
+trống mênh mông kéo dài về phải — gần như VÔ DỤNG để đọc. Đây chính là
+tình huống ở mục 12.5: phải dùng THANG LOG (hoặc log1p hoá biến) để nhìn
+được cả vùng dày lẫn đuôi.
+
+→ Lệch phải mạnh + kurtosis khổng lồ là BẰNG CHỨNG SỐ trực tiếp cho quyết
+  định log1p / winsorize ở Tập 3. Ta không "log1p cho có" — ta log1p vì
+  skew = 34,71 ở đây nói rằng cần.
+
+
+---------------------------------------------------------------------------
+13.3 [DA] TỔNG CLICK & VÙNG "ZERO-CLICK" — MỘT NHÓM ĐÁNG CHÚ Ý
+---------------------------------------------------------------------------
+
+Nhìn biến tổng hợp total_clicks (master_raw):
+
+  +---------------------------+----------------------+
+  | Thống kê total_clicks     | Giá trị              |
+  +---------------------------+----------------------+
+  | Trung bình (mean)         | 1215,1               |
+  | Trung vị (median)         | 609                  |
+  | Độ lệch (skew)            | 3,03                 |
+  | Lớn nhất (max)            | 24139                |
+  +---------------------------+----------------------+
+
+[WHY] Mean (1215,1) LỚN GẤP ĐÔI median (609) — dấu hiệu kinh điển của lệch
+phải: vài sinh viên siêu chăm (max tới 24139 click) kéo trung bình lên cao
+hơn hẳn "người điển hình". Bài học bảo vệ: với biến lệch, MEDIAN mô tả
+"người điển hình" trung thực hơn MEAN. Khi báo cáo biến lệch, nên ưu tiên
+trung vị.
+
+ĐIỂM ĐẶC BIỆT: có 3365 dòng ZERO-CLICK — sinh viên không có một cú click
+nào trong toàn bộ dữ liệu tương tác (verified_numbers.json → master_raw:
+zero_click_rows = 3365). [WHY] Đây không phải lỗi dữ liệu; rất nhiều trong
+số đó là người đăng ký rồi gần như không tham gia (gắn với nhóm Withdrawn
+ở Ch.16). Một cụm 0 lớn như vậy làm phân phối có "đỉnh tại 0" — lý do nữa
+khiến log1p (cộng 1 trước khi lấy log, để log(0) không vỡ) là lựa chọn
+hợp lý thay vì log thuần.
+
+→ Trên biểu đồ đơn biến của total_clicks: nên dùng histogram thang log +
+  ghi chú cụm zero-click; hoặc boxplot để ngoại lai (đuôi 24139) tự lộ.
+
+
+---------------------------------------------------------------------------
+13.4 [DA] MỘT BIẾN LỆCH TRÁI: ĐIỂM SỐ
+---------------------------------------------------------------------------
+
+Không phải biến nào cũng lệch phải. mean_score_to_date (điểm trung bình
+tới mốc) có hình dạng NGƯỢC LẠI (master_raw):
+
+  +---------------------------+----------------------+
+  | Thống kê mean_score       | Giá trị              |
+  +---------------------------+----------------------+
+  | Trung bình (mean)         | 57,0                 |
+  | Trung vị (median)         | 70,5                 |
+  | Độ lệch (skew)            | -0,85                |
+  +---------------------------+----------------------+
+
+[WHY] Ở đây mean (57,0) NHỎ HƠN median (70,5) và skew âm (-0,85) → LỆCH
+TRÁI: phần lớn sinh viên có điểm khá cao (dồn về phía phải, quanh 70), một
+nhóm điểm thấp kéo đuôi về trái. Điều này hợp lý: điểm thi có trần (tối đa
+100), bị "đụng trần" nên không thể lệch phải; thay vào đó nhóm yếu kéo
+đuôi xuống.
+
+→ Bài học chọn biểu đồ: cùng là biến định lượng nhưng HƯỚNG lệch khác nhau
+  → ta không áp một phép biến đổi máy móc cho mọi cột. log1p hợp với lệch
+  phải (đếm click), KHÔNG hợp với điểm số lệch trái. Phải nhìn từng biến.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 13
+---------------------------------------------------------------------------
+
+★ Hỏi: "Skew và kurtosis là gì, con số lớn nói lên điều gì?"
+   Đáp: Skew đo độ lệch: dương là lệch phải (đuôi về giá trị lớn, mean >
+   median), âm là lệch trái. Kurtosis đo độ nặng đuôi — cao nghĩa nhiều
+   ngoại lai. Trong dự án, clicks_resource có skew 34,71 và kurtosis
+   2125,45 — lệch phải cực mạnh, đuôi cực nặng; total_clicks skew 3,03 với
+   mean 1215,1 gấp đôi median 609; ngược lại điểm số mean_score lệch TRÁI
+   (skew -0,85). Đó là bằng chứng số cho việc log1p các biến đếm.
+
+★ Hỏi: "Vì sao nói mean dối mà median thật với biến lệch?"
+   Đáp: Vì vài giá trị cực lớn (vd total_clicks max 24139) kéo trung bình
+   lên, làm mean (1215,1) không còn đại diện "người điển hình"; median
+   (609) chia đôi đám đông nên bền với ngoại lai, mô tả người điển hình
+   trung thực hơn. Khi báo cáo biến lệch, tôi ưu tiên median.
+
+★ Hỏi: "3365 dòng zero-click có phải lỗi không, xử lý sao?"
+   Đáp: Không phải lỗi — đó là sinh viên đăng ký nhưng gần như không tham
+   gia (phần lớn thuộc nhóm Withdrawn). Cụm 0 lớn tạo đỉnh tại 0; ta dùng
+   log1p (cộng 1 trước khi log) để xử được giá trị 0 mà vẫn nén đuôi dài.
+
+
+===========================================================================
+CHƯƠNG 14 — ĐƠN BIẾN VS NHÃN: COHEN'S D, P-VALUE (BH), CRAMÉR'S V
+===========================================================================
+
+
+---------------------------------------------------------------------------
+14.1 [ĐN] COHEN'S D — ĐO "SỨC PHÂN BIỆT" CỦA MỘT BIẾN SỐ VỚI NHÃN
+---------------------------------------------------------------------------
+
+Câu hỏi trung tâm của EDA hướng-tới-mô-hình: mỗi biến TÁCH BIỆT hai nhóm
+(at-risk vs not-at-risk) MẠNH đến đâu? Biểu đồ hợp lý: boxplot/violin tách
+theo nhãn (định lượng × phân loại, theo 12.3). Con số đi kèm: Cohen's d.
+
+[ĐN] COHEN'S D (effect size — cỡ hiệu ứng): đo khoảng cách giữa trung bình
+hai nhóm, TÍNH BẰNG đơn vị độ lệch chuẩn. Công thức của dự án (src/eda):
+
+      d = |m1 - m0| / sqrt( (s1^2 + s0^2) / 2 )      (ddof = 1)
+
+trong đó m1, m0 là trung bình nhóm at-risk và not-at-risk; s1, s0 là độ
+lệch chuẩn hai nhóm (ddof=1: ước lượng không chệch của phương sai mẫu).
+
+[WHY] Vì sao chia cho độ lệch chuẩn (chuẩn hoá) chứ không lấy hiệu thô?
+Vì hiệu thô phụ thuộc đơn vị: "lệch 100 click" và "lệch 100 điểm" không so
+được. Chia cho độ lệch chuẩn đưa mọi biến về cùng thước đo "số độ lệch
+chuẩn", nên d so sánh được GIỮA các biến. Quy ước diễn giải (Cohen):
+0,2 = nhỏ; 0,5 = vừa; 0,8 = lớn. d ≥ 0,8 đã là phân biệt MẠNH.
+
+
+---------------------------------------------------------------------------
+14.2 [DA] BẢNG TOP-5 BIẾN SỐ THEO COHEN'S D
+---------------------------------------------------------------------------
+
+Áp công thức trên (mốc 100%, eda_findings.json → numeric_vs_target):
+
+  +------+------------------------------+------------+------------+
+  | Hạng | Biến                         | Cohen's d  | p_adj (BH) |
+  +------+------------------------------+------------+------------+
+  |  1   | days_since_last_activity     | 2,546      | 0,0        |
+  |  2   | n_assessments_submitted      | 2,054      | 0,0        |
+  |  3   | weighted_score_to_date       | 1,964      | 0,0        |
+  |  4   | n_days_active                | 1,584      | 0,0        |
+  |  5   | mean_score_to_date           | 1,578      | 0,0        |
+  +------+------------------------------+------------+------------+
+
+[WHY] days_since_last_activity (số ngày kể từ lần hoạt động cuối — gọi tắt
+"idle") đứng đầu với d = 2,546 — tức trung bình hai nhóm cách nhau HƠN HAI
+ĐỘ LỆCH CHUẨN. Đây là một effect size CỰC LỚN (vượt xa ngưỡng "lớn" 0,8),
+và là con số xương sống số 4 của cả giáo trình. Trực giác đằng sau nó rất
+thẳng: sinh viên sắp rớt thường BỎ BÊ, ngừng tương tác từ lâu; sinh viên
+ổn thì hoạt động gần đây. Số minh hoạ rõ ràng (group_means):
+
+      idle trung bình:  not-at-risk = 14,2 ngày   vs   at-risk = 171,1 ngày
+
+Khoảng cách 14,2 → 171,1 ngày giải thích vì sao d lên tới 2,546.
+
+→ Năm biến top đều là tín hiệu HÀNH VI (idle, nộp bài, điểm, ngày hoạt
+  động) — không phải nhân khẩu học. Đây là gợi ý lớn cho mô hình.
+
+
+---------------------------------------------------------------------------
+14.3 [ĐN] P-VALUE & HIỆU CHỈNH BENJAMINI-HOCHBERG (BH)
+---------------------------------------------------------------------------
+
+[ĐN] P-VALUE: xác suất quan sát được chênh lệch (giữa hai nhóm) LỚN NHƯ
+THẾ hoặc hơn, NẾU thực ra không có khác biệt thật (giả thuyết không H0).
+p nhỏ → khó tin H0 → khác biệt có Ý NGHĨA THỐNG KÊ. Ngưỡng quen dùng 0,05.
+
+[ĐN] VẤN ĐỀ SO SÁNH BỘI (multiple comparisons): ta kiểm 19 biến cùng lúc.
+Nếu mỗi biến ngưỡng 0,05, thì kể cả khi KHÔNG biến nào thật sự khác, xác
+suất "vô tình" có ít nhất một biến p<0,05 tăng vọt — báo động giả.
+
+[ĐN] HIỆU CHỈNH BENJAMINI-HOCHBERG (BH): một phương pháp điều chỉnh p-value
+khi kiểm nhiều giả thuyết, kiểm soát tỉ lệ phát hiện sai (FDR). Nó NGHIÊM
+KHẮC hơn p thô — chỉ những biến thật sự mạnh mới "sống sót".
+
+[DA] KẾT QUẢ: sau hiệu chỉnh BH, 19/19 biến số có ý nghĩa thống kê
+(n_significant = 19, n_tested = 19). [WHY] Ý nghĩa: TẤT CẢ các biến hành
+vi ta tạo ra đều phân biệt được at-risk một cách có ý nghĩa — không có
+biến nào "ăn may". Đây là bằng chứng feature engineering ở Tập 2 có giá
+trị: ta không tạo ra một rổ biến vô dụng.
+
+  ★ Lưu ý đọc số: p_adj_bh = 0,0 trong bảng là làm tròn của một giá trị
+    cực nhỏ (gần 0), không phải đúng 0 tuyệt đối — nghĩa là "ý nghĩa cực
+    mạnh". Ý nghĩa thống kê (p) trả lời "có thật không"; effect size (d)
+    trả lời "lớn cỡ nào". Cần CẢ HAI: một biến có thể có ý nghĩa nhưng
+    hiệu ứng nhỏ xíu. Ở đây ta may mắn có cả hai mạnh.
+
+
+---------------------------------------------------------------------------
+14.4 [ĐN/DA] CRAMÉR'S V — LIÊN HỆ GIỮA BIẾN PHÂN LOẠI VÀ NHÃN
+---------------------------------------------------------------------------
+
+Cohen's d chỉ dùng cho biến SỐ. Với biến PHÂN LOẠI (region, gender...) ta
+cần thước đo khác.
+
+[ĐN] CRAMÉR'S V: đo độ MẠNH của liên hệ giữa hai biến phân loại, dựa trên
+thống kê chi-bình phương, chuẩn hoá về thang [0; 1]. 0 = không liên hệ;
+gần 1 = liên hệ rất mạnh. Quy ước thô: < 0,1 yếu; 0,1–0,3 trung bình.
+
+[DA] Liên hệ giữa từng biến nhân khẩu học và at_risk (categorical_vs_target):
+
+  +--------------------+-------------+
+  | Biến phân loại     | Cramér's V  |
+  +--------------------+-------------+
+  | highest_education  | 0,15        |
+  | imd_band           | 0,149       |
+  | region             | 0,081       |
+  | age_band           | 0,069       |
+  | disability         | 0,059       |
+  | gender             | 0,022       |
+  +--------------------+-------------+
+
+[WHY] ĐỌC RA ĐIỀU GÌ: tất cả đều YẾU. Mạnh nhất là highest_education (0,15)
+và imd_band (0,149) cũng chỉ ở mức trung bình thấp; gender chỉ 0,022 — gần
+như không liên hệ. So với d = 2,546 của idle, rõ ràng NHÂN KHẨU HỌC có rất
+ít sức phân biệt at-risk so với HÀNH VI HỌC TẬP.
+
+→ Hai hệ quả lớn:
+   (1) Cho MÔ HÌNH: tín hiệu nằm ở hành vi (idle, nộp bài, click, điểm),
+       không phải ở "anh là ai" (vùng miền, giới tính). Mô hình nên dựa
+       vào hành vi.
+   (2) Cho CÔNG BẰNG (fairness): vì gender V chỉ 0,022, dùng đặc trưng
+       hành vi ít rủi ro phân biệt đối xử theo nhân khẩu hơn — một điểm
+       cộng đạo đức cho dự án.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 14
+---------------------------------------------------------------------------
+
+★ Hỏi: "Cohen's d là gì, vì sao 2,546 lại lớn?"
+   Đáp: d đo khoảng cách trung bình hai nhóm tính bằng số độ lệch chuẩn,
+   công thức |m1-m0|/sqrt((s1^2+s0^2)/2), ddof=1. Quy ước 0,8 đã là hiệu
+   ứng lớn; idle đạt 2,546 — hơn HAI độ lệch chuẩn, cực lớn. Cụ thể idle
+   trung bình not-at-risk 14,2 ngày vs at-risk 171,1 ngày, nên d khổng lồ.
+
+★ Hỏi: "Vì sao phải hiệu chỉnh p-value, BH là gì?"
+   Đáp: Vì kiểm 19 biến cùng lúc, ngưỡng 0,05 cho mỗi biến làm xác suất
+   báo động giả tích luỹ lên cao. BH (Benjamini-Hochberg) điều chỉnh để
+   kiểm soát tỉ lệ phát hiện sai (FDR), nghiêm hơn p thô. Sau BH vẫn 19/19
+   biến có ý nghĩa → không biến nào "ăn may".
+
+★ Hỏi: "Sao kết luận nhân khẩu học yếu? Lấy gì chứng minh?"
+   Đáp: Cramér's V của mọi biến nhân khẩu đều yếu: cao nhất highest_education
+   0,15 và imd_band 0,149, gender chỉ 0,022. So với d=2,546 của hành vi
+   idle, nhân khẩu học gần như không phân biệt được at-risk. Hệ quả: mô
+   hình dựa vào hành vi, và ít rủi ro thiên kiến theo giới/vùng.
+
+
+===========================================================================
+CHƯƠNG 15 — TƯƠNG QUAN & ĐA CỘNG TUYẾN (PEARSON/SPEARMAN, HEATMAP)
+===========================================================================
+
+
+---------------------------------------------------------------------------
+15.1 [ĐN] PEARSON VS SPEARMAN: HAI CÁCH ĐO TƯƠNG QUAN
+---------------------------------------------------------------------------
+
+[ĐN] HỆ SỐ TƯƠNG QUAN (correlation coefficient r): đo mức độ HAI biến số
+"đi cùng nhau", trong [-1; +1]. r = +1: cùng tăng hoàn hảo; r = -1: một
+tăng một giảm hoàn hảo; r ≈ 0: không quan hệ tuyến tính.
+
+  - PEARSON: đo quan hệ TUYẾN TÍNH (đường thẳng). Nhạy với ngoại lai và
+    giả định quan hệ thẳng.
+  - SPEARMAN: tính trên HẠNG (rank) thay vì giá trị thô → đo quan hệ ĐƠN
+    ĐIỆU (cùng tăng/giảm, không nhất thiết thẳng), BỀN với ngoại lai.
+
+[WHY] Vì dữ liệu ta có nhiều biến lệch mạnh và ngoại lai (Ch.13), Spearman
+là chốt an toàn để xác nhận: nếu Pearson và Spearman cùng nói "tương quan
+mạnh", ta tin chắc đó không phải ảo giác do vài ngoại lai. Biểu đồ phù hợp
+ở 12.3: HEATMAP cho toàn ma trận, SCATTER để soi từng cặp đáng ngờ.
+
+
+---------------------------------------------------------------------------
+15.2 [DA] CÁC CẶP TƯƠNG QUAN MẠNH (|r| ≥ 0,6)
+---------------------------------------------------------------------------
+
+eda_findings.json → correlation.strong_pairs_ge_0.6 (trích các cặp tiêu biểu):
+
+  +-------------------------------------------------+--------+
+  | Cặp biến                                        | r      |
+  +-------------------------------------------------+--------+
+  | n_days_active  ×  total_clicks                  | 0,837  |
+  | days_since_last_activity × n_assessments_submit | -0,828 |
+  | at_risk × days_since_last_activity              | 0,778  |
+  | days_since_last_activity × mean_score_to_date   | -0,769 |
+  | days_since_last_activity × weighted_score       | -0,726 |
+  | at_risk × n_assessments_submitted               | -0,716 |
+  | at_risk × weighted_score_to_date                | -0,706 |
+  +-------------------------------------------------+--------+
+
+Cũng đáng đọc: TƯƠNG QUAN VỚI NHÃN (top_target_corr) — idle 0,778,
+n_assessments 0,716, weighted_score 0,706, n_days_active 0,626,
+mean_score 0,61, total_clicks 0,477. [WHY] Thứ hạng này khớp với bảng
+Cohen's d ở Ch.14 (idle dẫn đầu cả hai) — hai phương pháp độc lập cho
+cùng kết luận → ta tin tưởng tín hiệu là thật, không phải nhiễu.
+
+
+---------------------------------------------------------------------------
+15.3 [ĐN/DA] ĐA CỘNG TUYẾN (|r| ≥ 0,8) — VÀ VÌ SAO NÓ QUAN TRỌNG
+---------------------------------------------------------------------------
+
+[ĐN] ĐA CỘNG TUYẾN (multicollinearity): khi hai (hay nhiều) biến đầu vào
+tương quan rất cao với nhau — chúng chứa gần như CÙNG một thông tin.
+
+[DA] Trong dự án, hai cặp vượt ngưỡng 0,8 (multicollinear_ge_0.8):
+
+  +-------------------------------------------------+--------+
+  | Cặp đa cộng tuyến                               | r      |
+  +-------------------------------------------------+--------+
+  | n_days_active × total_clicks                    | 0,837  |
+  | days_since_last_activity × n_assessments_submit | -0,828 |
+  +-------------------------------------------------+--------+
+
+[WHY] Vì sao đa cộng tuyến đáng lo, NHẤT là với mô hình tuyến tính?
+   - Với mô hình tuyến tính (hồi quy logistic): khi hai biến gần trùng
+     thông tin, thuật toán không biết "ghi công" cho biến nào → hệ số
+     trở nên BẤT ỔN, đổi dấu, phóng đại. Hệ số to không còn nghĩa là biến
+     quan trọng → GIẢI THÍCH SAI. Với dự án Explainable AI, đây là vấn đề
+     nghiêm trọng: ta cần hệ số/đóng góp đọc được.
+   - Với mô hình cây (random forest, gradient boosting): ít nhạy hơn về
+     dự đoán, nhưng tầm quan trọng đặc trưng vẫn bị "chia phiếu" giữa các
+     biến trùng lặp → vẫn gây hiểu nhầm khi giải thích.
+
+→ Hệ quả cho CHỌN BIẾN: với n_days_active vs total_clicks (r=0,837), hai
+  biến gần như nói cùng chuyện ("sinh viên hoạt động nhiều") — khi giải
+  thích bằng mô hình tuyến tính, nên cân nhắc giữ một hoặc gộp, và luôn
+  diễn giải hệ số có lưu ý đến cặp này.
+
+
+---------------------------------------------------------------------------
+15.4 [EVAL] KIỂM RÒ RỈ QUA TƯƠNG QUAN: KHÔNG CÓ CỘT "TIÊN TRI"
+---------------------------------------------------------------------------
+
+Tương quan với nhãn còn dùng cho một việc cực quan trọng: SOI RÒ RỈ.
+
+[WHY] Lập luận: nếu có một cột nào tương quan GẦN HOÀN HẢO với nhãn (vd
+|r| ≥ 0,95), đó là dấu hiệu đỏ — rất có thể cột đó là một "bản sao trá
+hình" của nhãn, hoặc chứa thông tin tương lai lọt vào (rò rỉ — xem Tập 5).
+Một biến hành vi lành mạnh hiếm khi đạt |r| ≥ 0,95 với kết quả cuối.
+
+[DA] Kết quả kiểm: leakage_suspects_ge_0.95 = [] (RỖNG). Không một cặp nào
+đạt |r| ≥ 0,95 với nhãn. Biến tương quan mạnh nhất với at_risk là idle ở
+0,778 — mạnh, nhưng còn XA ngưỡng 0,95.
+
+→ Đây là BẰNG CHỨNG (không phải lời hứa) rằng ma trận đặc trưng KHÔNG có
+  cột rò rỉ trắng trợn nào. Kết hợp với 19/19 unit test chống rò rỉ ở Tập
+  5 (allow-list chặn date_unregistration, mốc 100% khớp master), ta có
+  một bức tường phòng rò rỉ nhiều lớp. Lưu ý sắc thái: danh sách rỗng loại
+  bỏ rò rỉ TRẮNG TRỢN; rò rỉ tinh vi vẫn cần unit test + cắt thời gian
+  canh giữ — tương quan chỉ là một lớp.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 15
+---------------------------------------------------------------------------
+
+★ Hỏi: "Pearson khác Spearman chỗ nào, vì sao xét cả hai?"
+   Đáp: Pearson đo quan hệ tuyến tính trên giá trị thô, nhạy ngoại lai;
+   Spearman đo quan hệ đơn điệu trên hạng, bền với ngoại lai. Vì dữ liệu
+   nhiều biến lệch và ngoại lai, tôi đối chiếu cả hai: nếu cùng báo mạnh
+   thì tin chắc tương quan là thật chứ không do vài điểm cực đoan.
+
+★ Hỏi: "Đa cộng tuyến là gì, sao phải quan tâm?"
+   Đáp: Là khi hai biến đầu vào tương quan rất cao (≥0,8), chứa gần cùng
+   thông tin. Ở đây có n_days_active×total_clicks (0,837) và idle×n_assess
+   (-0,828). Với mô hình tuyến tính nó làm hệ số bất ổn, đổi dấu, phóng
+   đại → giải thích sai; với cây thì chia phiếu tầm quan trọng. Vì là dự
+   án giải thích được, tôi phải lưu ý khi chọn biến và đọc hệ số.
+
+★ Hỏi: "Làm sao biết không có cột rò rỉ?"
+   Đáp: Nếu một cột là bản sao của nhãn hoặc chứa thông tin tương lai, nó
+   sẽ tương quan gần hoàn hảo với nhãn. Tôi kiểm |r|≥0,95 với at_risk →
+   danh sách nghi rò rỉ RỖNG; mạnh nhất chỉ là idle 0,778, xa 0,95. Cộng
+   với 19/19 unit test chống rò rỉ ở Tập 5, đây là bằng chứng nhiều lớp.
+
+
+===========================================================================
+CHƯƠNG 16 — EDA THEO THỜI GIAN & KẾT QUẢ "PHÁT HIỆN SỚM KHẢ THI"
+===========================================================================
+
+
+---------------------------------------------------------------------------
+16.1 [ĐN] CÂU HỎI TRUNG TÂM: TÍN HIỆU XUẤT HIỆN TỪ KHI NÀO?
+---------------------------------------------------------------------------
+
+Mọi con số ở Ch.13–15 tính tại mốc 100% (biết hết khoá học). Nhưng mục
+tiêu dự án là PHÁT HIỆN SỚM (RQ1, xem Tập 5). Câu hỏi sống còn: ở các mốc
+SỚM (10%, 20%...), khi mới có một phần dữ liệu, các biến đã PHÂN BIỆT
+được at-risk chưa?
+
+[ĐN] Cách trả lời: tính lại Cohen's d của từng biến TẠI TỪNG MỐC thời gian,
+rồi xem d tăng thế nào theo tiến độ. Biểu đồ tự nhiên ở đây (theo 12.3):
+một ĐƯỜNG cho mỗi biến, trục hoành = mốc t%, trục tung = Cohen's d — chính
+là "đường cong sức phân biệt theo thời gian".
+
+
+---------------------------------------------------------------------------
+16.2 [DA] BẢNG COHEN'S D THEO 6 MỐC
+---------------------------------------------------------------------------
+
+eda_findings.json → time_aware.discrimination_by_checkpoint:
+
+  +---------------------------+-------+-------+-------+-------+-------+-------+
+  | Biến                      | t=10  | t=20  | t=40  | t=60  | t=80  | t=100 |
+  +---------------------------+-------+-------+-------+-------+-------+-------+
+  | days_since_last_activity  | 0,906 | 1,173 | 1,563 | 1,923 | 2,296 | 2,546 |
+  | mean_score_to_date        | 0,798 | 1,113 | 1,492 | 1,559 | 1,573 | 1,578 |
+  | n_assessments_submitted   | 0,669 | 0,919 | 1,233 | 1,652 | 1,879 | 2,054 |
+  | n_days_active             | 0,834 | 0,991 | 1,165 | 1,367 | 1,500 | 1,584 |
+  | total_clicks              | 0,616 | 0,688 | 0,780 | 0,913 | 0,994 | 1,064 |
+  | weighted_score_to_date    | 0,606 | 1,058 | 1,379 | 1,820 | 2,106 | 1,964 |
+  +---------------------------+-------+-------+-------+-------+-------+-------+
+
+Đọc bảng:
+
+  - Mọi biến đều ĐƠN ĐIỆU TĂNG (gần như) theo thời gian: càng về sau, sức
+    phân biệt càng mạnh — hợp lý, vì dữ liệu tích luỹ nhiều hơn.
+
+  - idle tăng từ 0,906 (t=10) lên 2,546 (t=100): mạnh ngay từ đầu và mạnh
+    dần đều. weighted_score đạt đỉnh 2,106 ở t=80 rồi nhích nhẹ xuống 1,964
+    ở t=100 — không phải lỗi, chỉ là biến động cuối kỳ khi điểm hoàn tất.
+
+  - total_clicks "khởi động chậm" nhất: t=10 mới 0,616, phải tới t=60 mới
+    vượt 0,8. [WHY] Hợp trực giác: số click tích luỹ cần thời gian; đầu kỳ
+    ai cũng click ít nên chưa tách nhóm rõ.
+
+
+---------------------------------------------------------------------------
+16.3 [DA] MỐC SỚM NHẤT ĐẠT d ≥ 0,8 — TRÁI TIM CỦA RQ1
+---------------------------------------------------------------------------
+
+Lấy ngưỡng "phân biệt mạnh" d ≥ 0,8, ta hỏi: mỗi biến lần đầu vượt ngưỡng
+đó ở mốc nào? (time_aware.earliest_checkpoint_d_ge_0.8):
+
+  +---------------------------+----------------------------+
+  | Biến                      | Mốc SỚM NHẤT đạt d ≥ 0,8   |
+  +---------------------------+----------------------------+
+  | days_since_last_activity  | t = 10%                    |
+  | n_days_active             | t = 10%                    |
+  | mean_score_to_date        | t = 20%                    |
+  | n_assessments_submitted   | t = 20%                    |
+  | weighted_score_to_date    | t = 20%                    |
+  | total_clicks              | t = 60%                    |
+  +---------------------------+----------------------------+
+
+[WHY] ĐÂY LÀ KẾT LUẬN LỚN NHẤT CỦA TẬP: PHÁT HIỆN SỚM LÀ KHẢ THI.
+
+  - Ngay tại t = 10% (mới ~1/10 chặng đường), HAI biến đã phân biệt MẠNH:
+    idle (0,906) và n_days_active (0,834).
+
+  - Tới t = 20%, thêm ba biến vượt 0,8: mean_score (1,113), n_assessments
+    (0,919), weighted_score (1,058).
+
+  → Nghĩa là chỉ với dữ liệu 10–20% đầu khoá học, ta ĐÃ CÓ tín hiệu phân
+    biệt mạnh để xác định sinh viên có nguy cơ — đủ sớm để can thiệp còn
+    kịp. Đây chính là câu trả lời định lượng cho RQ1: không cần chờ hết
+    khoá, mô hình có thể "ấm máy" rất sớm.
+
+  - total_clicks chỉ đạt 0,8 từ t=60% — bài học: KHÔNG nên dựa vào tổng
+    click cho dự đoán SỚM; hãy dựa vào idle, số ngày hoạt động, điểm và
+    số bài nộp — những biến tách nhóm ngay từ đầu kỳ.
+
+
+---------------------------------------------------------------------------
+16.4 [DA] PHÂN TÍCH NHÓM WITHDRAWN: HAI KIỂU "AT-RISK" KHÁC NHAU
+---------------------------------------------------------------------------
+
+Nhãn at-risk gộp cả Fail (rớt) và Withdrawn (huỷ/bỏ học). Một câu hỏi sắc
+bén của hội đồng: hai nhóm này có hành xử GIỐNG nhau không? Ta soi bằng
+trung vị (median bền với ngoại lai), withdrawn_analysis:
+
+  +---------------+------------------------+------------------+
+  | Nhóm          | median idle (ngày)     | median total_clicks |
+  +---------------+------------------------+------------------+
+  | Not-at-risk   | 11                     | 1425             |
+  | Fail          | 116                    | 317              |
+  | Withdrawn     | 233                    | 89               |
+  +---------------+------------------------+------------------+
+
+[WHY] Đọc ra ba điều:
+
+  (1) Thang BẬC rõ ràng theo nguy cơ: Not-at-risk hoạt động gần đây nhất
+      (idle 11 ngày) và click nhiều nhất (1425); Withdrawn bỏ bê lâu nhất
+      (idle 233 ngày) và click ít nhất (89). Fail nằm GIỮA.
+
+  (2) HAI KIỂU AT-RISK KHÁC NHAU: Withdrawn (idle 233, click 89) "biến
+      mất" hẳn — đăng ký rồi gần như không tham gia. Fail (idle 116, click
+      317) thì vẫn tham gia kha khá nhưng kết quả kém. Hành vi khác nhau
+      → tín hiệu cảnh báo sớm cho hai nhóm có thể khác nhau.
+
+  (3) Liên hệ với 3365 dòng zero-click ở Ch.13: phần lớn rơi vào Withdrawn
+      — khớp với median click chỉ 89 của nhóm này.
+
+→ Hệ quả cho mô hình & can thiệp: idle cực mạnh một phần vì nó bắt rất tốt
+  nhóm Withdrawn (bỏ bê = idle khổng lồ). Khi triển khai, có thể cần chiến
+  lược can thiệp KHÁC cho hai nhóm: kéo Withdrawn quay lại tham gia, còn
+  Fail thì hỗ trợ học thuật. EDA không chỉ phục vụ mô hình — nó định hình
+  cả cách HÀNH ĐỘNG.
+
+  ★ Lưu ý số: median idle theo final_result trong verified_numbers.json
+    (Distinction 8, Pass 12, Fail 116, Withdrawn 232) khớp bức tranh trên;
+    chênh lệch nhỏ ở Withdrawn (232 vs 233) là do nguồn/làm tròn khác nhau
+    giữa hai bảng — cùng một câu chuyện.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 16
+---------------------------------------------------------------------------
+
+★ Hỏi: "Lấy gì chứng minh phát hiện SỚM là khả thi, không phải chỉ ở cuối?"
+   Đáp: Tôi tính Cohen's d của từng biến tại 6 mốc. Ngay tại t=10%, idle
+   đã đạt 0,906 và n_days_active 0,834 — đều vượt ngưỡng mạnh 0,8. Tới
+   t=20% thêm mean_score (1,113), weighted_score (1,058), n_assessments
+   (0,919) vượt 0,8. Vậy chỉ với 10–20% dữ liệu đầu khoá đã có tín hiệu
+   phân biệt mạnh, đủ sớm để can thiệp — đó là câu trả lời cho RQ1.
+
+★ Hỏi: "Vì sao total_clicks lại yếu ở mốc sớm?"
+   Đáp: Vì số click tích luỹ theo thời gian; đầu kỳ ai cũng click ít nên
+   chưa tách nhóm. d của total_clicks chỉ 0,616 ở t=10 và mãi tới t=60 mới
+   vượt 0,8. Bài học: dự đoán sớm nên dựa vào idle/n_days_active/điểm/số
+   bài nộp, không dựa vào tổng click.
+
+★ Hỏi: "At-risk gộp Fail và Withdrawn — hai nhóm có giống nhau không?"
+   Đáp: Không. Theo trung vị: Withdrawn idle 233 ngày, click 89 — gần như
+   biến mất; Fail idle 116, click 317 — vẫn tham gia nhưng kết quả kém;
+   Not-at-risk idle 11, click 1425. Hai kiểu nguy cơ khác nhau về hành vi,
+   nên chiến lược can thiệp cũng nên khác: kéo Withdrawn quay lại, hỗ trợ
+   học thuật cho Fail.
+
+
+===========================================================================
+TÓM TẮT TẬP 6
+===========================================================================
+
+- TRIẾT LÝ & CHỌN BIỂU ĐỒ: EDA là bước bắt buộc để HIỂU dữ liệu trước khi
+  mô hình hoá (phát hiện vấn đề, chọn phép biến đổi, sinh giả thuyết, tạo
+  bằng chứng bảo vệ). Chọn biểu đồ theo hai câu hỏi — KIỂU DỮ LIỆU (định
+  lượng/phân loại) và SỐ BIẾN (1/2/nhiều): histogram/boxplot/violin cho
+  một biến số, bar cho biến phân loại, boxplot tách nhóm cho số×nhóm,
+  scatter cho số×số, heatmap cho ma trận tương quan. Trực quan tốt = đúng
+  loại + thang trung thực + không rác + an toàn mù màu; tránh pie chart.
+
+- ĐƠN BIẾN: biến đếm click lệch phải cực mạnh (clicks_resource skew 34,71,
+  kurtosis 2125,45; clicks_url skew 13,1; max_clicks_single_day skew 10,56);
+  total_clicks mean 1215,1 > median 609, skew 3,03; 3365 dòng zero-click;
+  điểm số lệch TRÁI (mean_score skew -0,85). → bằng chứng số cho log1p các
+  biến đếm, dùng median cho biến lệch.
+
+- ĐƠN BIẾN VS NHÃN: Cohen's d = |m1-m0|/sqrt((s1^2+s0^2)/2), ddof=1. Top-5:
+  idle 2,546, n_assessments 2,054, weighted_score 1,964, n_days_active
+  1,584, mean_score 1,578 (idle group_means: not-at-risk 14,2 vs at-risk
+  171,1 ngày). Sau hiệu chỉnh BH, 19/19 biến số có ý nghĩa. Cramér's V của
+  nhân khẩu học đều yếu (highest_education 0,15, imd_band 0,149, region
+  0,081, age_band 0,069, disability 0,059, gender 0,022) → tín hiệu ở
+  HÀNH VI, không ở nhân khẩu (cũng tốt cho fairness).
+
+- TƯƠNG QUAN & ĐA CỘNG TUYẾN: cặp mạnh nhất n_days_active×total_clicks
+  0,837 và idle×n_assessments -0,828 (≥0,8 = đa cộng tuyến, lưu ý cho mô
+  hình tuyến tính/giải thích). Tương quan với nhãn: idle 0,778, n_assess
+  0,716, weighted_score 0,706 — khớp thứ hạng Cohen's d. KIỂM RÒ RỈ:
+  không cặp nào |r|≥0,95 → leakage_suspects rỗng, không có cột rò rỉ
+  trắng trợn (kèm 19/19 unit test ở Tập 5).
+
+- THEO THỜI GIAN: Cohen's d tăng theo mốc; idle & n_days_active đạt d≥0,8
+  ngay t=10%, mean_score & n_assessments & weighted_score từ t=20%,
+  total_clicks mãi t=60%. → PHÁT HIỆN SỚM KHẢ THI, trả lời RQ1: chỉ 10–20%
+  dữ liệu đầu đã có tín hiệu mạnh. Withdrawn (median idle 233, click 89)
+  khác hẳn Fail (116, 317) và Not-at-risk (11, 1425): hai kiểu at-risk có
+  hành vi khác nhau, gợi ý can thiệp khác nhau.
+
+
+-- HẾT TẬP 6 --

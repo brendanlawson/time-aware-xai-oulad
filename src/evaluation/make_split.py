@@ -1,54 +1,59 @@
-"""Materialise the fixed train/test split (Tasks 7, 8, 15).
+"""Materialise the fixed train/test split and reuse it everywhere.
 
-The split is defined ONCE at the student level — a 20% test set, stratified by
-``at_risk`` and grouped by ``id_student`` (seed 42) — and reused identically across
-``master_raw`` and all six checkpoint datasets. This module:
+The split is defined ONCE at the student level — 20% test, stratified by at_risk,
+grouped by id_student (seed 42) — and reused identically across master_raw and all
+six checkpoints. This module:
+  * writes data/splits/test_student_ids.csv (committed) so every run/teammate uses
+    the EXACT same hold-out set even if library versions drift;
+  * writes reports/tables/split_report.csv (sizes, balance, zero overlap);
+  * optionally materialises per-dataset *_train.parquet / *_test.parquet.
 
-* writes the canonical split definition ``data/splits/test_student_ids.csv``
-  (committed, ~6.5k ids) so every run and every team member uses the exact same
-  hold-out set even if library versions drift;
-* writes ``reports/tables/split_report.csv`` verifying sizes, class balance and
-  zero student overlap;
-* optionally materialises per-dataset ``*_train.parquet`` / ``*_test.parquet``
-  files (git-ignored) for convenience.
+Modelling loads the split via load_checkpoint_split().
 
-The modelling phase should load the split with :func:`load_checkpoint_split`.
+CLI:
+    python -m src.evaluation.make_split                # definition + report
+    python -m src.evaluation.make_split --materialise  # also write parquet
 
-CLI
-    python -m src.evaluation.make_split                # split definition + report
-    python -m src.evaluation.make_split --materialise  # also write train/test parquet
+See guide section "evaluation/make_split.py".
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src.config import RANDOM_SEED, TEST_SIZE  # noqa: E402
-from src.data.io_utils import CHECKPOINTS_DIR, INTERIM_DIR, save_parquet_atomic  # noqa: E402
-from src.data.time_utils import CHECKPOINTS  # noqa: E402
-from src.evaluation.split_harness import (  # noqa: E402
+from src.config import (
+    CHECKPOINTS,
+    CHECKPOINTS_DIR,
+    INTERIM_DATA_DIR,
+    RANDOM_SEED,
+    SPLITS_DIR,
+    TABLES_DIR,
+    TEST_SIZE,
+)
+from src.data.io_utils import save_parquet_atomic
+from src.evaluation.split_harness import (
     class_balance,
     group_overlap,
     make_fixed_test_ids,
     split_by_ids,
 )
 
-SPLITS_DIR = Path(__file__).resolve().parents[2] / "data" / "splits"
-REPORT_PATH = (
-    Path(__file__).resolve().parents[2] / "reports" / "tables" / "split_report.csv"
-)
 TEST_IDS_PATH = SPLITS_DIR / "test_student_ids.csv"
+REPORT_PATH = TABLES_DIR / "split_report.csv"
 
 
 def save_definition(
     master: pd.DataFrame, seed: int = RANDOM_SEED, test_size: float = TEST_SIZE
 ) -> set:
-    """Compute and persist the canonical test id_student list."""
+    """Compute the fixed test ids from the master roster and persist them.
+
+    The committed ``test_student_ids.csv`` is the source of truth: every run and
+    teammate reuses the exact same hold-out membership even if library versions
+    drift.
+    """
     ids = make_fixed_test_ids(master, test_size, seed)
     SPLITS_DIR.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({"id_student": sorted(ids)}).to_csv(TEST_IDS_PATH, index=False)
@@ -65,14 +70,20 @@ def load_split(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return split_by_ids(df, load_test_ids())
 
 
-def load_checkpoint_split(
-    t: int, checkpoints_dir: Path = CHECKPOINTS_DIR
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Convenience for the modelling phase: (train, test) for checkpoint ``t``."""
-    return load_split(pd.read_parquet(checkpoints_dir / f"dataset_t{t}.parquet"))
+def load_checkpoint_split(t_percent: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Load dataset_t{t}.parquet and split it with the committed test ids.
+
+    This is the convenience entry point the modelling phase calls.
+    """
+    return load_split(pd.read_parquet(CHECKPOINTS_DIR / f"dataset_t{t_percent}.parquet"))
 
 
 def build_report(master: pd.DataFrame, ids: set) -> pd.DataFrame:
+    """Summarise the split across master and every materialised checkpoint.
+
+    One row per dataset: train/test sizes, at-risk rates, the rate gap and the
+    student overlap (which must be 0). Written to ``reports/tables/split_report.csv``.
+    """
     rows = []
     datasets = {"master": master}
     for t in CHECKPOINTS:
@@ -121,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
 
-    master = pd.read_parquet(INTERIM_DIR / "master_raw.parquet")
+    master = pd.read_parquet(INTERIM_DATA_DIR / "master_raw.parquet")
     ids = save_definition(master)
     report = build_report(master, ids)
     print(
@@ -138,4 +149,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

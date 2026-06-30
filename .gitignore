@@ -4,6 +4,9 @@ data/interim/
 data/checkpoints/
 *.parquet
 *.pkl
+# Large data archive / local ClickHouse binary (too big for git, regenerable)
+data.zip
+clickhouse
 !data/.gitkeep
 # Train/test split: keep the canonical id list (committed); the materialised
 # train/test parquets are regenerable and stay ignored via the *.parquet rule.

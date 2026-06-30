@@ -1,0 +1,615 @@
+TẬP 2 — DATA ENGINEERING
+
+==========================================================================
+GIÁO TRÌNH DATA TASK — TẬP 2: DATA ENGINEERING
+(Xử lý dữ liệu lớn & Dựng bảng master / Feature Engineering)
+==========================================================================
+
+Lời mở đầu cho người học
+------------------------
+Tập 1 đã trả lời câu hỏi "Chúng ta đang giải bài toán gì?" (dự đoán sinh
+viên có nguy cơ trượt/bỏ học từ dữ liệu OULAD). Tập 2 trả lời câu hỏi kế
+tiếp, cũng là câu hỏi mà nhiều sinh viên hay bỏ qua: "Làm sao biến một
+đống file thô — trong đó có file hơn 10 triệu dòng — thành MỘT bảng gọn
+gàng, mỗi sinh viên một dòng, đủ đặc trưng để mô hình học?"
+
+Đây chính là phần "tay lấm bùn" của data science. Mô hình đẹp đến đâu cũng
+vô nghĩa nếu bảng đầu vào sai. Trong tập này, mỗi quyết định kỹ thuật đều
+được PHẢN BIỆN (vì sao làm thế?) và BẢO VỆ (vì sao không làm cách khác?).
+Bạn chưa cần giỏi SQL hay biết database — chúng ta sẽ xây từ con số 0.
+
+Quy ước ký hiệu dùng xuyên suốt:
+  [ĐN]   Định nghĩa khái niệm.
+  [DA]   Dữ liệu / số liệu thật của dự án.
+  [WHY]  Vì sao chọn cách này.
+  [ALT]  Phương án thay thế và vì sao loại.
+  [EVAL] Đánh giá / kiểm tra tính đúng đắn.
+  [NEXT] Đầu ra dùng cho bước sau.
+  ★Q/A   Hỏi đáp phản biện kiểu vấn đáp.
+
+
+==========================================================================
+CHƯƠNG 4 — XỬ LÝ DỮ LIỆU LỚN
+==========================================================================
+
+4.0  Bức tranh dữ liệu OULAD: bảng nào nặng?
+--------------------------------------------
+[DA] Bộ dữ liệu OULAD gồm nhiều bảng. Phần lớn bảng nhỏ, mở bằng Excel hay
+pandas không vấn đề gì:
+
+  - studentInfo   : ~28.785 sinh viên (mỗi dòng một lượt ghi danh).
+  - assessments   : 206 bài kiểm tra (TMA 106, CMA 76, Exam 24).
+  - studentAssessment : 173.912 lượt nộp bài.
+  - courses       : các khoá học, độ dài 234–269 ngày.
+  - vle           : 6.364 tài nguyên học liệu, 20 loại activity_type.
+
+Nhưng có MỘT bảng làm vỡ mọi công cụ quen thuộc:
+
+  - studentVle (clickstream — nhật ký nhấp chuột):
+       10.655.280 dòng, kích thước ~433 MB.
+       Cột: code_module, code_presentation, id_student, id_site, date,
+            sum_click.
+
+Mỗi dòng là một sự kiện: "sinh viên X, ngày thứ D, nhấp vào tài nguyên
+id_site Y, tổng sum_click lần". Đây là dữ liệu hành vi — và hành vi sinh ra
+RẤT nhiều dòng. Hơn mười triệu dòng cho một bộ dữ liệu "học tập" nghe có vẻ
+lạ, nhưng hãy nhớ: 28.785 sinh viên × hàng trăm ngày × nhiều lần nhấp/ngày
+= con số bùng nổ.
+
+★Q/A — "10 triệu dòng thì có gì ghê gớm? Máy nào chả chạy được."
+   Vấn đề không phải lưu nổi 433 MB (ổ cứng nào cũng chứa). Vấn đề là:
+   (1) Excel KHÔNG MỞ NỔI — bảng tính Excel trần khoảng 1.048.576 dòng
+       (~1 triệu). 10,6 triệu dòng vượt trần gấp hơn 10 lần; Excel sẽ cắt
+       cụt hoặc từ chối mở.
+   (2) pandas đọc cả file vào RAM tốn nhiều GB (xem 4.1).
+   (3) Trong giai đoạn EDA/feature engineering ta phải hỏi file này HÀNG
+       CHỤC lần. Mỗi lần đọc lại 433 MB từ đĩa là một lần trả giá.
+   Tóm lại: "lớn" ở đây nghĩa là "lớn so với cách làm ngây thơ", không phải
+   lớn so với ổ cứng.
+
+
+4.1  Vì sao không "nạp hết vào RAM"?
+------------------------------------
+[ĐN] RAM (bộ nhớ trong) là nơi chương trình đặt dữ liệu để xử lý nhanh.
+Nó nhanh nhưng ít và đắt. Đĩa (SSD/HDD) thì nhiều nhưng chậm hơn.
+
+Khi bạn viết:
+
+      import pandas as pd
+      df = pd.read_csv("studentVle.csv")   # 433 MB trên đĩa
+
+pandas KHÔNG chỉ chiếm 433 MB RAM. Lý do:
+  - CSV là văn bản. Số "10655280" trên đĩa là 8 ký tự (8 byte), nhưng khi
+    nạp thành cột số nguyên 64-bit, mỗi giá trị chiếm 8 byte BẤT KỂ độ dài
+    — và nhiều cột bị pandas đoán nhầm thành kiểu "object" (chuỗi Python),
+    mỗi ô tốn vài chục byte cộng thêm overhead con trỏ.
+  - pandas dựng nhiều cấu trúc phụ (chỉ mục, bộ đệm phân tích cú pháp).
+  - Một phép biến đổi (lọc, gộp) thường tạo BẢN SAO trong RAM.
+[DA] Hệ quả thực tế: nạp file 433 MB này có thể ngốn nhiều GB RAM. Trên một
+laptop 8–16 GB, chỉ riêng việc giữ bảng đã chiếm phần lớn bộ nhớ, chưa kể
+hệ điều hành và trình duyệt. Máy bắt đầu "swap" (đẩy RAM ra đĩa) → chậm như
+rùa hoặc treo.
+
+[WHY] Vấn đề tệ hơn nữa là TÍNH LẶP. EDA không phải hỏi một lần. Bạn hỏi:
+"có bao nhiêu dòng?", rồi "ngày lớn nhất là bao nhiêu?", rồi "trung bình
+click/sự kiện?", rồi "mỗi sinh viên click bao nhiêu?"... Với pandas-ngây-
+thơ, mỗi câu hỏi lại đọc lại 433 MB từ đĩa (~chục giây/lần) hoặc phải giữ
+nguyên bảng khổng lồ trong RAM suốt phiên làm việc. Cả hai đều tệ.
+
+★Q/A — "Sao không đọc theo từng khúc (chunk) bằng pandas?"
+   Đọc theo chunk (read_csv(..., chunksize=...)) giải được bài toán RAM,
+   nhưng bạn phải TỰ TAY viết vòng lặp gộp kết quả cho MỖI câu hỏi: tự cộng
+   dồn, tự gom nhóm, tự xử lý trạng thái giữa các chunk. Mỗi câu hỏi mới =
+   một đoạn code mới, dễ sai. Ta muốn một công cụ làm việc đó GIÙM, chỉ cần
+   ra lệnh "đếm", "lấy max", "gộp theo sinh viên" bằng một câu — đó là SQL
+   trên một engine cột. Xem tiếp.
+
+
+4.2  Lưu theo hàng vs lưu theo cột (row vs columnar)
+----------------------------------------------------
+[ĐN] Có hai cách sắp dữ liệu một bảng lên đĩa/RAM:
+
+  ROW-ORIENTED (theo hàng) — CSV, đa số database giao dịch:
+     Lưu lần lượt hết các cột của dòng 1, rồi dòng 2, ...
+        (mod, pres, sv1, site, date, click) (mod, pres, sv2, ...) ...
+     Tốt khi: cần ĐỌC/GHI cả một dòng (ví dụ "lấy hồ sơ khách hàng #5").
+
+  COLUMNAR (theo cột) — Parquet, ClickHouse:
+     Lưu hết giá trị của cột 1, rồi hết giá trị cột 2, ...
+        [tất cả code_module] [tất cả date] [tất cả sum_click] ...
+     Tốt khi: phân tích — thường chỉ cần VÀI cột trên TẤT CẢ các dòng.
+
+[WHY] Phân tích dữ liệu (analytics/OLAP) gần như luôn có dạng "tính gì đó
+trên một vài cột của hàng triệu dòng": tổng sum_click, max date, đếm số
+sinh viên... Với câu "tổng sum_click", kho cột chỉ cần ĐỌC ĐÚNG cột
+sum_click, bỏ qua hoàn toàn 5 cột kia. Kho hàng buộc phải quét qua mọi byte
+của mọi dòng (vì các cột nằm xen kẽ) chỉ để nhặt ra một cột.
+
+Hai lợi thế then chốt của columnar:
+  (1) Đọc ít hơn (projection): chỉ động vào cột cần → ít I/O.
+  (2) Nén tốt hơn: một cột chứa giá trị CÙNG KIỂU, thường lặp lại
+      (code_module chỉ vài giá trị, date là số nhỏ). Dữ liệu giống nhau
+      đứng cạnh nhau thì thuật toán nén "ăn" rất khoẻ. Cột code_presentation
+      có thể chỉ vài giá trị như "2013J", "2014B" lặp hàng triệu lần → nén
+      gần như miễn phí.
+
+[ĐN] OLAP (Online Analytical Processing) = xử lý phục vụ phân tích/tổng hợp
+trên khối dữ liệu lớn. Ngược với OLTP (giao dịch, đọc/ghi từng dòng lẻ).
+Bài toán của chúng ta là OLAP thuần tuý → chọn công cụ cột.
+
+
+4.3  Triết lý: ĐẨY câu hỏi xuống dữ liệu, đừng KÉO dữ liệu lên
+-------------------------------------------------------------
+[ĐN] Hai triết lý xử lý đối lập:
+
+  KÉO DỮ LIỆU LÊN (pull): Mang toàn bộ 433 MB vào RAM của Python, rồi để
+  Python tính. Tốn RAM, tốn thời gian chuyển dữ liệu.
+
+  ĐẨY CÂU HỎI XUỐNG (push): Để dữ liệu nằm yên trên đĩa. Gửi CÂU HỎI (SQL)
+  xuống engine; engine đọc dữ liệu ngay tại chỗ, tính toán, chỉ TRẢ VỀ kết
+  quả nhỏ (vài dòng). Ta gửi đi vài trăm byte SQL, nhận về vài con số.
+
+Hai kỹ thuật làm cho "đẩy xuống" hiệu quả:
+
+[ĐN] PROJECTION PUSHDOWN (đẩy phép chọn cột xuống): engine chỉ đọc đúng
+những cột câu hỏi cần. Câu "SELECT max(date)" → chỉ đọc cột date.
+
+[ĐN] PREDICATE PUSHDOWN (đẩy điều kiện lọc xuống): nếu câu hỏi có
+"WHERE sum_click > 0", engine bỏ qua sớm những phần dữ liệu không thoả,
+không nạp chúng lên rồi mới lọc.
+
+[WHY] Với kho cột (Parquet/ClickHouse), hai pushdown này biến một câu hỏi
+trên 10,6 triệu dòng thành việc đọc một phần nhỏ dữ liệu → nhanh và nhẹ.
+Đây là lý do cốt lõi vì sao ta không dùng pandas-ngây-thơ.
+
+
+4.4  Chọn công cụ: pandas vs ClickHouse-local vs Apache Spark
+-------------------------------------------------------------
+[ALT] Ba ứng viên cho việc xử lý bảng clickstream trên MỘT laptop:
+
++------------------+------------------+------------------+------------------+
+| Tiêu chí         | pandas           | ClickHouse-local | Apache Spark     |
++------------------+------------------+------------------+------------------+
+| Mô hình          | Kéo cả bảng vào  | Engine cột OLAP, | Engine phân tán  |
+|                  | RAM rồi tính     | chạy SQL tại chỗ | (cho nhiều máy)  |
++------------------+------------------+------------------+------------------+
+| RAM cho 433 MB   | Nhiều GB; dễ hết | Thấp; quét theo  | Cao; JVM + bộ    |
+|                  | RAM trên laptop  | luồng, đọc cột   | điều phối nặng   |
++------------------+------------------+------------------+------------------+
+| Cài đặt          | pip install      | 1 lệnh, 1 file   | Cài JVM, cấu     |
+|                  | (rất dễ)         | thực thi đơn lẻ  | hình cluster;    |
+|                  |                  | (không cần server)| nặng & rườm rà  |
++------------------+------------------+------------------+------------------+
+| Đọc trực tiếp    | Có, nhưng nạp    | CÓ — SQL chạy    | Có, nhưng overkill|
+| CSV/Parquet      | hết vào RAM      | thẳng trên file  | cho 1 máy        |
++------------------+------------------+------------------+------------------+
+| Tốc độ phân tích | Chậm khi lặp     | Rất nhanh (cột + | Nhanh khi DỮ LIỆU|
+| lặp lại          | nhiều lần        | pushdown + nén)  | RẤT lớn, nhiều máy|
++------------------+------------------+------------------+------------------+
+| Phù hợp khi      | Bảng nhỏ/vừa     | Bảng lớn, 1 máy, | Hàng trăm GB–TB, |
+|                  |                  | phân tích OLAP   | hạ tầng cluster  |
++------------------+------------------+------------------+------------------+
+
+[WHY] Vì sao chọn ClickHouse-local:
+  - pandas: hết RAM với 433 MB khi lặp nhiều lần. Loại cho bảng nặng (vẫn
+    dùng tốt cho các bảng nhỏ và cho bước cuối khi bảng đã gọn).
+  - Spark: sinh ra để chia việc cho NHIỀU máy (cluster). Trên một laptop,
+    chi phí khởi động JVM và bộ điều phối còn lớn hơn cả việc xử lý —
+    "dùng cần cẩu để nhấc cái ghế". Dữ liệu 433 MB chưa tới ngưỡng cần Spark.
+  - ClickHouse-local: đúng điểm ngọt. Engine cột OLAP, chạy SQL THẲNG trên
+    file CSV/Parquet, KHÔNG cần dựng server, một file thực thi. Nhẹ RAM, cực
+    nhanh cho phân tích lặp lại. Thắng tuyệt đối cho bối cảnh "1 laptop, dữ
+    liệu chục triệu dòng".
+
+[ĐN] "local" trong ClickHouse-local nghĩa là chế độ chạy như một công cụ
+dòng lệnh trên máy cá nhân: không cần cài đặt máy chủ, không cần nạp dữ liệu
+"vào" database trước — bạn trỏ thẳng SQL vào file.
+
+[DA] Cài đặt: ClickHouse chạy native trên Linux. Trên Windows ta dùng qua
+WSL (Windows Subsystem for Linux) với Ubuntu. Cài chỉ một lệnh:
+
+      curl https://clickhouse.com/ | sh        # tải về ~/clickhouse
+
+Sau đó gọi ~/clickhouse local ... để chạy SQL.
+
+★Q/A — "Dự án dữ liệu lớn ai cũng nói Spark/Hadoop, sao mình không học?"
+   Spark là kỹ năng quý KHI bạn thật sự có dữ liệu phân tán hàng trăm GB–TB
+   trên cluster. Nhưng nguyên tắc kỹ sư giỏi là CHỌN CÔNG CỤ VỪA VẶN BÀI
+   TOÁN, không chọn theo "thời thượng". Ép Spark vào một laptop xử lý 433 MB
+   là phản kỹ thuật: chậm hơn, phức tạp hơn, dễ lỗi hơn. Bạn vẫn HIỂU tư
+   tưởng dữ liệu lớn (cột, pushdown, đẩy việc xuống) qua ClickHouse — đó mới
+   là cái cốt lõi mang theo được.
+
+
+4.5  Parquet — định dạng cột nén, và con số biết nói
+----------------------------------------------------
+[ĐN] Parquet là một ĐỊNH DẠNG FILE lưu dữ liệu bảng theo CỘT, có kèm:
+  - SCHEMA (lược đồ): mỗi cột ghi rõ KIỂU dữ liệu (Int32, String...) ngay
+    trong file. CSV thì không — CSV chỉ là văn bản, kiểu phải tự đoán.
+  - NÉN (compression): vì dữ liệu cùng cột đứng cạnh nhau, nén rất hiệu quả.
+  - METADATA thống kê theo khối (min/max mỗi đoạn) → hỗ trợ predicate
+    pushdown: engine có thể bỏ qua cả khối không thoả điều kiện.
+
+Nói gọn: CSV là "kho hàng đổ đống dạng văn bản"; Parquet là "kho hàng xếp
+ngăn nắp theo cột, dán nhãn kiểu, ép gọn".
+
+[DA] CON SỐ THẬT của dự án khi chuyển studentVle từ CSV sang Parquet:
+
+      Kích thước :  433 MB  →  22,9 MB    (~20× nhỏ hơn)
+      count()    : 14,6 s   →  0,55 s     (~26× nhanh hơn)
+
+[EVAL] Vì sao đánh đổi này CỰC LỜI:
+  - Chi phí chuyển đổi chỉ trả MỘT LẦN (vài chục giây).
+  - Lợi ích thu về MỖI LẦN truy vấn. EDA + feature engineering hỏi bảng này
+    hàng chục lần. Tiết kiệm ~14 giây mỗi câu × hàng chục câu = tiết kiệm
+    rất lớn thời gian chờ, lại giảm 20× dung lượng đĩa và RAM đọc.
+  - Đây là nguyên tắc "tối ưu cái lặp lại": bỏ công một lần để mỗi lần sau
+    đều rẻ.
+
+[DA] Ô chuyển đổi được viết IDEMPOTENT: nếu file Parquet đã tồn tại thì bỏ
+qua, không tạo lại. Chạy lại notebook nhiều lần cũng an toàn, không tốn công
+chuyển đổi thừa.
+
+  -- Ý tưởng SQL chuyển CSV -> Parquet (khai báo kiểu tường minh, xem 4.6):
+  INSERT INTO FUNCTION file('studentVle.parquet', 'Parquet')
+  SELECT *
+  FROM file('studentVle.csv', 'CSVWithNames',
+            'code_module String, code_presentation String,
+             id_student Int32, id_site Int32,
+             date Int16, sum_click Int32');
+
+★Q/A — "Sao không nén luôn CSV bằng zip cho nhẹ?"
+   Zip CSV giảm dung lượng đĩa nhưng KHÔNG giúp truy vấn nhanh: để hỏi gì
+   cũng phải GIẢI NÉN TOÀN BỘ rồi mới đọc theo hàng, không có projection
+   pushdown, không có schema. Parquet vừa nhỏ vừa truy vấn nhanh vì nén
+   THEO CỘT và giữ cấu trúc. Nén để cất khác với nén để tính.
+
+
+4.6  "Bẫy kiểu dữ liệu": khi max(date) = "99"
+---------------------------------------------
+Đây là bài học quan trọng nhất chương 4 — và là minh hoạ kinh điển cho việc
+"đừng tin kiểu dữ liệu suy đoán".
+
+[DA] Khi ta hỏi ClickHouse mô tả file CSV:
+
+      DESCRIBE file('studentVle.csv', 'CSVWithNames');
+
+ClickHouse không biết kiểu thật (CSV không ghi kiểu), nên nó ĐOÁN — và đoán
+an toàn nhất: mọi cột đều là String (chuỗi). Hậu quả tai hại khi ta hỏi:
+
+      SELECT max(date) FROM file('studentVle.csv', 'CSVWithNames');
+      -- Trả về: "99"   (SAI!)
+
+[ĐN] Vì sao "99"? Vì date đang là CHUỖI, và max trên chuỗi so sánh theo THỨ
+TỰ TỪ ĐIỂN (lexicographic), từng ký tự một, không phải theo giá trị số.
+Theo từ điển, ký tự '9' lớn hơn '2', nên chuỗi "99" được coi là "lớn hơn"
+chuỗi "269". Giống như trong từ điển "zebra" đứng sau "apple" dù ngắn hơn:
+máy so ký tự đầu trước. Kết quả "99" là một con số VÔ NGHĨA về mặt thời gian
+(date thật của OULAD chạy âm/dương quanh ngày khai giảng).
+
+[EVAL] Đây là loại lỗi NGUY HIỂM vì nó KHÔNG báo lỗi — chương trình chạy
+trơn tru và trả về một con số trông "hợp lý". Nếu không cảnh giác, bạn sẽ
+xây cả feature lên trên một max sai.
+
+KHẮC PHỤC — khai báo kiểu TƯỜNG MINH trong lời gọi file():
+
+      SELECT max(date), min(date), avg(sum_click)
+      FROM file('studentVle.csv', 'CSVWithNames',
+                'code_module String, code_presentation String,
+                 id_student Int32, id_site Int32,
+                 date Int16, sum_click Int32');
+
+[DA] Sau khi ép kiểu đúng (date là Int16), kết quả hợp lý ngay:
+  - date chạy từ -25 đến 269 (âm = trước ngày khai giảng chính thức; dương
+    = các ngày sau khi khoá bắt đầu).
+  - trung bình 3,72 click mỗi sự kiện.
+
+[WHY] Bài học rút ra cho dữ liệu lớn:
+  ĐỪNG TIN KIỂU SUY ĐOÁN. Với file lớn, một cột bị đoán nhầm có thể bóp méo
+  thống kê mà bạn không hề hay biết. Hãy KHAI BÁO KIỂU TƯỜNG MINH cho từng
+  cột. Vừa đúng, vừa nhanh hơn (engine không phải dò kiểu), vừa là tài liệu
+  tự ghi (đọc câu lệnh là biết schema). Parquet giữ luôn schema này nên sau
+  khi chuyển sang Parquet, ta không gặp lại bẫy nữa.
+
+★Q/A — "Bẫy này chỉ xảy ra với date thôi đúng không?"
+   Không. Bất kỳ cột số nào bị đoán thành String đều dính: min/max sai theo
+   thứ tự từ điển, không cộng/trung bình được, lọc số ("> 100") cho kết quả
+   lạ. Quy tắc an toàn: luôn DESCRIBE để xem engine đoán gì, rồi ÉP KIỂU mọi
+   cột bạn sẽ tính toán.
+
+
+4.7  Cầu nối Python ↔ WSL: Python chỉ gửi SQL
+---------------------------------------------
+[ĐN] Kiến trúc làm việc trong dự án này:
+  - Notebook chạy Python (trên Windows) lo phần điều phối, ghép kết quả,
+    vẽ biểu đồ, gọi các bảng NHỎ bằng pandas.
+  - Việc nặng (quét clickstream) được ĐẨY XUỐNG ClickHouse trong WSL Ubuntu.
+
+Luồng một truy vấn:
+  1. Python dựng một CHUỖI SQL (vài trăm byte).
+  2. Python gọi ~/clickhouse local trong WSL, truyền SQL đó.
+  3. ClickHouse đọc file (CSV/Parquet) tại chỗ, tính toán.
+  4. Trả về RẤT ÍT dữ liệu — vài dòng kết quả — cho Python.
+
+[WHY] Điểm tinh tế: cái đi qua "cây cầu" Python↔WSL chỉ là câu hỏi (đi) và
+vài con số (về). 433 MB clickstream KHÔNG BAO GIỜ chui qua cầu vào RAM của
+Python. Đây chính là triết lý "đẩy câu hỏi xuống" (4.3) hiện thực hoá thành
+kiến trúc. Nhờ vậy notebook nhẹ, không treo, và mỗi câu hỏi trả lời trong
+chưa tới một giây (trên Parquet).
+
+★Q/A — "Vậy Python để làm gì nếu việc nặng ClickHouse làm hết?"
+   Python là "nhạc trưởng": quyết định hỏi gì, theo thứ tự nào, ghép kết
+   quả các truy vấn lại, xử lý bảng nhỏ, vẽ đồ thị, lưu Parquet. Phân vai
+   rõ ràng: ClickHouse cày dữ liệu lớn, Python điều phối và trình bày. Mỗi
+   công cụ làm đúng việc nó giỏi nhất.
+
+
+==========================================================================
+CHƯƠNG 5 — DỰNG BẢNG MASTER & FEATURE ENGINEERING
+==========================================================================
+
+5.0  Mục tiêu: một bảng, một sinh viên một dòng
+-----------------------------------------------
+[ĐN] GRAIN (hạt/độ chi tiết) của một bảng = "mỗi dòng đại diện cho cái gì".
+Đây là khái niệm nền tảng của data engineering. Các bảng thô có grain KHÁC
+NHAU:
+
+  - studentInfo      : grain = một lượt ghi danh (sinh viên × khoá × kỳ).
+  - studentVle       : grain = một sự kiện click (rất mịn — 10,6 triệu dòng).
+  - studentAssessment: grain = một lượt nộp bài.
+
+[DA] GRAIN của bảng MASTER mà ta muốn xây:
+      (code_module, code_presentation, id_student)
+  Nghĩa là: một dòng = "sinh viên này, trong khoá này, ở kỳ này".
+  Bảng master_raw đích: 32.593 dòng × 33 cột.
+
+[WHY] Vì sao chọn grain này? Vì bài toán dự đoán là "sinh viên X trong lần
+học cụ thể này có nguy cơ không?". Một sinh viên có thể học nhiều khoá/kỳ →
+mỗi lần học là một trường hợp riêng để dự đoán, nên grain phải gồm cả module
+và presentation, không chỉ id_student.
+
+Thách thức: clickstream có grain MỊN HƠN master rất nhiều (nhiều sự kiện cho
+mỗi sinh viên). Phải GỘP (aggregate) clickstream lên đúng grain master rồi
+GHÉP (join) vào. Hai khái niệm này là xương sống chương 5.
+
+
+5.1  JOIN — ghép các bảng theo khoá chung
+-----------------------------------------
+[ĐN] JOIN là phép ghép hai bảng dựa trên (các) cột KHOÁ chung. Ở đây khoá
+là bộ ba (code_module, code_presentation, id_student).
+
+Hai kiểu JOIN ta cần phân biệt rõ:
+
+[ĐN] INNER JOIN: chỉ giữ những dòng có khoá XUẤT HIỆN Ở CẢ HAI bảng. Nếu
+một sinh viên có trong studentInfo nhưng KHÔNG có click nào trong clickstream
+đã gộp → INNER JOIN sẽ LOẠI BỎ sinh viên đó.
+
+[ĐN] LEFT JOIN: giữ TẤT CẢ dòng của bảng bên TRÁI; với mỗi dòng, nếu bảng
+phải có khoá khớp thì lấy giá trị, không khớp thì điền NULL (rỗng).
+
+  Minh hoạ (ví dụ minh hoạ):
+     studentInfo (trái)        clickstream gộp (phải)
+       SV A, ... , 1500 click  ->  A: total_clicks=1500
+       SV B, ... , (không click)-> (không có dòng cho B)
+
+     INNER JOIN  : chỉ còn A.            (B bị đánh rơi — SAI cho ta!)
+     LEFT JOIN   : A=1500, B=NULL.       (giữ B, đánh dấu chưa click)
+
+[WHY] DỰ ÁN DÙNG LEFT JOIN, lấy studentInfo làm bảng TRÁI. Lý do mang tính
+sống còn cho bài toán:
+   Sinh viên KHÔNG hề click chính là tín hiệu NGUY CƠ mạnh nhất! Nếu dùng
+   INNER JOIN, ta vô tình XOÁ BỎ đúng nhóm rủi ro nhất khỏi dữ liệu — mô
+   hình sẽ không bao giờ học được "im lặng tuyệt đối = nguy hiểm". LEFT JOIN
+   giữ họ lại, các cột click thành NULL, và ta sẽ ĐIỀN 0 (họ click 0 lần là
+   sự thật, không phải dữ liệu thiếu).
+
+[DA] Bằng chứng nhóm này có thật và đáng kể:
+   - studentVle có 26.074 sinh viên TỪNG click.
+   - Tổng số sinh viên là 28.785.
+   → Chênh lệch nghĩa là CÓ những sinh viên không click lần nào. Nếu INNER
+     JOIN, họ biến mất. (Xem sanity check 5.5.)
+
+
+5.2  AGGREGATION — gộp nhiều dòng về một dòng
+---------------------------------------------
+[ĐN] AGGREGATION (gộp nhóm) = thu nhiều dòng thành một, kèm một PHÉP TỔNG
+HỢP (sum, count, max, avg...). Trong SQL thực hiện bằng GROUP BY.
+
+Đây là cách ta đưa clickstream (grain mịn: sự kiện) lên grain master (grain
+thô: sinh viên×khoá×kỳ). Khung SQL:
+
+      SELECT code_module, code_presentation, id_student,    -- khoá nhóm
+             sum(sum_click)               AS total_clicks,
+             count(DISTINCT date)         AS n_days_active,
+             max(sum_click)               AS max_clicks_single_day
+      FROM file('studentVle.parquet', 'Parquet')
+      GROUP BY code_module, code_presentation, id_student;
+
+[ĐN] GROUP BY gom mọi dòng có CÙNG bộ khoá lại thành MỘT nhóm; mỗi hàm tổng
+hợp (sum, count...) tính trên các dòng trong nhóm đó. Hàng triệu sự kiện của
+một sinh viên co lại thành đúng MỘT dòng đặc trưng.
+
+[WHY] Sau bước này, clickstream-đã-gộp có grain TRÙNG với master → JOIN được
+"1 dòng khớp 1 dòng", không sợ nhân bản (xem cảnh báo 5.5).
+
+
+5.3  FEATURE ENGINEERING — chế tạo đặc trưng
+--------------------------------------------
+[ĐN] FEATURE ENGINEERING (kỹ thuật đặc trưng) = từ dữ liệu thô, TẠO RA các
+biến (đặc trưng/feature) mới mô tả đối tượng theo cách mô hình HỌC được tốt
+hơn. Mô hình không "hiểu" 10 triệu dòng click; nó cần những con số cô đọng,
+giàu ý nghĩa cho từng sinh viên.
+
+[WHY] Vì sao quan trọng đến vậy? Vì chất lượng đặc trưng quyết định trần
+hiệu năng của mô hình. "Dữ liệu thô + đặc trưng tốt > dữ liệu thô + mô hình
+xịn". Một con số như "đã im lặng bao lâu rồi" có sức dự báo nguy cơ hơn cả
+một thuật toán phức tạp ăn dữ liệu thô.
+
+--- Các đặc trưng từ CLICKSTREAM (gộp về grain master) ---
+
+[ĐN] total_clicks = sum(sum_click).
+   ĐO: tổng mức độ hoạt động/đầu tư của sinh viên trong khoá.
+   VÌ SAO: hoạt động nhiều thường tương quan với gắn kết (engagement). Đây
+   là tín hiệu thô nhất.
+   [DA] Phân bố (đã tổng hợp): mean 1.355 ≫ median 740, skew 2,94, max
+        24.139 → LỆCH PHẢI NẶNG (vài sinh viên click cực nhiều kéo trung
+        bình lên). Việc lệch này sẽ được xử lý ở tập sau; ở đây chỉ ghi nhận.
+
+[ĐN] n_days_active = count(DISTINCT ngày có click).
+   ĐO: SỰ ĐỀU ĐẶN — bao nhiêu ngày KHÁC NHAU sinh viên có mặt.
+   VÌ SAO: phân biệt "học rải đều 60 ngày" với "cày dồn 1 ngày rồi biến
+   mất". Hai người có thể cùng total_clicks nhưng hành vi trái ngược.
+
+[ĐN] days_since_last_activity = cutoff - (ngày click cuối cùng).
+   ĐO: "đã IM LẶNG bao lâu" tính đến mốc thời gian dự đoán (cutoff).
+   VÌ SAO: đây thường là tín hiệu nguy cơ MẠNH nhất. Một sinh viên ngừng
+   tương tác từ lâu là dấu hiệu sắp bỏ học rõ rệt — gần với trực giác của
+   giáo viên ("em này lâu rồi không lên lớp").
+
+[ĐN] clicks theo loại tài nguyên: clicks_forumng, clicks_resource,
+     clicks_url, clicks_oucollaborate, ...
+   ĐO: sinh viên dành công sức vào LOẠI hoạt động nào (diễn đàn? tài liệu?
+   liên kết ngoài? học trực tuyến cộng tác?).
+   VÌ SAO: chất lượng tương tác khác nhau. Tích cực trên diễn đàn (forumng)
+   có thể báo hiệu gắn kết khác với chỉ mở tài liệu (resource).
+   [DA] Bảng vle có 6.364 tài nguyên thuộc 20 loại activity_type; dự án GIỮ
+        8 loại chính (gom phần còn lại) để tránh quá nhiều cột thưa thớt.
+
+[ĐN] max_clicks_single_day = max(sum_click theo ngày).
+   ĐO: đỉnh hoạt động trong một ngày — cường độ dồn nén.
+   VÌ SAO: nhận diện kiểu "nước đến chân mới nhảy" (dồn toàn bộ vào sát hạn).
+
+[ĐN] mean_clicks_per_active_day = total_clicks / n_days_active.
+   ĐO: cường độ TRUNG BÌNH mỗi ngày CÓ HỌC (không tính ngày vắng).
+   VÌ SAO: tách "cường độ khi học" khỏi "tần suất học". Hai người cùng
+   total_clicks: người học đều 50 ngày có mean thấp; người dồn 2 ngày có
+   mean cao — chân dung học tập rất khác nhau.
+
+--- Các đặc trưng từ PERFORMANCE (kết quả bài tập) ---
+   (Bảng nguồn: assessments 206 bài; studentAssessment 173.912 lượt nộp.)
+
+[ĐN] n_assessments_submitted = số bài đã nộp tính đến cutoff.
+   ĐO: mức độ theo kịp lịch bài tập.
+   VÌ SAO: nộp ít/không nộp là dấu hiệu tụt lại.
+
+[ĐN] mean_score_to_date = điểm trung bình các bài đã nộp tới cutoff.
+   ĐO: năng lực/kết quả trung bình hiện thời.
+   VÌ SAO: kết quả thấp sớm là cảnh báo rủi ro học thuật.
+
+[ĐN] weighted_score_to_date = điểm trung bình có TRỌNG SỐ (theo trọng số
+     từng bài).
+   ĐO: kết quả phản ánh đúng tầm quan trọng từng bài (bài nặng điểm hơn).
+   VÌ SAO: trung bình trơn coi mọi bài như nhau; thực tế bài cuối kỳ/Exam
+   nặng hơn TMA nhỏ. Trọng số cho ước lượng năng lực sát thực hơn.
+
+[WHY] Lưu ý "...to date" / cutoff: mọi đặc trưng phải tính bằng dữ liệu CÓ
+TRƯỚC mốc dự đoán, không dùng tương lai. Chi tiết về cắt thời gian thuộc tập
+sau; ở đây chỉ nhấn rằng các feature được thiết kế để TÔN TRỌNG mốc đó.
+
+
+5.4  Vì sao "im lặng bao lâu" và "đều đặn" hơn hẳn chỉ "tổng click"
+------------------------------------------------------------------
+[EVAL] So sánh sức mô tả của ba feature trên cùng một tình huống (ví dụ
+minh hoạ về hành vi, không phải số liệu thật):
+
+  - SV An: total_clicks=1000, trải đều 50 ngày, ngày click cuối = hôm qua.
+  - SV Bình: total_clicks=1000, dồn vào 3 ngày đầu, im lặng 40 ngày nay.
+
+  Nếu CHỈ nhìn total_clicks: An và Bình GIỐNG HỆT (cùng 1000). Mô hình mù.
+  Thêm n_days_active: An=50, Bình=3 → lộ ra An đều, Bình dồn cục.
+  Thêm days_since_last_activity: An≈1, Bình≈40 → Bình rõ ràng đang RỜI BỎ.
+
+[WHY] total_clicks là feature "thể tích" — nói tổng lượng, không nói NHỊP
+ĐIỆU và TÍNH MỚI của hoạt động. Nguy cơ bỏ học gắn với SỰ THAY ĐỔI hành vi
+theo thời gian (đang tụt dốc, đã ngừng), điều mà tổng tĩnh che giấu.
+days_since_last_activity bắt "tính mới" (recency); n_days_active bắt "tính
+đều" (consistency). Bộ ba bổ sung nhau, vẽ chân dung đầy đủ hơn nhiều so với
+một con số tổng.
+
+★Q/A — "Vậy bỏ total_clicks đi cho gọn?"
+   Không. total_clicks vẫn hữu ích như nền (baseline) và kết hợp với các
+   feature kia (ví dụ mean_clicks_per_active_day = total/active days cần cả
+   hai). Nguyên tắc: cung cấp nhiều GÓC NHÌN bổ sung, để mô hình tự chọn,
+   chứ không vứt bỏ thông tin sớm.
+
+
+5.5  SANITY CHECK sau JOIN — kiểm tra bắt buộc
+----------------------------------------------
+[EVAL] Sau MỖI lần JOIN, phải kiểm tra ba điều. Đây không phải thủ tục cho
+vui — JOIN là nơi dễ âm thầm làm hỏng dữ liệu nhất.
+
+(1) SỐ DÒNG ĐÚNG = 32.593, KHÔNG nhân đôi, KHÔNG đánh rơi.
+    [DA] Sau studentInfo LEFT JOIN clickstream-đã-gộp: đúng 32.593 dòng.
+    VÌ SAO quan trọng:
+      - NHÂN ĐÔI (số dòng PHÌNH lên): xảy ra khi bảng phải có NHIỀU dòng
+        cùng một khoá (grain chưa gộp đúng) → mỗi dòng trái bị nhân thành
+        nhiều. Đây là lỗi JOIN kinh điển. Vì ta đã GROUP BY clickstream về
+        đúng grain master (5.2), mỗi khoá phải chỉ còn 1 dòng → không phình.
+      - ĐÁNH RƠI (số dòng GIẢM): dấu hiệu lỡ dùng INNER JOIN, mất nhóm
+        không-click. Số dòng phải KHỚP số lượt ghi danh ban đầu.
+
+(2) 3.365 DÒNG CÓ 0 CLICK là DỮ LIỆU THẬT, không phải lỗi.
+    [DA] Sau JOIN, có 3.365 dòng với 0 click (các cột click là NULL → sẽ
+    điền 0). Đây CHÍNH là nhóm LEFT JOIN giữ lại được. Phải xác nhận đây là
+    "không hoạt động thật" (tín hiệu nguy cơ) chứ không phải lỗi ghép sai
+    khoá. Nếu vô tình INNER JOIN, 3.365 dòng này biến mất → kiểm tra này sẽ
+    phát hiện ngay (vì tổng dòng tụt xuống còn ~29.228).
+    [DA] Trung bình total_clicks sau JOIN ≈ 1.215,1 (thấp hơn mean 1.355 của
+    nhóm-có-click ở 5.3, đúng như kỳ vọng vì giờ đã tính cả nhóm 0 click kéo
+    trung bình xuống — một dấu hiệu nhất quán nữa).
+
+(3) TÍNH NHẤT QUÁN: 26.074 < 28.785.
+    [DA] Số sinh viên từng click (26.074) phải NHỎ HƠN tổng số sinh viên
+    (28.785). Chênh lệch 2.711 sinh viên không click khớp về mặt logic với
+    sự tồn tại của nhóm 0-click. (Lưu ý: 3.365 dòng 0-click ở (2) tính theo
+    grain ghi-danh, còn 26.074/28.785 đếm theo sinh viên — hai cách đếm khác
+    grain nhưng cùng kể MỘT câu chuyện: có người hoàn toàn im lặng.)
+
+[WHY] Vì sao sanity check là BẮT BUỘC sau mỗi JOIN: JOIN sai thường KHÔNG
+báo lỗi — code chạy ngon, ra một bảng trông bình thường, nhưng số dòng đã
+phình/rơi và mọi thống kê phía sau đều sai. Ba phép đếm đơn giản (đếm dòng,
+đếm nhóm 0-click, so số sinh viên) bắt được hầu hết thảm hoạ JOIN trong vài
+giây. Đây là thói quen kỷ luật phân biệt người làm dữ liệu cẩn thận với
+người "may rủi".
+
+★Q/A — "Đếm dòng thôi mà cũng thành quy trình?"
+   Đúng vậy, và nó cứu mạng. Trong thực tế công nghiệp, vô số bug phân tích
+   bắt nguồn từ một JOIN nhân đôi không ai để ý, làm doanh thu/chỉ số bị
+   thổi phồng. Một dòng SELECT count(*) so với con số kỳ vọng (32.593) là
+   bảo hiểm rẻ nhất bạn từng mua.
+
+
+5.6  Kết chương & cầu nối sang tập sau
+--------------------------------------
+[DA] Đầu ra của chương 5: bảng master_raw kích thước 32.593 dòng × 33 cột.
+Mỗi dòng là một (sinh viên × khoá × kỳ) với đầy đủ đặc trưng hành vi
+(clickstream) và kết quả (performance) đã gộp về đúng grain, đã qua sanity
+check.
+
+[NEXT] master_raw 32.593×33 CHƯA phải dữ liệu sẵn sàng cho mô hình. Nó là
+ĐẦU VÀO cho các bước tiếp theo (thuộc các tập sau, KHÔNG bàn ở đây):
+  - Cắt thời gian (cutoff) & chia tập train/validation/test.
+  - Làm sạch: xử lý giá trị thiếu (như điền 0 cho nhóm 0-click), xử lý
+    outlier của total_clicks lệch phải.
+  - Mã hoá biến phân loại & co giãn (scale) biến số.
+Ở Tập 2 này, ta đã hoàn thành đúng nhiệm vụ data engineering: TỪ dữ liệu thô
+nhiều grain, nhiều chục triệu dòng, DỰNG được một bảng master sạch về cấu
+trúc, đúng grain, giàu đặc trưng, và TIN CẬY (đã kiểm chứng).
+
+--------------------------------------------------------------------------
+TÓM TẮT TẬP 2 (ôn nhanh)
+--------------------------------------------------------------------------
+  - Dữ liệu lớn (10,6 triệu dòng / 433 MB) không nạp hết vào RAM; dùng engine
+    CỘT + đẩy SQL xuống dữ liệu (ClickHouse-local qua WSL), không pandas thô,
+    không Spark thừa thãi.
+  - Parquet (cột, có schema, nén): 433 MB→22,9 MB, 14,6 s→0,55 s — đánh đổi
+    cực lời vì EDA hỏi hàng chục lần.
+  - "Bẫy kiểu": CSV bị đoán toàn String → max(date)="99"; phải khai báo kiểu
+    tường minh → date -25..269, 3,72 click/sự kiện.
+  - Master grain (module, presentation, student): GROUP BY gộp clickstream,
+    LEFT JOIN từ studentInfo để GIỮ nhóm không-click (nguy cơ).
+  - Feature engineering: recency (days_since_last_activity) & consistency
+    (n_days_active) mạnh hơn chỉ total_clicks; kèm các feature performance.
+  - Sanity check sau JOIN: 32.593 dòng, 3.365 dòng 0-click là thật,
+    26.074<28.785 nhất quán. → master_raw 32.593×33 cho các tập sau.
+==========================================================================

@@ -1,0 +1,557 @@
+TẬP 3 — LÀM SẠCH DỮ LIỆU
+(Data Cleaning)
+
+====================================================================
+LỜI MỞ ĐẦU TẬP 3
+====================================================================
+
+Ở Tập 1 và 2 chúng ta đã dựng được bảng tổng hợp (master table) và
+nhìn dữ liệu một lần đầu. Bảng dữ liệu thô của chúng ta là:
+
+    master_raw = 32.593 dòng × 33 cột
+    Khoá (key) định danh một dòng: (code_module, code_presentation,
+    id_student) — tức "môn nào, kỳ học nào, sinh viên nào".
+
+"Có bảng rồi" KHÔNG có nghĩa là "dùng được ngay". Dữ liệu thật luôn có
+chỗ trống (thiếu), có giá trị bất thường (ngoại lai), có sai khoá, có
+trùng lặp. Tập 3 này chỉ làm một việc nhưng làm cho kỹ: BIẾN dữ liệu
+thô thành dữ liệu sạch, MÀ KHÔNG bịa thêm thông tin và KHÔNG làm rò rỉ
+(leakage) thông tin từ tương lai vào mô hình.
+
+Trong tập này ta dùng khuôn ký hiệu thống nhất:
+    [ĐN]  = Định nghĩa / khái niệm nền.
+    [DA]  = Dữ liệu Áp dụng (làm thật trên số liệu của dự án).
+    [WHY] = Vì sao chọn cách này (lý lẽ bảo vệ quyết định).
+    [ALT] = Phương án thay thế và vì sao ta KHÔNG chọn.
+    [EVAL]= Đo lường / kiểm chứng kết quả.
+    [NEXT]= Nối sang phần/tập sau.
+    ★Q/A  = Hỏi đáp phản biện (em hỏi khó, ta trả lời).
+
+--------------------------------------------------------------------
+MỘT QUY TẮC PHẢI THUỘC LÒNG TRƯỚC KHI BẮT ĐẦU: "QUY TẮC VÀNG"
+--------------------------------------------------------------------
+[WHY] (Quy tắc vàng — train-only)
+Mọi CON SỐ mà ta "học" được để làm sạch — ví dụ giá trị median dùng để
+điền khuyết, mốc cắt winsorize, tham số scaler — PHẢI được tính CHỈ TRÊN
+TẬP HUẤN LUYỆN (train set), rồi ÁP nguyên si các con số đó lên tập kiểm
+thử (test set).
+
+Vì sao? Vì test set đóng vai "tương lai chưa thấy". Nếu ta tính median
+trên toàn bộ dữ liệu (gồm cả test) rồi mới chia tập, thì test đã "rò"
+thông tin của nó vào bước tiền xử lý — điểm đánh giá sẽ đẹp giả tạo, và
+khi đem mô hình ra đời thật (gặp dữ liệu thật sự mới) nó sẽ tệ hơn ta
+tưởng. Hiện tượng đó gọi là RÒ RỈ DỮ LIỆU (data leakage).
+
+Lưu ý kỹ thuật: việc CHIA train/test thuộc Tập 5. Ở Tập 3 ta chỉ cần
+ghi nhớ nguyên tắc: "mốc nào học từ dữ liệu thì học trên train". Khi
+trình bày các con số (median, mốc winsorize) trong tập này, hiểu ngầm
+là "median của tập train", "phân vị 1%/99% của tập train".
+
+====================================================================
+CHƯƠNG 6 — DỮ LIỆU THIẾU (MISSING DATA)
+====================================================================
+
+--------------------------------------------------------------------
+6.1 [ĐN] "ĐẾM NaN" LÀ CHƯA ĐỦ — PHẢI HỎI CƠ CHẾ THIẾU
+--------------------------------------------------------------------
+Người mới thường làm: chạy df.isna().sum(), thấy cột nào thiếu thì
+df.fillna(0) hoặc df.dropna() cho xong. Đây là cái bẫy lớn nhất của
+khâu làm sạch.
+
+Lý do: "thiếu" không phải lúc nào cũng cùng một bản chất. Một ô trống
+có thể vì:
+   (a) Người ta QUÊN ghi (ngẫu nhiên) — điền giá trị đại diện là hợp lý.
+   (b) Ô đó VỀ BẢN CHẤT không thể có giá trị — điền vào là BỊA.
+   (c) Ô trống vì một lý do LIÊN QUAN tới chính giá trị bị giấu — điền
+       bừa sẽ làm lệch (bias) cả mô hình.
+
+Cùng là "NaN" trên màn hình, nhưng (a),(b),(c) đòi 3 cách xử lý khác
+nhau. Vậy trước khi xử lý, câu hỏi đúng KHÔNG phải "thiếu bao nhiêu?"
+mà là "thiếu VÌ SAO?" — tức hỏi về CƠ CHẾ SINH RA SỰ THIẾU (missingness
+mechanism). Thống kê học chia cơ chế thiếu thành 3 (đôi khi 4) loại.
+
+[ĐN] MCAR — Missing Completely At Random (Thiếu hoàn toàn ngẫu nhiên)
+   Xác suất một ô bị thiếu KHÔNG phụ thuộc vào bất cứ thứ gì — không phụ
+   thuộc giá trị bị thiếu, cũng không phụ thuộc các biến khác. Thiếu
+   "rơi đều như mưa".
+   Ví dụ: cảm biến đôi lúc mất kết nối ngẫu nhiên; một dòng nhập liệu bị
+   lỗi truyền dữ liệu không liên quan tới sinh viên nào.
+   Hệ quả tốt: vì thiếu ngẫu nhiên đều, phần dữ liệu còn lại vẫn là mẫu
+   đại diện. Điền median/mean hoặc thậm chí bỏ vài dòng ít gây thiên lệch.
+
+[ĐN] MAR — Missing At Random (Thiếu ngẫu nhiên CÓ ĐIỀU KIỆN)
+   Tên dễ gây hiểu lầm. MAR nghĩa là: xác suất thiếu phụ thuộc vào các
+   biến QUAN SÁT ĐƯỢC khác, NHƯNG khi đã biết các biến đó thì không còn
+   phụ thuộc vào chính giá trị bị giấu.
+   Ví dụ: nhóm sinh viên ở vùng A khai báo chỉ số nghèo khó đầy đủ hơn
+   nhóm vùng B (thiếu phụ thuộc "vùng" — một biến ta thấy được), nhưng
+   trong cùng một vùng thì việc thiếu hay không lại không liên quan tới
+   mức nghèo thật.
+   Hệ quả: điền được, nhưng nên điền có điều kiện và/hoặc gắn cờ để mô
+   hình tự học pattern thiếu.
+
+[ĐN] MNAR — Missing Not At Random (Thiếu KHÔNG ngẫu nhiên)
+   Xác suất thiếu phụ thuộc vào CHÍNH giá trị bị giấu.
+   Ví dụ: người thu nhập rất cao thường từ chối khai thu nhập → ô "thu
+   nhập" thiếu nhiều ở chính nhóm thu nhập cao. Bỏ hoặc điền median sẽ
+   làm lệch nặng vì ta đang xoá đúng nhóm đặc biệt.
+   MNAR là loại khó nhất; thường phải dùng cờ missing-indicator để giữ
+   lại "tín hiệu" của việc thiếu, hoặc mô hình hoá riêng.
+
+[ĐN] Thiếu CẤU TRÚC (Structural missingness)
+   Một dạng đặc biệt: ô KHÔNG THỂ có giá trị vì về mặt logic nó không
+   tồn tại. Đây không phải "mất dữ liệu" mà là "dữ liệu vốn không có".
+   Ví dụ kinh điển trong dự án: ngày rút môn (date_unregistration) CHỈ
+   tồn tại nếu sinh viên CÓ rút môn. Sinh viên học hết kỳ thì làm gì có
+   "ngày rút"? Ô đó trống là ĐÚNG, không phải lỗi.
+   Điền median/0 vào đây = bịa ra một sự kiện chưa từng xảy ra.
+
+[ĐN] Cách PHÂN BIỆT trong thực tế (không có máy đo "cơ chế thiếu")
+   Không tồn tại lệnh tự động báo "cột này MCAR, cột kia MNAR". Ta suy
+   luận bằng:
+   1. HIỂU NGHIỆP VỤ (domain): cột này nghĩa là gì? Nó CÓ THỂ trống một
+      cách hợp lệ không? (→ phát hiện thiếu cấu trúc).
+   2. SO SÁNH NHÓM: chia dữ liệu theo "thiếu vs không thiếu" rồi xem các
+      biến khác có khác nhau không. Khác → nghiêng về MAR/MNAR. Giống →
+      nghiêng về MCAR.
+   3. TỶ LỆ THIẾU: thiếu 0,1% và thiếu 70% đòi thái độ rất khác nhau.
+   Kết luận về cơ chế là một LẬP LUẬN có cơ sở, không phải con số tuyệt
+   đối — nên ta phải GHI RÕ lý do (đó là tinh thần "phản biện/bảo vệ").
+
+--------------------------------------------------------------------
+6.2 [ĐN] CATALOGUE CÁC PHÉP XỬ LÝ THIẾU (kèm ưu/nhược)
+--------------------------------------------------------------------
++----+--------------------------+--------------------------+--------------------------+
+| #  | Phép xử lý               | Ưu điểm                  | Nhược điểm               |
++----+--------------------------+--------------------------+--------------------------+
+| 1  | Bỏ DÒNG (listwise        | Đơn giản; không bịa số.  | Mất dữ liệu; nếu thiếu   |
+|    | deletion / dropna theo   |                          | không phải MCAR → mẫu    |
+|    | dòng)                    |                          | còn lại bị thiên lệch.   |
++----+--------------------------+--------------------------+--------------------------+
+| 2  | Bỏ CỘT                   | Gọn; loại bỏ cột vô dụng | Mất luôn thông tin tốt   |
+|    |                          | hoặc thiếu cấu trúc.     | nếu cột vẫn có ích.      |
++----+--------------------------+--------------------------+--------------------------+
+| 3  | Điền MEAN (trung bình)   | Giữ nguyên số dòng;      | Nhạy với ngoại lai &     |
+|    |                          | nhanh.                   | biến lệch → kéo lệch về  |
+|    |                          |                          | giá trị không thực.      |
++----+--------------------------+--------------------------+--------------------------+
+| 4  | Điền MEDIAN (trung vị)   | Bền với ngoại lai &      | Làm giảm phương sai;     |
+|    |                          | biến lệch; giữ số dòng.  | xoá quan hệ với biến    |
+|    |                          |                          | khác nếu điền mù.        |
++----+--------------------------+--------------------------+--------------------------+
+| 5  | Điền MODE (giá trị hay   | Hợp cho biến phân loại   | Dồn thêm vào nhóm đông;  |
+|    | gặp nhất / categorical)  | (categorical).           | có thể che pattern thiếu.|
++----+--------------------------+--------------------------+--------------------------+
+| 6  | Điền HẰNG / SENTINEL     | Rõ ràng, kiểm soát được; | Nếu chọn số có nghĩa     |
+|    | (vd 0, -1)               | hợp khi 0 có ý nghĩa.    | (như -1) mô hình tuyến  |
+|    |                          |                          | tính dễ hiểu sai.        |
++----+--------------------------+--------------------------+--------------------------+
+| 7  | Tạo hạng "Unknown"       | Không bịa nhãn; biến     | Tăng số hạng; cần đủ     |
+|    | (cho biến phân loại)     | "thiếu" thành 1 nhóm rõ. | mẫu để hạng có nghĩa.   |
++----+--------------------------+--------------------------+--------------------------+
+| 8  | Thêm CỜ missing-indicator| Giữ "tín hiệu của việc   | Tăng số cột; nếu MCAR    |
+|    | (cột 0/1 đánh dấu thiếu) | thiếu" cho mô hình học. | thì cờ thường vô dụng.  |
++----+--------------------------+--------------------------+--------------------------+
+| 9  | Điền NÂNG CAO: KNN-impute | Dùng quan hệ giữa các    | Tốn tính toán; dễ rò rỉ |
+|    | (lấy hàng xóm gần)       | biến → điền "thông minh".| nếu fit trên cả test;   |
+|    |                          |                          | khó giải thích.          |
++----+--------------------------+--------------------------+--------------------------+
+| 10 | Điền NÂNG CAO: MICE      | Mô hình hoá từng cột     | Phức tạp; chậm; nhiều    |
+|    | (multiple imputation /   | theo các cột khác; phản | giả định; khó tái lập;  |
+|    | iterative imputer)       | ánh độ bất định.        | dễ over-engineer.        |
++----+--------------------------+--------------------------+--------------------------+
+
+Nguyên tắc chọn: bắt đầu từ cơ chế thiếu (6.1), rồi chọn phép ĐƠN GIẢN
+NHẤT đủ tốt. Không "đốt" KNN/MICE khi median + cờ đã giải quyết gọn.
+
+--------------------------------------------------------------------
+6.3 [DA] ÁP DỤNG CHO DỮ LIỆU THẬT (4 nhóm thiếu trong dự án)
+--------------------------------------------------------------------
+Bảng tổng quan các cột thiếu (số liệu thật của dự án):
+
++----------------------+-----------+--------+----------------+------------------------+
+| Cột                  | Số thiếu  | Tỷ lệ  | Cơ chế         | Quyết định xử lý       |
++----------------------+-----------+--------+----------------+------------------------+
+| date_unregistration  | 22.521    | 69,1%  | Thiếu cấu trúc | LOẠI khỏi đặc trưng;   |
+|                      |           |        | (structural)   | KHÔNG điền.            |
++----------------------+-----------+--------+----------------+------------------------+
+| imd_band             | 1.111     | 3,41%  | MAR/MCAR       | Thêm hạng "Unknown".   |
++----------------------+-----------+--------+----------------+------------------------+
+| date_registration    | 45        | 0,14%  | MCAR           | Điền MEDIAN của TRAIN. |
++----------------------+-----------+--------+----------------+------------------------+
+| Điểm bài nộp         | 173 điểm  | (rất   | Thiếu cấu trúc | Điền 0 + thêm cờ       |
+| (studentAssessment)  | thiếu     | nhỏ)   | / hành vi      | not_submitted (0/1).   |
++----------------------+-----------+--------+----------------+------------------------+
+
+CỘT 1 — date_unregistration (22.521 thiếu, 69,1%)
+   Cơ chế: THIẾU CẤU TRÚC. Cột này ghi NGÀY sinh viên rút môn. Nó chỉ có
+   giá trị nếu sinh viên ĐÃ rút. 69,1% trống nghĩa là 69,1% sinh viên
+   KHÔNG rút môn — ô trống là kết quả ĐÚNG, không phải mất dữ liệu.
+   Cách xử lý: LOẠI cột này khỏi tập đặc trưng (feature). KHÔNG điền gì.
+   [WHY] Điền median/0 vào đây = gán cho người không rút một "ngày rút"
+   tưởng tượng → bịa sự kiện. Tệ hơn: ngày rút môn là thông tin của
+   TƯƠNG LAI (xảy ra sau khi học bắt đầu) và liên quan trực tiếp tới
+   nhãn "có hoàn thành/đậu hay không" → giữ lại sẽ gây RÒ RỈ NHÃN (label
+   leakage), mô hình "đoán" được kết quả vì đã nhìn lén kết quả.
+   [ALT] Có thể biến nó thành cờ "đã_rút (0/1)" không? Về kỹ thuật được,
+   nhưng vẫn là biến phái sinh từ sự kiện tương lai gắn chặt với nhãn →
+   vẫn rò rỉ. Vì vậy ta loại hẳn, an toàn nhất.
+
+CỘT 2 — imd_band (1.111 thiếu, 3,41%)
+   imd_band là chỉ số phân nhóm theo mức thiệt thòi vùng cư trú (một
+   biến PHÂN LOẠI có thứ tự, vd "0-10%", "10-20%", ...). Cơ chế: nghiêng
+   về MAR/MCAR — thiếu có thể do hồ sơ vùng không đầy đủ, không có dấu
+   hiệu thiếu phụ thuộc vào chính mức thiệt thòi.
+   Cách xử lý: THÊM MỘT HẠNG MỚI tên "Unknown" cho các ô thiếu.
+   [WHY] (a) Giữ trọn 1.111 dòng (3,41% không nhỏ, bỏ đi phí phạm).
+   (b) KHÔNG bịa mức thiệt thòi cho ai: ta không gán họ vào "0-10%" hay
+   "90-100%", mà nói thẳng "không biết". (c) Nếu việc thiếu tình cờ
+   mang tín hiệu (vd nhóm hồ sơ thiếu có hành vi khác), mô hình vẫn học
+   được qua hạng "Unknown".
+   [ALT] Vì sao KHÔNG điền MEAN/MODE cho imd_band?
+   - imd_band là biến PHÂN LOẠI → "mean" vô nghĩa (không có trung bình
+     của "0-10%" và "20-30%").
+   - Điền MODE (hạng hay gặp nhất) = gán 1.111 người vào một mức thiệt
+     thòi CỤ THỂ mà ta không có bằng chứng → đó là BỊA dữ liệu, và còn
+     làm phình giả tạo nhóm đông, bóp méo quan hệ với nhãn.
+   → "Unknown" trung thực hơn hẳn.
+
+CỘT 3 — date_registration (45 thiếu, 0,14%)
+   Ngày đăng ký môn (so với mốc bắt đầu kỳ). Cơ chế: MCAR — chỉ 45/32.593
+   dòng (0,14%), rải rác, không thấy liên hệ hệ thống.
+   Cách xử lý: ĐIỀN MEDIAN tính TRÊN TẬP TRAIN.
+   [WHY median chứ không mean?] date_registration thường lệch (đa số đăng
+   ký quanh đầu kỳ, lác đác vài người đăng ký rất sớm/rất muộn → đuôi
+   dài). Mean bị mấy giá trị đuôi kéo đi; median (trung vị) đứng giữa,
+   bền với đuôi → đại diện "ngày đăng ký điển hình" tốt hơn.
+   [WHY train-only?] Median phải tính từ train rồi áp lên test (Quy tắc
+   vàng) để không rò rỉ.
+   [ALT] Vì sao KHÔNG bỏ 45 dòng?
+   - Bỏ thì đơn giản thật, nhưng mất 45 dòng dữ liệu có ích (các cột khác
+     của 45 sinh viên này vẫn đầy đủ và giá trị).
+   - Quan trọng hơn về NGUYÊN TẮC: với MCAR, điền median gần như không
+     gây thiên lệch, nên không có lý do gì để vứt dòng. Giữ dòng + điền
+     1 ô là lựa chọn ít tổn thất nhất.
+
+CỘT 4 — Điểm bài nộp thiếu (studentAssessment: 173 điểm thiếu)
+   Bối cảnh: bảng điểm bài tập (studentAssessment) có 173 chỗ điểm bị
+   trống. Điều tra nghiệp vụ cho thấy phần lớn là vì SINH VIÊN KHÔNG NỘP
+   BÀI → không có điểm. Đây vừa mang tính thiếu cấu trúc (không nộp thì
+   không có điểm) vừa là HÀNH VI có ý nghĩa.
+   Cách xử lý: ĐIỀN 0 cho điểm + THÊM CỜ not_submitted (0/1):
+   not_submitted = 1 nếu bài đó không nộp, = 0 nếu có nộp.
+   [WHY điền 0?] Trong khung điểm, "không nộp" tương đương "không ghi
+   được điểm dương" → 0 là sentinel có nghĩa thật (khác với date, nơi 0
+   sẽ là một mốc thời gian giả).
+   [WHY thêm cờ not_submitted?] Đây là điểm tinh tế nhất chương:
+   "KHÔNG NỘP BÀI" TỰ NÓ LÀ MỘT TÍN HIỆU NGUY CƠ. Một sinh viên bỏ nộp
+   bài có rủi ro rớt/bỏ học cao hơn nhiều so với một sinh viên NỘP và bị
+   0 điểm. Nhưng nếu ta chỉ điền 0, cả hai trường hợp đều thành "điểm 0"
+   — mô hình không phân biệt nổi "0 vì kém" với "0 vì vắng mặt". Cờ
+   not_submitted GIỮ LẠI sự khác biệt đó để mô hình học được pattern
+   "ngưng tương tác → nguy cơ". Đây chính là biến thể của kỹ thuật
+   missing-indicator (catalogue mục #8): biến SỰ THIẾU thành tín hiệu.
+   [ALT] Bỏ các bài không nộp? Không — ta sẽ mất đúng nhóm rủi ro nhất,
+   thiên lệch mẫu về phía sinh viên chăm chỉ.
+
+--------------------------------------------------------------------
+6.4 [EVAL] KIỂM CHỨNG SAU XỬ LÝ: 0 NaN
+--------------------------------------------------------------------
+Sau khi áp 4 cách trên, mọi cột ĐẶC TRƯNG (feature) không còn ô trống.
+Ta KHẲNG ĐỊNH bằng một dòng assert (kiểm tra cứng), không "tin bằng mắt":
+
+    assert df_features.isna().sum().sum() == 0, "Vẫn còn NaN!"
+
+Ý nghĩa: isna() đánh dấu mọi ô thiếu (True=1), .sum().sum() cộng tất cả
+ô thiếu trên mọi cột; nếu tổng = 0 thì sạch. Nếu còn sót, assert dừng
+chương trình ngay — đỡ hơn nhiều so với để mô hình lặng lẽ chạy lỗi sau.
+[EVAL] Kết quả thực tế: 0 NaN ở mọi cột đặc trưng. ĐẠT.
+(Lưu ý: date_unregistration đã bị LOẠI nên không nằm trong tập đặc trưng,
+không tính vào kiểm tra này — đúng thiết kế.)
+
+--------------------------------------------------------------------
+6.5 ★Q/A PHẢN BIỆN — CHƯƠNG 6
+--------------------------------------------------------------------
+★ Hỏi: "Sao không xử lý cho nhanh: cứ fillna(0) hết rồi tính sau?"
+   Đáp: Vì 0 mang nghĩa khác nhau ở mỗi cột. Với điểm bài nộp, 0 là hợp
+   lý. Với date_registration, 0 là "đăng ký đúng ngày mốc" — sai bản
+   chất. Với imd_band (phân loại), 0 thậm chí không phải hạng hợp lệ.
+   Một con dao không cắt được mọi thứ; phải theo CƠ CHẾ từng cột.
+
+★ Hỏi: "imd_band gắn 'Unknown' rồi sau này encode kiểu gì cho mô hình?"
+   Đáp: "Unknown" chỉ là MỘT hạng nữa trong biến phân loại. Khi mã hoá
+   (one-hot/ordinal — chi tiết ở Tập 4) nó được xử lý như mọi hạng khác.
+   Ở đây ta chỉ cần đảm bảo không bịa và không mất dòng.
+
+★ Hỏi: "Median tính trên train, nhưng test cũng có ô date_registration
+   thiếu — lấy gì điền cho test?"
+   Đáp: Lấy ĐÚNG con số median đã học từ train để điền cho cả test. Test
+   KHÔNG được góp phần tính median. Đó là cốt lõi chống rò rỉ.
+
+★ Hỏi: "date_unregistration thiếu tới 69% nên bỏ — vậy cứ cột nào thiếu
+   nhiều là bỏ à?"
+   Đáp: KHÔNG. Ta bỏ nó vì cơ chế (thiếu cấu trúc) + rò rỉ nhãn, KHÔNG
+   phải vì con số 69%. Tỷ lệ thiếu cao chỉ là dấu hiệu nhắc ta điều tra;
+   quyết định đến từ NGHĨA của cột. Một cột thiếu 60% nhưng phần có giá
+   trị mang tín hiệu mạnh và không rò rỉ thì ta vẫn có thể giữ (kèm cờ).
+
+★ Hỏi: "Sao không dùng KNN/MICE cho 'sang', điền thông minh hơn?"
+   Đáp: (1) Bài toán của ta giải gọn bằng median + 'Unknown' + cờ, KNN/
+   MICE là dùng đại bác bắn ruồi. (2) Chúng dễ gây rò rỉ nếu vô ý fit
+   trên cả test. (3) Khó giải thích, khó tái lập — đi ngược tinh thần
+   "bảo vệ được mọi quyết định". Đơn giản mà đúng > phức tạp mà mờ.
+
+[NEXT] Hết Chương 6 ta đã KHÔNG còn ô trống và KHÔNG bịa thông tin.
+Chương 7 chuyển sang câu hỏi: các giá trị CÓ MẶT đó có "ngoan" không,
+hay có những con số cực đoan (ngoại lai) và phân phối méo cần xử lý.
+
+====================================================================
+CHƯƠNG 7 — NGOẠI LAI & PHÂN PHỐI (OUTLIERS & DISTRIBUTIONS)
+====================================================================
+
+--------------------------------------------------------------------
+7.1 [ĐN] NGOẠI LAI LÀ GÌ? LỖI HAY HÀNH VI THẬT?
+--------------------------------------------------------------------
+[ĐN] Ngoại lai (outlier) là quan sát nằm XA bất thường so với phần lớn
+dữ liệu của cùng biến đó. "Xa" được lượng hoá bằng các quy tắc ở 7.2.
+
+Điểm mấu chốt — và là chỗ người mới hay làm sai: KHÔNG phải ngoại lai
+nào cũng đáng xoá. Phải phân loại:
+
+   (A) Ngoại lai do LỖI (error / data-entry artifact):
+       Giá trị bất khả thi hoặc sai kỹ thuật. Ví dụ: tuổi = 999, điểm =
+       -50, số click âm. → Nên SỬA (nếu biết đúng) hoặc LOẠI, vì nó
+       không phản ánh thực tế.
+
+   (B) Ngoại lai là HÀNH VI THẬT (genuine extreme behaviour):
+       Giá trị lớn nhưng CÓ THẬT và HỢP LỆ. Ví dụ: một sinh viên siêu
+       chăm click vào hệ thống học 24.139 lần trong kỳ — cực đoan nhưng
+       hoàn toàn có thật. → KHÔNG xoá, vì đó là thông tin quý.
+
+[WHY] Vì sao trong dự án này ngoại lai là HÀNH VI THẬT → KHÔNG xoá DÒNG?
+   - Các biến cực đoan của ta (số lần click, ...) đều là HÀNH VI học tập
+     có thật, nằm trong miền hợp lệ (không âm, không vô lý).
+   - Xoá những dòng này gây 3 tác hại:
+     (1) MẤT THÔNG TIN: sinh viên siêu chăm hay siêu thụ động chính là
+         nhóm dự báo rủi ro quan trọng nhất; xoá đi là vứt tín hiệu mạnh.
+     (2) LỆCH MẪU (sample distortion): phân phối còn lại không còn giống
+         dân số thật → mô hình học sai thực tế.
+     (3) THIÊN LỆCH CHỌN MẪU (selection bias): ta vô tình "chọn" giữ lại
+         nhóm trung bình, mô hình sẽ dở đúng ở các ca biên — vốn là ca
+         ta cần cảnh báo nhất.
+   → Kết luận: trong dự án này, ta KHÔNG XOÁ DÒNG NÀO vì ngoại lai. Thay
+   vào đó ta BIẾN ĐỔI (transform) biến để bớt méo mà vẫn giữ đủ dòng.
+
+--------------------------------------------------------------------
+7.2 [ĐN] CÁCH PHÁT HIỆN NGOẠI LAI
+--------------------------------------------------------------------
+[ĐN] Quy tắc IQR (1.5×IQR — Tukey):
+   - Q1 = phân vị 25%, Q3 = phân vị 75%. IQR = Q3 − Q1 (khoảng tứ phân
+     vị, "bề rộng" của 50% giá trị giữa).
+   - Coi là ngoại lai nếu: x < Q1 − 1.5×IQR  HOẶC  x > Q3 + 1.5×IQR.
+   - Ưu: không giả định phân phối chuẩn; bền với chính ngoại lai (Q1,Q3
+     ít bị kéo). Đây là quy tắc mặc định, hợp với dữ liệu lệch.
+
+[ĐN] Z-score:
+   - z = (x − mean) / std. Thường coi |z| > 3 là ngoại lai.
+   - Nhược: mean và std BỊ chính ngoại lai kéo lệch → với dữ liệu lệch
+     nặng, z-score kém tin cậy hơn IQR. Z-score hợp khi dữ liệu xấp xỉ
+     chuẩn.
+
+[ĐN] Vì sao BOXPLOT trực quan hoá đúng quy tắc IQR:
+   - "Hộp" của boxplot trải từ Q1 đến Q3 (chiều dài hộp = IQR), vạch giữa
+     là median. Hai "râu" (whiskers) kéo tới điểm xa nhất còn nằm trong
+     [Q1−1.5×IQR, Q3+1.5×IQR]. Mọi điểm ngoài râu được vẽ thành CHẤM rời.
+   - Nhìn boxplot là thấy ngay: hộp lệch về một phía + một rừng chấm ở
+     đuôi phải = "lệch phải, nhiều ngoại lai bên cao". (Biểu đồ EDA chi
+     tiết ở Tập 6; ở đây chỉ dùng để hiểu khái niệm.)
+
+--------------------------------------------------------------------
+7.3 [ĐN] PHÂN PHỐI: SKEWNESS & KURTOSIS — ĐỌC "VÂN TAY" LỆCH
+--------------------------------------------------------------------
+[ĐN] Độ lệch (skewness):
+   - Đo sự bất đối xứng của phân phối.
+   - skew = 0: đối xứng. skew > 0: LỆCH PHẢI (đuôi dài bên phải, vài giá
+     trị rất lớn kéo đuôi). skew < 0: lệch trái.
+   - DẤU HIỆU NHẬN BIẾT NHANH: khi mean ≫ median và skew > 0 → gần như
+     chắc chắn lệch phải. (Mean bị đuôi phải kéo lên cao hơn median.)
+
+[ĐN] Độ nhọn (kurtosis):
+   - Đo độ "nặng đuôi" / nhọn đỉnh so với phân phối chuẩn.
+   - Kurtosis cao = đuôi rất nặng = nhiều giá trị cực đoan hiếm nhưng có.
+     (Quy ước "excess kurtosis": chuẩn = 0; số càng lớn càng nặng đuôi.)
+
+[ĐN/EVAL] CÁC CON SỐ THẬT của dự án (bằng chứng lệch phải nặng):
++-----------------------------+-----------+-------------+
+| Biến                        | Skewness  | Kurtosis    |
++-----------------------------+-----------+-------------+
+| total_clicks                | 2,94      | (mean 1.355 |
+|                             |           |  ≫ median   |
+|                             |           |  740; max   |
+|                             |           |  24.139)    |
++-----------------------------+-----------+-------------+
+| clicks_resource             | 34,71     | 2.125,45    |
++-----------------------------+-----------+-------------+
+| clicks_url                  | 13,10     | 516,09      |
++-----------------------------+-----------+-------------+
+| max_clicks_single_day       | 10,56     | 320,18      |
++-----------------------------+-----------+-------------+
+| clicks_oucollaborate        | 7,83      | -           |
++-----------------------------+-----------+-------------+
+| clicks_forumng              | 7,33      | -           |
++-----------------------------+-----------+-------------+
+
+Đọc bảng: total_clicks có mean 1.355 GẤP gần đôi median 740 — vân tay
+lệch phải kinh điển; skew 2,94 xác nhận; max tới 24.139 cho thấy đuôi
+phải kéo rất xa. clicks_resource còn dữ dội hơn: skew 34,71 và kurtosis
+2.125,45 — gần như toàn bộ giá trị nhỏ, lác đác vài giá trị khổng lồ.
+Đây ĐÚNG là dạng dữ liệu đếm (count) tương tác, không phải lỗi.
+
+--------------------------------------------------------------------
+7.4 [ĐN/ALT] CATALOGUE CÁC PHÉP BIẾN ĐỔI PHÂN PHỐI
+--------------------------------------------------------------------
++----------------+----------------------------+----------------------------+
+| Phép biến đổi  | Làm gì / khi nào dùng      | Lưu ý / hạn chế            |
++----------------+----------------------------+----------------------------+
+| log(x)         | Nén đuôi phải mạnh cho     | KHÔNG xử lý được x = 0     |
+|                | biến dương, lệch phải.    | (log 0 = -∞) và x < 0.    |
++----------------+----------------------------+----------------------------+
+| log1p(x)       | = log(1 + x). Như log      | Cần x ≥ -1; với count (≥0) |
+| = log(1+x)     | nhưng XỬ LÝ ĐƯỢC x = 0     | là hoàn hảo.               |
+|                | (log1p(0)=0).             |                            |
++----------------+----------------------------+----------------------------+
+| sqrt(x)        | Nén đuôi NHẸ hơn log;      | Với lệch RẤT nặng thì sức |
+|                | hợp lệch vừa.             | nén của sqrt không đủ.    |
++----------------+----------------------------+----------------------------+
+| Box-Cox        | Họ biến đổi tự tìm số mũ   | YÊU CẦU x > 0 (không nhận |
+|                | tối ưu để gần chuẩn nhất. | 0/âm) → vướng với count.  |
++----------------+----------------------------+----------------------------+
+| Yeo-Johnson    | Như Box-Cox nhưng nhận    | Phức tạp hơn; tham số học |
+|                | được cả 0 và số âm.       | từ dữ liệu (phải train-   |
+|                |                           | only).                     |
++----------------+----------------------------+----------------------------+
+| Winsorize      | KẸP giá trị về phân vị     | Làm thay đổi giá trị biên |
+|                | biên (vd 1%/99%): cái nào | (không "đúng số gốc" nữa) |
+|                | thấp/cao hơn mốc thì đẩy   | nhưng KHÔNG mất dòng.     |
+|                | về đúng mốc.              |                            |
++----------------+----------------------------+----------------------------+
+| Clipping       | Như winsorize nhưng mốc    | Cần biết mốc hợp lệ; tự  |
+|                | thường là CHẶN VẬT LÝ     | định mốc dễ tuỳ tiện.    |
+|                | đã biết (vd điểm 0–100).  |                            |
++----------------+----------------------------+----------------------------+
+| RobustScaler   | Co giãn theo median & IQR  | Là bước SCALE (Tập 4),    |
+|                | → bền với ngoại lai.      | không "sửa" độ lệch.      |
++----------------+----------------------------+----------------------------+
+
+--------------------------------------------------------------------
+7.5 [DA] CHIẾN LƯỢC XỬ LÝ THEO LOẠI BIẾN (làm thật)
+--------------------------------------------------------------------
+Ta KHÔNG áp một phép duy nhất cho mọi cột. Phân loại biến rồi chọn phép
+phù hợp:
+
+NHÓM (1) — Biến ĐẾM CLICK lệch nặng → log1p:
+   Gồm total_clicks, clicks_resource, clicks_url, clicks_forumng,
+   clicks_oucollaborate, max_clicks_single_day, ...
+   Phép: x → log1p(x) = log(1 + x).
+   [WHY chọn log1p, không log thường, không sqrt?]
+   - log thường KHÔNG nhận x = 0, mà biến đếm click ĐẦY giá trị 0 (sinh
+     viên không click loại tài nguyên đó). log1p(0) = 0 → xử lý mượt.
+   - log1p NÉN ĐUÔI mạnh: biến 24.139 và 740 từ "cách nhau 1 trời 1 vực"
+     thành gần nhau hơn nhiều trên thang log → skew từ ~3 kéo về gần 0.
+   - log1p GIỮ THỨ HẠNG (monotonic): ai click nhiều hơn vẫn lớn hơn sau
+     biến đổi → không làm méo quan hệ "nhiều click vs ít click".
+   - sqrt nén quá nhẹ, không đủ cho skew 34,71 (clicks_resource).
+   - Box-Cox vướng vì không nhận 0.
+
+NHÓM (2) — Biến CÓ CHẶN TỰ NHIÊN → winsorize 1% (kẹp về phân vị 1%/99%):
+   Gồm: điểm bài (0–100), số tín chỉ đã học studied_credits, số lần học
+   lại num_of_prev_attempts.
+   Phép: kẹp mọi giá trị < phân vị 1% về đúng mốc 1%, và > phân vị 99%
+   về đúng mốc 99% (mốc HỌC TỪ TRAIN).
+   [WHY winsorize cho nhóm này?]
+   - Các biến này đã có biên ý nghĩa (điểm tối đa 100; số lần học lại
+     hiếm khi lớn). Vài giá trị biên cực đoan có thể "kéo" mô hình nhưng
+     ta KHÔNG muốn nén bằng log (chúng không phải đuôi đếm khổng lồ).
+   - Winsorize làm DỊU ảnh hưởng của 1% biên mà vẫn GIỮ ĐỦ DÒNG (chỉ kéo
+     giá trị về mốc, không xoá ai).
+
+NHÓM (3) — Biến KHÔNG có ngoại lai thật → ĐỂ NGUYÊN:
+   Ví dụ mean_score_to_date (điểm trung bình tới thời điểm hiện tại).
+   [WHY để nguyên?] Khi áp quy tắc IQR, biên ngoại lai tính ra còn VƯỢT
+   khỏi cả khoảng hợp lệ 0–100 — nghĩa là theo định nghĩa biến này KHÔNG
+   thực sự có giá trị "ngoài vùng cho phép". Không có ngoại lai thật thì
+   không có gì để xử lý; biến đổi thừa chỉ làm dữ liệu khó diễn giải hơn.
+   → Nguyên tắc: KHÔNG biến đổi cho có. Chỉ can thiệp khi có vấn đề thật.
+
+(Lưu ý: việc CHUẨN HOÁ/SCALE sau biến đổi thuộc Tập 4 — ở đây chỉ nhắc
+thoáng rằng các biến sau log1p/winsorize sẽ còn được scale ở bước sau.)
+
+--------------------------------------------------------------------
+7.6 [EVAL] ĐO HIỆU QUẢ: SO SKEW TRƯỚC/SAU, KHÔNG MẤT DÒNG
+--------------------------------------------------------------------
+Cách đo đúng: tính skewness TRƯỚC và SAU biến đổi cho cùng một biến.
+   - total_clicks: skew ~2,94 TRƯỚC → giảm mạnh về GẦN 0 SAU log1p.
+     (Đuôi phải bị nén, phân phối cân đối hơn hẳn.)
+   - Các biến đếm khác (skew 7–35) cũng giảm rõ rệt sau log1p.
+   - Số DÒNG trước và sau: KHÔNG đổi (vẫn 32.593 dòng). Đây là tiêu chí
+     bắt buộc — ta đặt mục tiêu "không mất dòng nào" và đã đạt: cả log1p
+     lẫn winsorize đều KHÔNG xoá dòng.
+
+Cách kiểm bằng assert (gợi ý):
+    assert len(df_after) == len(df_before), "Đã làm mất dòng!"
+    # và in skew trước/sau để đối chiếu:
+    # print(before.skew(), after.skew())
+
+[WHY nhắc lại Quy tắc vàng cho winsorize] Mốc phân vị 1%/99% là con số
+HỌC ĐƯỢC từ dữ liệu → phải tính TRÊN TRAIN, rồi áp đúng mốc đó để kẹp
+test. Nếu tính mốc trên cả test = rò rỉ. (log1p không có tham số học từ
+dữ liệu nên không vướng vấn đề này — đó cũng là một điểm cộng của nó.)
+
+--------------------------------------------------------------------
+7.7 ★Q/A PHẢN BIỆN — CHƯƠNG 7
+--------------------------------------------------------------------
+★ Hỏi: "Outlier sao không xoá cho 'sạch'?"
+   Đáp: Vì đây là HÀNH VI THẬT, không phải lỗi. Xoá = (1) mất thông tin
+   của đúng nhóm rủi ro cần cảnh báo, (2) làm lệch mẫu so với thực tế,
+   (3) thiên lệch chọn mẫu khiến mô hình dở ở ca biên. "Sạch mắt" không
+   bằng "đúng thực tế". Ta xử bằng biến đổi, giữ nguyên 32.593 dòng.
+
+★ Hỏi: "Vì sao log1p chứ không log hay sqrt?"
+   Đáp: log thường chết ở x = 0 (mà click đầy số 0); log1p = log(1+x)
+   nhận được 0. sqrt nén quá nhẹ, không đủ cho skew tới 34,71. log1p
+   vừa nén mạnh, vừa nhận 0, vừa giữ thứ hạng → đúng nhất cho dữ liệu
+   đếm lệch nặng.
+
+★ Hỏi: "Winsorize có làm MẤT dữ liệu không?"
+   Đáp: KHÔNG mất DÒNG nào. Nó chỉ KẸP giá trị biên về mốc 1%/99% — số
+   quan sát giữ nguyên. Có "thay đổi" vài giá trị biên (chúng không còn
+   là số gốc), đó là cái giá có ý thức để giảm ảnh hưởng cực đoan; ta
+   chấp nhận đánh đổi này một cách minh bạch.
+
+★ Hỏi: "Sao biến này biến đổi, biến kia để nguyên — không nhất quán?"
+   Đáp: Nhất quán ở NGUYÊN TẮC, không ở thao tác: "chỉ can thiệp khi có
+   vấn đề thật, và chọn phép theo loại biến". Biến đếm lệch nặng → log1p;
+   biến có chặn → winsorize; biến không có ngoại lai thật (như
+   mean_score_to_date) → để nguyên. Biến đổi vô cớ là tự thêm méo.
+
+★ Hỏi: "Sao không dùng z-score (|z|>3) để bắt outlier rồi cắt?"
+   Đáp: Dữ liệu của ta lệch RẤT nặng nên mean/std (nguyên liệu của
+   z-score) đã bị chính ngoại lai kéo méo → z-score kém tin. IQR bền hơn
+   với lệch. Mà dù bắt được, ta cũng không CẮT (xem câu đầu) — ta biến
+   đổi.
+
+★ Hỏi: "Winsorize 1% — vì sao 1% mà không phải 5%?"
+   Đáp: 1% là mức nhẹ tay: chỉ dịu 1% biên mỗi đầu, can thiệp tối thiểu
+   để giữ tối đa thông tin thật. Cắt 5% sẽ thay đổi nhiều giá trị hơn,
+   rủi ro làm phẳng cả tín hiệu thật của nhóm biên. Nguyên tắc: can
+   thiệp nhỏ nhất đủ dùng.
+
+[NEXT] Sau Tập 3, dữ liệu đã: (1) không còn ô trống, không bịa thông
+tin; (2) phân phối đã được làm dịu (log1p/winsorize) mà không mất dòng;
+(3) mọi mốc học đều theo Quy tắc vàng (train-only). Tập 4 sẽ MÃ HOÁ biến
+phân loại (gồm hạng "Unknown") và CHUẨN HOÁ/SCALE các biến số (gồm các
+biến vừa biến đổi) để sẵn sàng đưa vào mô hình.
+
+====================================================================
+HẾT TẬP 3.
+====================================================================

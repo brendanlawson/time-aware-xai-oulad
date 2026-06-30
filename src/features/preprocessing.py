@@ -60,18 +60,17 @@ Cập nhật từ handoff_outliers_for_Duc.csv (Bình → Đức)
 from __future__ import annotations
 
 import logging
-import sys
-import warnings
 from pathlib import Path
+import sys
 from typing import Optional
+import warnings
 
 import joblib
 import numpy as np
 import pandas as pd
-
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
@@ -163,15 +162,9 @@ ID_COLS: list[str] = ["id_student", "code_module", "code_presentation"]
 # bao giờ được vào X: nhãn, nguồn thô của nhãn (final_result) và ngày rút môn
 # (date_unregistration — mã hoá trực tiếp kết quả Withdrawn).
 FEATURE_COLUMNS: list[str] = (
-    NUMERIC_FEATURES
-    + ORDINAL_FEATURES
-    + NOMINAL_FEATURES
-    + BINARY_FEATURES
-    + INDICATOR_FEATURES
+    NUMERIC_FEATURES + ORDINAL_FEATURES + NOMINAL_FEATURES + BINARY_FEATURES + INDICATOR_FEATURES
 )
-LEAKY_COLUMNS: frozenset[str] = frozenset(
-    {TARGET_COL, "final_result", "date_unregistration"}
-)
+LEAKY_COLUMNS: frozenset[str] = frozenset({TARGET_COL, "final_result", "date_unregistration"})
 
 
 def make_X_y(df: pd.DataFrame) -> tuple[pd.DataFrame, "pd.Series | None"]:
@@ -290,9 +283,7 @@ def handle_missing(
     # ── Kiểm tra sau xử lý ───────────────────────────────────────────
     all_feat_cols = [
         c
-        for c in (
-            NUMERIC_FEATURES + ORDINAL_FEATURES + NOMINAL_FEATURES + BINARY_FEATURES
-        )
+        for c in (NUMERIC_FEATURES + ORDINAL_FEATURES + NOMINAL_FEATURES + BINARY_FEATURES)
         if c in df.columns
     ]
     remaining = df[all_feat_cols].isnull().sum()
@@ -446,7 +437,7 @@ def handle_outliers(
                     stats[key] = (lo, hi)
             df[col] = df[col].clip(lower=lo, upper=hi)
             reason = (
-                f"Winsorize/clip tại [p{int(WINSORIZE_LIMITS[0]*100)}, "
+                f"Winsorize/clip tại [p{int(WINSORIZE_LIMITS[0] * 100)}, "
                 f"p{int((1 - WINSORIZE_LIMITS[1]) * 100)}] (ngưỡng học trên train)"
             )
         else:
@@ -514,9 +505,7 @@ class BinaryEncoder(BaseEstimator, TransformerMixin):
 
     def __init__(self, feature_names: list[str] = None):
         # Nhận danh sách tên cột từ bên ngoài để get_feature_names_out hoạt động đúng
-        self.feature_names = (
-            feature_names if feature_names is not None else BINARY_FEATURES
-        )
+        self.feature_names = feature_names if feature_names is not None else BINARY_FEATURES
 
     def fit(self, X, y=None):
         return self
@@ -715,6 +704,7 @@ def preprocess(
     scaler_save_path: Optional[str] = "scaler.pkl",
     numeric_cols: Optional[list[str]] = None,
     nominal_cols: Optional[list[str]] = None,
+    return_stats: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, ColumnTransformer, list[str]]:
     """
     Thực thi đầy đủ pipeline tiền xử lý theo đúng trình tự anti-leakage:
@@ -766,17 +756,13 @@ def preprocess(
     log.info("── Bước 2: handle_missing ──")
     missing_stats: dict = {}
     X_train = handle_missing(X_train, log_path=missing_log_path, stats=missing_stats)
-    X_test = handle_missing(
-        X_test, log_path=None, stats=missing_stats
-    )  # áp tham số train
+    X_test = handle_missing(X_test, log_path=None, stats=missing_stats)  # áp tham số train
 
     # ── Bước 3: Xử lý ngoại lai (ngưỡng winsorize HỌC TRÊN TRAIN) ────
     log.info("── Bước 3: handle_outliers ──")
     outlier_stats: dict = {}
     X_train = handle_outliers(X_train, log_path=outlier_log_path, stats=outlier_stats)
-    X_test = handle_outliers(
-        X_test, log_path=None, stats=outlier_stats
-    )  # áp ngưỡng train
+    X_test = handle_outliers(X_test, log_path=None, stats=outlier_stats)  # áp ngưỡng train
 
     # ── Bước 4a: Fit & transform trên train ───────────────────────────
     log.info("── Bước 4a: fit_transform (train only) ──")
@@ -801,6 +787,11 @@ def preprocess(
     )
     log.info("  [Bước 5 tiếp theo] Áp dụng SMOTE/ADASYN CHỈ trên X_train_proc")
 
+    if return_stats:
+        # Train-learned median/winsor params, so a saved model can re-apply them to
+        # raw rows at inference time (self-contained artifact, no NaN leakage).
+        stats = {"missing": missing_stats, "outlier": outlier_stats}
+        return X_train_proc, X_test_proc, ct, feature_names, stats
     return X_train_proc, X_test_proc, ct, feature_names
 
 
@@ -834,9 +825,7 @@ if __name__ == "__main__":
             "max_clicks_single_day": rng.integers(0, 8000, n).astype(float),
             "mean_clicks_per_active_day": rng.integers(0, 2000, n).astype(float),
             "days_since_last_activity": rng.integers(0, 80, n).astype(float),
-            "mean_score_to_date": np.where(
-                rng.random(n) < 0.12, np.nan, rng.uniform(0, 100, n)
-            ),
+            "mean_score_to_date": np.where(rng.random(n) < 0.12, np.nan, rng.uniform(0, 100, n)),
             "n_assessments_submitted": rng.integers(0, 5, n).astype(float),
             "weighted_score_to_date": np.where(
                 rng.random(n) < 0.10, np.nan, rng.uniform(0, 100, n)

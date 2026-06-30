@@ -1,0 +1,705 @@
+TẬP 1 — NỀN TẢNG
+
+Giáo trình "Data Task" — Dự án DSP391m Nhóm 1, FPT University
+Đề tài: "Time-Aware Explainable ML for Early At-Risk Student Prediction on OULAD"
+Giảng viên hướng dẫn: Nguyễn Thị Hoàng Yến
+
+Lời nói đầu cho người học
+-------------------------
+Cuốn giáo trình này được viết cho một bạn sinh viên CHƯA có nền tảng vững về
+khoa học dữ liệu (data science), nhưng lại phải đứng trước giáo viên để TRÌNH BÀY,
+PHẢN BIỆN và BẢO VỆ từng quyết định kỹ thuật trong phần "Data Task" của dự án.
+Vì vậy, mỗi khái niệm ở đây đều được giảng từ gốc, kèm ví dụ cụ thể, và quan
+trọng nhất: mỗi quyết định đều được trình bày kèm LÝ DO và CÁC PHƯƠNG ÁN THAY THẾ
+đã bị loại bỏ — để khi bị hỏi "tại sao em làm thế?", bạn luôn có câu trả lời chắc chắn.
+
+Quy ước ký hiệu dùng xuyên suốt giáo trình:
+  [ĐN]  = Định nghĩa khái niệm (definition).
+  [DA]  = Dữ liệu / số liệu thật của dự án (data / facts).
+  [WHY] = Lý do vì sao chọn quyết định này.
+  [ALT] = Phương án thay thế (alternative) đã cân nhắc và vì sao loại bỏ.
+  [EVAL]= Cách đánh giá / hệ quả của quyết định.
+  [NEXT]= Việc này dẫn tới bước nào ở các tập sau.
+  ★Q/A  = Câu hỏi phản biện điển hình của giáo viên + câu trả lời mẫu.
+
+Cách dùng các con số trong giáo trình: TẤT CẢ số liệu thật đều nằm trong khối
+"FACTS" của dự án và được dùng đúng nguyên trạng. Khi nào cần một con số chỉ để
+minh hoạ cho dễ hiểu (không phải số thật của dự án), giáo trình sẽ ghi rõ
+"(ví dụ minh hoạ)" để bạn không nhầm lẫn.
+
+Bản đồ 8 tập của bộ giáo trình (để bạn biết mình đang ở đâu):
+  Tập 1 (cuốn này) — NỀN TẢNG: khoa học dữ liệu, quy trình, bộ dữ liệu, bài toán.
+  Tập 2 — Hạ tầng lưu trữ (ClickHouse/Parquet).
+  Tập 3 — Làm sạch dữ liệu (cleaning).
+  Tập 4 — Mã hoá & chuẩn hoá (encoding/scaling).
+  Tập 5 — Thời gian & chia tập (time-aware, train/test split).
+  Tập 6 — EDA & biểu đồ.
+  Tập 7 — Đánh giá chất lượng dữ liệu.
+  Tập 8 — Từ điển thuật ngữ tổng hợp.
+
+Tập 1 gồm 3 chương:
+  Chương 1 — Khoa học dữ liệu là gì & quy trình CRISP-DM.
+  Chương 2 — Bộ dữ liệu OULAD: mô hình quan hệ (relational model).
+  Chương 3 — Định nghĩa bài toán & biến mục tiêu (target).
+
+
+
+==============================================================================
+CHƯƠNG 1 — KHOA HỌC DỮ LIỆU LÀ GÌ & QUY TRÌNH CRISP-DM
+==============================================================================
+
+Chương này trả lời ba câu hỏi nền tảng: (1) Khoa học dữ liệu thực chất là gì và
+vì sao phần lớn công sức lại nằm ở khâu chuẩn bị dữ liệu? (2) Có một quy trình
+chuẩn nào để làm việc đó một cách bài bản không? (3) Dự án của chúng ta đứng ở
+đâu trong quy trình ấy, và những ràng buộc đặc thù nào định hình mọi quyết định
+về sau?
+
+
+--- 1.1. Khoa học dữ liệu (data science) là gì ---
+
+[ĐN] Khoa học dữ liệu là lĩnh vực kết hợp ba trụ cột: (a) kiến thức chuyên ngành
+(domain knowledge — ở đây là giáo dục trực tuyến), (b) thống kê và học máy
+(statistics & machine learning), và (c) kỹ năng lập trình / kỹ thuật dữ liệu
+(programming & data engineering). Mục tiêu của khoa học dữ liệu là biến DỮ LIỆU
+THÔ thành TRI THỨC HÀNH ĐỘNG ĐƯỢC (actionable insight) — tức là những kết luận
+đủ tin cậy để ai đó dựa vào đó mà ra quyết định.
+
+Hãy phân biệt ba tầng để bạn hiểu rõ ta đang làm gì:
+  - Dữ liệu (data): các con số, bản ghi thô. Ví dụ: "sinh viên A click vào tài
+    nguyên X vào ngày thứ 12".
+  - Thông tin (information): dữ liệu đã được tổng hợp có ý nghĩa. Ví dụ: "sinh
+    viên A có tổng 340 click trong 4 tuần đầu".
+  - Tri thức (knowledge): quy luật rút ra. Ví dụ: "sinh viên có ít hơn 50 click
+    trong 4 tuần đầu có nguy cơ trượt cao gấp đôi".
+Dự án của chúng ta đi đúng con đường này: từ hơn 10 triệu dòng click thô, ta sẽ
+chưng cất ra một mô hình dự đoán nguy cơ và GIẢI THÍCH được vì sao nó dự đoán vậy.
+
+Trong dự án này, "domain" là giáo dục từ xa: ta cần hiểu rằng một sinh viên
+"có nguy cơ" (at-risk) là sinh viên có khả năng trượt hoặc bỏ học, và nếu phát
+hiện SỚM thì nhà trường có thể can thiệp (gọi điện, nhắc nhở, hỗ trợ học tập).
+Đây chính là "giá trị hành động được" mà khoa học dữ liệu hướng tới.
+
+
+--- 1.2. Vì sao 70–80% công sức nằm ở khâu chuẩn bị dữ liệu ---
+
+Có một câu nói kinh điển trong ngành: nhiều khảo sát thực tế cho thấy người làm
+khoa học dữ liệu dành khoảng 70–80% thời gian cho việc THU THẬP, GỘP, LÀM SẠCH
+và BIẾN ĐỔI dữ liệu, chỉ 20–30% còn lại mới dành cho việc xây và tinh chỉnh mô
+hình. Vì sao lại mất cân đối như vậy?
+
+[WHY] Nguyên lý "rác vào, rác ra" (garbage in, garbage out — GIGO): một mô hình
+học máy, dù tinh vi đến đâu, cũng chỉ học được những gì có trong dữ liệu đưa vào.
+Nếu dữ liệu đầu vào sai lệch, thiếu, trùng lặp, hoặc bị "rò rỉ" thông tin tương
+lai, thì kết quả mô hình sẽ đẹp một cách giả tạo trên giấy nhưng vô dụng (thậm
+chí gây hại) trong thực tế. Mô hình không có khả năng "tự sửa" một bộ dữ liệu tồi.
+
+Một vài lý do cụ thể khiến khâu chuẩn bị tốn công:
+  1. Dữ liệu thật hầu như không bao giờ ở dạng "một bảng phẳng sẵn sàng học".
+     Nó nằm rải rác ở nhiều bảng quan hệ, ở các mức chi tiết (grain) khác nhau,
+     phải gộp (join) và tổng hợp (aggregate) lại — chính là trường hợp OULAD với
+     7 bảng (xem Chương 2).
+  2. Dữ liệu có giá trị thiếu (missing), trùng lặp, sai kiểu, ngoại lai (outlier).
+  3. Nguy hiểm nhất với dự án DỰ ĐOÁN SỚM của chúng ta: rò rỉ dữ liệu (data
+     leakage) — vô tình đưa vào mô hình thông tin chỉ có được SAU thời điểm dự
+     đoán. Phòng chống rò rỉ phải làm ngay từ khâu chuẩn bị, không thể sửa sau.
+
+[EVAL] Bài học bảo vệ trước giáo viên: nếu thầy/cô hỏi "vì sao báo cáo Data Task
+lại dài và chi tiết đến thế?", câu trả lời đúng là: vì đây là khâu quyết định
+chất lượng của TOÀN BỘ dự án; mọi sai sót ở đây sẽ nhân lên ở các bước sau và
+không thể bù đắp bằng thuật toán mạnh hơn.
+
+
+--- 1.3. Quy trình CRISP-DM: 6 giai đoạn ---
+
+[ĐN] CRISP-DM (Cross-Industry Standard Process for Data Mining — Quy trình chuẩn
+liên ngành cho khai phá dữ liệu) là một khung quy trình (process framework) mô tả
+vòng đời của một dự án khoa học dữ liệu thành 6 giai đoạn. Nó "liên ngành" nghĩa
+là không gắn với một công cụ hay lĩnh vực cụ thể nào, dùng được cho ngân hàng, y
+tế, giáo dục... Đây là quy trình LẶP (iterative): được phép quay lui giữa các
+giai đoạn khi phát hiện vấn đề, không phải đường thẳng một chiều.
+
+Sáu giai đoạn của CRISP-DM:
+
+  1. Business Understanding (Thấu hiểu bài toán nghiệp vụ)
+     - Xác định mục tiêu thực tế và mục tiêu phân tích.
+     - Trong dự án ta: "phát hiện sinh viên có nguy cơ trượt/bỏ học CÀNG SỚM
+       CÀNG TỐT để nhà trường can thiệp", và diễn giải nó thành 3 câu hỏi nghiên
+       cứu RQ1, RQ2, RQ3 (xem mục 1.6).
+
+  2. Data Understanding (Thấu hiểu dữ liệu)
+     - Thu thập dữ liệu ban đầu, mô tả, khám phá, kiểm tra chất lượng.
+     - Trong dự án ta: tìm hiểu 7 bảng OULAD, grain từng bảng, khoá JOIN
+       (xem Chương 2).
+
+  3. Data Preparation (Chuẩn bị dữ liệu)  ◀── ĐÂY LÀ "TASK 3" CỦA DỰ ÁN
+     - Chọn, làm sạch, xây dựng, tích hợp (integrate) và định dạng dữ liệu thành
+       bảng cuối cùng (analytic base table) sẵn sàng cho mô hình.
+     - Đây là phần mà toàn bộ bộ giáo trình "Data Task" này tập trung mô tả.
+
+  4. Modeling (Mô hình hoá)
+     - Chọn thuật toán, huấn luyện, tinh chỉnh siêu tham số.
+
+  5. Evaluation (Đánh giá)
+     - Đánh giá mô hình theo TIÊU CHÍ NGHIỆP VỤ, không chỉ theo độ chính xác.
+
+  6. Deployment (Triển khai)
+     - Đưa kết quả/mô hình vào sử dụng; với dự án học thuật thì thường là báo cáo,
+       dashboard, hoặc khuyến nghị.
+
+[DA] Định vị rõ: phần "Data Task" / "Task 3" của dự án chính là giai đoạn 3 —
+Data Preparation. Cụ thể, từ master_raw kích thước 32.593 dòng × 33 cột (sẽ giải
+thích ở Chương 2), ta tích hợp 7 bảng, định nghĩa nhãn, và biến đổi thành bảng
+sẵn sàng học. Hai giai đoạn trước (Business & Data Understanding) là tiền đề mà
+Chương 1 và 2 cung cấp.
+
+[WHY] Vì sao phải "quy trình hoá" (proceduralize) thay vì cứ làm tới đâu hay tới
+đó? Ba lý do:
+  - Tái lập được (reproducibility): người khác (kể cả giáo viên) chạy lại đúng
+    quy trình thì ra đúng kết quả. Khoa học đòi hỏi điều này.
+  - Truy vết được (traceability): mỗi con số trong báo cáo truy ngược được về
+    bước nào sinh ra. Khi bị hỏi, ta chỉ vào đúng bước.
+  - Quản trị rủi ro: quy trình chuẩn buộc ta KHÔNG bỏ sót kiểm tra chất lượng và
+    KHÔNG nhảy cóc sang mô hình khi dữ liệu chưa sạch — đúng tinh thần GIGO.
+
+
+--- 1.4. So sánh CRISP-DM với KDD, SEMMA, TDSP ---
+
+CRISP-DM không phải quy trình duy nhất. Ba quy trình hay được nhắc cùng:
+
+  - KDD (Knowledge Discovery in Databases — Khám phá tri thức trong CSDL):
+    quy trình học thuật, gồm các bước Selection → Preprocessing → Transformation
+    → Data Mining → Interpretation/Evaluation. Nó là "tổ tiên" của CRISP-DM,
+    thiên về nghiên cứu, ít nhấn mạnh khía cạnh nghiệp vụ và triển khai.
+
+  - SEMMA (Sample, Explore, Modify, Model, Assess): do hãng SAS đề xuất, gắn với
+    công cụ SAS Enterprise Miner. Nó bắt đầu thẳng từ giai đoạn lấy mẫu dữ liệu,
+    KHÔNG có bước "thấu hiểu nghiệp vụ" và "triển khai" rõ ràng như CRISP-DM.
+
+  - TDSP (Team Data Science Process): do Microsoft đề xuất, hiện đại hơn, nhấn
+    mạnh làm việc NHÓM, quản lý mã nguồn (git), vai trò trong team, và vòng đời
+    DevOps. Phù hợp cho tổ chức lớn, nhưng nặng nề hơn cho dự án sinh viên.
+
+So sánh ngắn dạng bảng ASCII:
+
+  +-----------+---------------------+------------------+-----------------------+
+  | Quy trình | Số bước             | Có bước nghiệp   | Đặc điểm nổi bật      |
+  |           |                     | vụ & triển khai? |                       |
+  +-----------+---------------------+------------------+-----------------------+
+  | KDD       | 5 (thiên DB)        | Yếu              | Học thuật, gốc rễ     |
+  | SEMMA     | 5 (S-E-M-M-A)       | Không            | Gắn công cụ SAS       |
+  | TDSP      | 5 + vai trò team    | Có, mạnh         | Hiện đại, nặng, nhóm  |
+  | CRISP-DM  | 6                   | Có, đầy đủ       | Trung lập, phổ biến   |
+  +-----------+---------------------+------------------+-----------------------+
+
+[WHY] Vì sao dự án chọn CRISP-DM (và vì sao nó phổ biến nhất)?
+  - Trung lập công cụ và lĩnh vực: dùng được cho dự án giáo dục như của ta.
+  - Bao trọn vòng đời từ "hiểu bài toán" đến "triển khai" — khớp với yêu cầu báo
+    cáo học thuật phải biện minh cả động cơ nghiệp vụ lẫn kết quả.
+  - Có giai đoạn Data Preparation TÁCH RIÊNG và được mô tả kỹ — chính là phần
+    chấm điểm "Data Task" của môn học.
+  - Được công nghiệp và giới học thuật công nhận rộng rãi, nhiều khảo sát xếp nó
+    là quy trình data science/data mining được dùng nhiều nhất trong nhiều năm.
+
+[ALT] Vì sao không dùng SEMMA hay KDD? Vì cả hai thiếu hoặc làm mờ bước thấu
+hiểu nghiệp vụ và triển khai — trong khi đề tài của ta bắt buộc phải nêu rõ động
+cơ "can thiệp sớm" (nghiệp vụ) và hàm ý ứng dụng (triển khai). TDSP thì quá nặng
+về hạ tầng tổ chức so với quy mô một nhóm sinh viên.
+
+
+--- 1.5. Định vị dự án trong CRISP-DM ---
+
+[DA] Sơ đồ định vị (ASCII):
+
+  (1) Business Understanding
+      → mục tiêu: can thiệp SỚM cho sinh viên nguy cơ; hình thành RQ1/RQ2/RQ3.
+                |
+  (2) Data Understanding
+      → 7 bảng OULAD, 32.593 dòng cấp sinh viên×lượt mở môn, grain khác nhau.
+                |
+  (3) Data Preparation   ◀═══  "DATA TASK" / TASK 3  (trọng tâm giáo trình)
+      → JOIN 7 bảng theo khoá chung; định nghĩa nhãn at_risk; master_raw 33 cột.
+                |
+  (4) Modeling
+      → so sánh thuật toán theo từng mốc tiến độ 10–100% (RQ1).
+                |
+  (5) Evaluation
+      → ổn định giải thích SHAP/LIME (RQ2); ảnh hưởng cân bằng lớp (RQ3).
+                |
+  (6) Deployment
+      → khuyến nghị/triển khai cảnh báo sớm.
+
+  (Các mũi tên cho phép QUAY LUI giữa các giai đoạn — CRISP-DM là quy trình lặp.)
+
+
+--- 1.6. Ba ràng buộc đặc thù định hình mọi quyết định ---
+
+Tiêu đề đề tài "Time-Aware Explainable ML for Early At-Risk Student Prediction"
+hé lộ ba ràng buộc xuyên suốt. Bạn cần thuộc lòng ba ràng buộc này vì gần như mọi
+câu hỏi phản biện đều xoay quanh chúng.
+
+  Ràng buộc 1 — DỰ ĐOÁN SỚM (time-aware / nhận biết thời gian):
+    [ĐN] "Time-aware" nghĩa là mô hình chỉ được dùng thông tin có tới một MỐC
+    THỜI GIAN nhất định trong khoá học để dự đoán. RQ1 hỏi: ở mỗi mốc tiến độ
+    10%, 20%, ... 100% của khoá học, thuật toán nào dự đoán tốt nhất, và SỚM tới
+    đâu thì kết quả đã đáng tin cậy.
+    [WHY] Vì giá trị thực tế là CAN THIỆP KỊP. Dự đoán đúng nhưng đến cuối khoá
+    mới biết thì vô nghĩa.
+    [NEXT] Ràng buộc này chi phối toàn bộ cách cắt dữ liệu theo thời gian và chia
+    tập — sẽ trình bày kỹ ở Tập 5.
+
+  Ràng buộc 2 — GIẢI THÍCH ĐƯỢC (explainable / XAI):
+    [ĐN] XAI (eXplainable AI) là khả năng cho biết VÌ SAO mô hình ra một dự đoán.
+    RQ2 hỏi về độ ỔN ĐỊNH của hai phương pháp giải thích phổ biến: SHAP và LIME.
+    [WHY] Vì nhà trường cần biết "vì sao em A bị xếp nguy cơ" để can thiệp đúng
+    chỗ; một con số "nguy cơ 0,8" mà không kèm lý do thì khó hành động và khó tin.
+    [NEXT] Yêu cầu này khiến ta ưu tiên giữ đặc trưng (feature) có ý nghĩa diễn
+    giải được, và ảnh hưởng tới cách nhị phân hoá nhãn (xem Chương 3).
+
+  Ràng buộc 3 — CHỐNG RÒ RỈ (anti-leakage):
+    [ĐN] Rò rỉ dữ liệu (data leakage) là khi mô hình vô tình "nhìn thấy" thông
+    tin của tương lai (sau mốc dự đoán) hoặc thông tin tiết lộ trực tiếp đáp án.
+    [WHY] Ví dụ minh hoạ: nếu dùng điểm bài thi cuối kỳ để dự đoán nguy cơ trượt
+    ở tuần 4, mô hình sẽ "đoán" gần như hoàn hảo — nhưng đó là gian lận, vì ở
+    tuần 4 ta CHƯA có điểm thi cuối kỳ. Mô hình như vậy đẹp trên giấy, vô dụng
+    thực tế.
+    [NEXT] Chống rò rỉ là kim chỉ nam khi xây đặc trưng từ clickstream và điểm số
+    theo từng mốc thời gian — chi tiết ở Tập 5.
+
+★Q/A — Câu hỏi phản biện cho Chương 1
+  Q1: "Tại sao nhóm em chọn CRISP-DM mà không phải KDD hay SEMMA?"
+  A1: Vì CRISP-DM trung lập về công cụ và lĩnh vực, bao trọn vòng đời từ thấu
+      hiểu nghiệp vụ tới triển khai, và có giai đoạn Data Preparation tách bạch —
+      đúng phần Data Task của môn. KDD thiên về CSDL học thuật và yếu ở khía cạnh
+      nghiệp vụ/triển khai; SEMMA gắn với công cụ SAS và bỏ qua bước nghiệp vụ.
+
+  Q2: "Data Task của em nằm ở giai đoạn nào, và vì sao nó quan trọng?"
+  A2: Nằm ở giai đoạn 3 — Data Preparation. Quan trọng vì theo nguyên lý GIGO,
+      chất lượng dữ liệu chuẩn bị quyết định trần chất lượng của mọi mô hình sau;
+      khảo sát thực tế cho thấy 70–80% công sức dự án nằm ở khâu này.
+
+  Q3: "Vì sao báo cáo cứ nhắc đi nhắc lại chuyện 'rò rỉ dữ liệu'?"
+  A3: Vì đề tài là dự đoán SỚM theo thời gian; nếu để lọt thông tin tương lai vào
+      đặc trưng, kết quả sẽ tốt giả tạo và mất giá trị can thiệp. Rò rỉ phải chặn
+      ngay từ khâu chuẩn bị, không sửa được ở khâu mô hình.
+
+  Q4: "CRISP-DM là đường thẳng phải không?"
+  A4: Không. CRISP-DM là quy trình LẶP, cho phép quay lui. Ví dụ khi ở giai đoạn
+      Evaluation phát hiện đặc trưng kém, ta quay lại Data Preparation để sửa.
+
+
+
+==============================================================================
+CHƯƠNG 2 — BỘ DỮ LIỆU OULAD: MÔ HÌNH QUAN HỆ
+==============================================================================
+
+Chương này giúp bạn nắm chắc OULAD là gì, vì sao nó gồm 7 bảng, mỗi bảng "to nhỏ"
+ở mức nào (grain), chúng nối với nhau qua khoá nào, và vì sao buộc phải gộp tất
+cả về MỘT bảng duy nhất ở MỘT mức chi tiết duy nhất để học máy.
+
+
+--- 2.1. OULAD là gì ---
+
+[ĐN] OULAD (Open University Learning Analytics Dataset) là bộ dữ liệu công khai
+do Đại học Mở (The Open University, Anh) phát hành, phục vụ nghiên cứu phân tích
+học tập (learning analytics). Nó ghi lại hành vi học và kết quả của sinh viên học
+trực tuyến.
+
+[DA] Số liệu nền tảng của OULAD trong dự án:
+  - 32.593 dòng ở bảng trung tâm, mỗi dòng = 1 sinh viên × 1 lượt mở môn.
+  - 28.785 sinh viên DUY NHẤT (một sinh viên có thể học nhiều lượt mở môn nên
+    số dòng > số sinh viên).
+  - 22 lượt mở môn (module-presentation).
+  - 7 bảng quan hệ.
+  - Giấy phép CC-BY 4.0; dữ liệu đã được ẩn danh (anonymised) ngay tại nguồn.
+
+[WHY] Vì sao chọn OULAD cho đề tài này?
+  - Có sẵn cả tín hiệu HÀNH VI (clickstream) lẫn KẾT QUẢ (final_result) — đủ để
+    làm bài toán dự đoán nguy cơ.
+  - Có chiều THỜI GIAN rõ ràng (cột date trong clickstream và bài nộp) — bắt buộc
+    cho ràng buộc "time-aware".
+  - Công khai, ẩn danh, giấy phép CC-BY 4.0 — hợp lệ về đạo đức và pháp lý để
+    nghiên cứu, không lo lộ thông tin cá nhân.
+
+
+--- 2.2. Dữ liệu quan hệ, khoá chính/khoá ngoại, và "grain" ---
+
+[ĐN] Dữ liệu quan hệ (relational data) là cách tổ chức dữ liệu thành nhiều BẢNG
+(table), mỗi bảng mô tả một loại thực thể (sinh viên, bài kiểm tra, tài nguyên...),
+và các bảng nối với nhau qua các CỘT CHUNG. Cách này tránh lặp dữ liệu và giữ
+dữ liệu nhất quán.
+
+[ĐN] Khoá chính (primary key) là (tập) cột định danh DUY NHẤT mỗi dòng trong một
+bảng — không trùng, không rỗng. Ví dụ minh hoạ: trong một bảng "sinh viên × lượt
+mở môn", khoá chính là bộ ba (code_module, code_presentation, id_student).
+
+[ĐN] Khoá ngoại (foreign key) là cột trong bảng này trỏ tới khoá chính của bảng
+khác, dùng để NỐI (join) hai bảng. Ví dụ: cột id_student trong bảng clickstream
+là khoá ngoại trỏ về sinh viên.
+
+[ĐN] Grain (mức chi tiết / hạt) của một bảng là: "MỖI DÒNG đại diện cho cái gì?".
+Đây là khái niệm tối quan trọng. Hai bảng có thể cùng nói về "sinh viên" nhưng ở
+grain khác nhau: một bảng có 1 dòng/sinh viên/lượt mở môn, bảng khác có 1 dòng/
+mỗi cú click. Xác định sai grain là nguồn gốc của hầu hết lỗi gộp dữ liệu (ví dụ
+đếm trùng, nhân bản dòng).
+
+[ĐN] Khoá JOIN chung của OULAD: bộ ba (code_module, code_presentation, id_student)
+— định danh "sinh viên nào, học môn nào, ở lượt mở môn nào". Hầu hết các bảng nối
+về nhau qua (một phần hoặc toàn bộ) bộ ba này.
+
+
+--- 2.3. Mô tả 7 bảng và grain từng bảng ---
+
+Dưới đây là 7 bảng, vai trò, grain và các cột/đặc điểm đáng chú ý (số liệu thật).
+
+  (1) studentInfo — BẢNG TRUNG TÂM, chứa NHÃN
+      - Vai trò: thông tin nhân khẩu (demographics) + kết quả cuối cùng.
+      - Grain: 1 dòng / 1 sinh viên / 1 lượt mở môn  → 32.593 dòng.
+      - Cột then chốt: final_result (nhãn gốc 4 lớp — xem Chương 3).
+      - Đây là nơi tồn tại NHÃN, nên grain của bảng master sẽ bám theo bảng này.
+
+  (2) studentVle — CLICKSTREAM (dòng click)
+      - Vai trò: ghi lại từng lần sinh viên tương tác với một tài nguyên trên hệ
+        thống học trực tuyến (VLE = Virtual Learning Environment).
+      - Grain: 1 dòng / 1 sự kiện click gộp theo (sinh viên, tài nguyên, ngày).
+      - Quy mô: 10.655.280 dòng (~433 MB) — bảng LỚN NHẤT.
+      - Cột: code_module, code_presentation, id_student, id_site, date, sum_click.
+      - [DA] 26.074 sinh viên có phát sinh click; date chạy từ -25 đến 269 (số âm
+        nghĩa là trước ngày khai giảng chính thức); trung bình 3,72 click/sự kiện.
+      - id_site là khoá ngoại trỏ về bảng vle (tài nguyên nào).
+
+  (3) vle — TỪ ĐIỂN TÀI NGUYÊN
+      - Vai trò: mô tả mỗi tài nguyên học liệu (trang, quiz, diễn đàn...).
+      - Grain: 1 dòng / 1 tài nguyên.
+      - [DA] 6.364 tài nguyên thuộc 20 loại hoạt động (activity_type); nhóm chỉ
+        giữ 8 loại chính cho phân tích.
+      - Nối với studentVle qua id_site.
+
+  (4) studentAssessment — LƯỢT NỘP BÀI
+      - Vai trò: điểm số từng lần sinh viên nộp một bài kiểm tra.
+      - Grain: 1 dòng / 1 lượt nộp (sinh viên × bài đánh giá).
+      - [DA] 173.912 lượt nộp; có 173 điểm bị thiếu (missing).
+      - Nối với assessments qua id_assessment.
+
+  (5) assessments — TỪ ĐIỂN BÀI ĐÁNH GIÁ
+      - Vai trò: mô tả mỗi bài kiểm tra (loại, hạn nộp, trọng số).
+      - Grain: 1 dòng / 1 bài đánh giá.
+      - [DA] 206 bài: 106 TMA (Tutor-Marked Assessment), 76 CMA (Computer-Marked
+        Assessment), 24 Exam (bài thi); trong đó 11 bài Exam KHÔNG có hạn nộp ghi
+        nhận (date rỗng).
+
+  (6) studentRegistration — ĐĂNG KÝ
+      - Vai trò: ngày sinh viên đăng ký và (nếu có) ngày huỷ đăng ký môn.
+      - Grain: 1 dòng / 1 sinh viên / 1 lượt mở môn.
+      - Cột: date_registration, date_unregistration (rỗng nếu không huỷ).
+      - [WHY hữu ích] date_unregistration giúp hiểu hành vi "bỏ học" (Withdrawn).
+
+  (7) courses — TỪ ĐIỂN LƯỢT MỞ MÔN
+      - Vai trò: mô tả mỗi lượt mở môn.
+      - Grain: 1 dòng / 1 lượt mở môn  → 22 dòng.
+      - [DA] Độ dài khoá từ 234 đến 269 ngày — quan trọng để tính các MỐC TIẾN ĐỘ
+        10%–100% trong RQ1 (vì 50% của khoá 234 ngày khác 50% của khoá 269 ngày).
+
+[WHY] Vì sao grain khác nhau buộc phải tổng hợp về một grain chung?
+  Học máy có giám sát (supervised) cần một bảng PHẲNG: mỗi dòng là một "đối tượng
+  cần dự đoán" kèm nhãn của nó. Nhãn của ta tồn tại ở grain "1 sinh viên × 1 lượt
+  mở môn" (bảng studentInfo). Nhưng clickstream ở grain "mỗi cú click" và điểm ở
+  grain "mỗi lượt nộp". Không thể nhét 10,6 triệu dòng click thẳng vào cạnh 32.593
+  dòng nhãn. Ta phải TỔNG HỢP (aggregate) click và điểm LÊN tới grain của nhãn —
+  ví dụ minh hoạ: "tổng số click của sinh viên A trong khoá này", "điểm trung bình
+  các bài đã nộp của A". Đây chính là lý do khâu Data Preparation tốn công.
+
+
+--- 2.4. Sơ đồ quan hệ 7 bảng (ASCII) ---
+
+  Khoá chung (k) = (code_module, code_presentation, id_student)
+
+                         +------------------+
+                         |     courses      |   grain: 1 lượt mở môn (22)
+                         | (code_module,    |
+                         |  code_presentation)
+                         +---------+--------+
+                                   | (code_module, code_presentation)
+            +----------------------+----------------------+
+            |                      |                      |
+   +--------v---------+   +--------v---------+   +---------v----------+
+   |  studentInfo     |   | studentRegistr.  |   |   studentVle       |
+   |  (NHÃN here)     |   |  (đăng ký/huỷ)   |   |  clickstream       |
+   |  grain: k        |   |  grain: k        |   |  grain: mỗi click  |
+   |  32.593 dòng     |   |                  |   |  10.655.280 dòng   |
+   +--------+---------+   +------------------+   +---------+----------+
+            |                                              | id_site
+            | id_student (+ module/presentation)           |
+            |                                     +--------v---------+
+            |                                     |       vle        |
+            |                                     | từ điển tài nguyên|
+            |                                     | grain: 1 tài ng. |
+            |                                     | 6.364 dòng       |
+            |                                     +------------------+
+            |
+   +--------v-----------+        id_assessment      +------------------+
+   | studentAssessment  +-------------------------->|   assessments    |
+   | lượt nộp (173.912) |                           | từ điển bài (206)|
+   | grain: mỗi lượt nộp|                           | grain: 1 bài     |
+   +--------------------+                           +------------------+
+
+  Đọc sơ đồ: courses và vle, assessments là các bảng "từ điển" (dimension) cung
+  cấp mô tả; studentInfo/studentRegistration/studentVle/studentAssessment là các
+  bảng "sự kiện/dữ kiện" gắn với sinh viên. Tất cả quy tụ về sinh viên qua khoá
+  chung k, và về tài nguyên/bài qua id_site / id_assessment.
+
+
+--- 2.5. Grain của bảng master và lý do chọn ---
+
+[ĐN] Bảng master (master table / analytic base table) là bảng phẳng cuối cùng,
+mỗi dòng là một đối tượng dự đoán kèm đặc trưng và nhãn, dùng để đưa vào mô hình.
+
+[DA] Grain của master = "1 sinh viên × 1 lượt mở môn". Kết quả: master_raw có kích
+thước 32.593 dòng × 33 cột — đúng bằng số dòng của studentInfo (vì ta gắn các đặc
+trưng tổng hợp vào từng dòng nhãn), với 33 cột là hợp nhất của các nhóm tín hiệu.
+
+[WHY] Vì sao chọn grain này?
+  - Vì NHÃN tồn tại đúng ở mức này: final_result được ghi cho mỗi (sinh viên,
+    lượt mở môn). Học máy có giám sát cần mỗi dòng có đúng một nhãn → grain của
+    bảng học PHẢI trùng grain của nhãn.
+  - Vì cùng một sinh viên ở hai lượt mở môn khác nhau là hai "tình huống học" khác
+    nhau (động lực, thời điểm, môn khác nhau) → tách thành hai dòng là hợp lý.
+
+[ALT] Phương án grain khác đã loại:
+  - Grain "1 dòng / 1 sinh viên" (gộp mọi lượt mở môn của một người): bị loại, vì
+    sẽ trộn lẫn nhiều khoá học và nhiều nhãn vào một dòng — không còn nhãn duy nhất
+    để học, và phá vỡ tính so sánh theo từng lượt mở môn.
+  - Grain "mỗi cú click" hoặc "mỗi lượt nộp": bị loại, vì ở mức đó KHÔNG có nhãn
+    nguy cơ (nhãn chỉ có ở mức sinh viên×lượt mở môn).
+
+[DA] Ba nhóm tín hiệu được gộp vào master:
+  - Demographics (nhân khẩu) — từ studentInfo.
+  - Engagement (mức độ tham gia) — từ studentVle + vle.
+  - Performance (kết quả học tập) — từ studentAssessment + assessments.
+
+★Q/A — Câu hỏi phản biện cho Chương 2
+  Q1: "Vì sao có 32.593 dòng mà chỉ 28.785 sinh viên?"
+  A1: Vì grain là sinh viên × lượt mở môn. Một sinh viên học nhiều lượt mở môn sẽ
+      có nhiều dòng, nên số dòng (32.593) lớn hơn số sinh viên duy nhất (28.785).
+
+  Q2: "Vì sao không nhét thẳng clickstream vào mô hình cho 'nhiều dữ liệu'?"
+  A2: Vì clickstream ở grain 'mỗi cú click' (10,6 triệu dòng) không khớp grain của
+      nhãn (32.593 dòng). Phải tổng hợp click lên mức sinh viên×lượt mở môn trước,
+      nếu không sẽ làm trùng nhãn và sai cấu trúc bài toán.
+
+  Q3: "Vì sao date trong clickstream lại có giá trị âm (-25)?"
+  A3: date được tính mốc 0 = ngày khai giảng chính thức của lượt mở môn; giá trị
+      âm là hoạt động TRƯỚC khai giảng (ví dụ xem trước tài liệu). Đây là thông
+      tin hợp lệ và cần xử lý cẩn thận theo từng mốc thời gian (Tập 5).
+
+  Q4: "Vì sao courses chỉ có 22 dòng lại quan trọng?"
+  A4: Vì độ dài mỗi khoá khác nhau (234–269 ngày). Mốc tiến độ 10%–100% của RQ1
+      phải tính theo TỈ LỆ độ dài từng khoá, nên ta cần courses để biết mẫu số.
+
+  Q5: "Khoá JOIN chung là gì và vì sao cần nó?"
+  A5: Là bộ ba (code_module, code_presentation, id_student). Cần vì nó định danh
+      duy nhất 'sinh viên nào, môn nào, lượt mở môn nào', là trục để gắn mọi đặc
+      trưng từ các bảng khác về đúng dòng nhãn tương ứng.
+
+
+
+==============================================================================
+CHƯƠNG 3 — ĐỊNH NGHĨA BÀI TOÁN & BIẾN MỤC TIÊU
+==============================================================================
+
+Chương này định nghĩa rõ "ta đang dạy máy dự đoán cái gì". Đây là phần mà giáo
+viên hay vặn nhất, vì cách định nghĩa nhãn quyết định toàn bộ ý nghĩa của dự án.
+
+
+--- 3.1. Học có giám sát, biến mục tiêu, phân loại nhị phân vs đa lớp ---
+
+[ĐN] Học có giám sát (supervised learning) là kiểu học máy trong đó mỗi mẫu huấn
+luyện đã có sẵn ĐÁP ÁN (nhãn). Mô hình học ánh xạ từ ĐẶC TRƯNG (features) sang
+nhãn, rồi dùng ánh xạ đó để dự đoán nhãn cho mẫu mới chưa biết.
+
+[ĐN] Biến mục tiêu / nhãn (target / label) là cột chứa "đáp án" mà mô hình phải
+học để dự đoán. Trong dự án ta, nhãn xuất phát từ cột final_result.
+
+[ĐN] Phân loại (classification) là bài toán nhãn rời rạc (lớp), khác với hồi quy
+(regression) — nhãn là số liên tục. Trong phân loại:
+  - Nhị phân (binary): nhãn chỉ có 2 lớp (ví dụ 0/1, có nguy cơ / không nguy cơ).
+  - Đa lớp (multiclass): nhãn có từ 3 lớp trở lên (ví dụ 4 lớp final_result gốc).
+
+
+--- 3.2. Nhãn gốc và phép nhị phân hoá ---
+
+[DA] Nhãn gốc final_result có 4 lớp với phân bố:
+  +--------------+---------+
+  | Lớp          | Số dòng |
+  +--------------+---------+
+  | Pass         | 12.361  |
+  | Withdrawn    | 10.156  |
+  | Fail         |  7.052  |
+  | Distinction  |  3.024  |
+  +--------------+---------+
+  Tổng = 32.593 (khớp số dòng master).
+
+[ĐN] Quy tắc nhị phân hoá (binarisation) của dự án:
+  at_risk = 1  nếu final_result ∈ {Fail, Withdrawn}
+  at_risk = 0  nếu final_result ∈ {Pass, Distinction}
+
+[DA] Sau nhị phân hoá:
+  - at-risk (=1): Fail 7.052 + Withdrawn 10.156 = 17.208 dòng.
+  - không nguy cơ (=0): Pass 12.361 + Distinction 3.024 = 15.385 dòng.
+  - Tỉ lệ at-risk = 52,8%; tỉ số mất cân bằng (imbalance ratio) = 1,118 (rất nhẹ).
+
+
+--- 3.3. Vì sao nhị phân hoá, và vì sao Withdrawn xếp vào nguy cơ ---
+
+[WHY] Vì sao gộp 4 lớp thành 2 lớp?
+  - Hành động can thiệp là NHỊ PHÂN: nhà trường hoặc can thiệp, hoặc không. Một
+    nhãn 2 lớp ("cần can thiệp / không") ánh xạ trực tiếp tới hành động thực tế.
+  - Lớp Distinction quá nhỏ (3.024 dòng, ~9,3% tổng) — học một lớp hiếm vừa khó
+    vừa dễ gây kết quả không ổn định; gộp Distinction vào nhóm "không nguy cơ"
+    (cùng với Pass) là hợp lý vì đỗ xuất sắc rõ ràng không phải đối tượng cảnh báo.
+  - XAI gọn hơn: giải thích "vì sao có nguy cơ" trên 2 lớp dễ diễn giải và đáng
+    tin hơn so với giải thích đồng thời 4 lớp — phục vụ ràng buộc giải thích được
+    (RQ2).
+
+[WHY] Vì sao Withdrawn (bỏ học giữa chừng) được xếp vào NGUY CƠ (at_risk = 1)?
+  - Về mặt nghiệp vụ, bỏ học là một kết cục KHÔNG mong muốn giống như trượt: sinh
+    viên không hoàn thành môn. Cả hai đều là đối tượng nhà trường muốn phát hiện
+    sớm để can thiệp (giữ chân, hỗ trợ).
+  - Nếu xếp Withdrawn vào "không nguy cơ", ta sẽ bỏ sót đúng nhóm dễ rời bỏ nhất —
+    đi ngược mục tiêu "can thiệp sớm" của đề tài.
+
+[EVAL] Hệ quả: định nghĩa này biến bài toán thành "phát hiện sinh viên KHÔNG hoàn
+thành tốt môn học (trượt hoặc bỏ)", khớp đúng mục tiêu can thiệp sớm.
+
+
+--- 3.4. Các phương án thay thế và vì sao loại ---
+
+[ALT] Giữ nguyên 4 lớp (multiclass: Distinction/Pass/Fail/Withdrawn):
+  - Vì sao loại: (a) lớp Distinction quá nhỏ gây mất cân bằng nặng và bất ổn;
+    (b) hành động can thiệp không cần phân biệt Distinction với Pass, cũng không
+    cần phân biệt Fail với Withdrawn ở bước cảnh báo; (c) giải thích XAI cho 4 lớp
+    phức tạp hơn nhiều, làm khó RQ2. Ranh giới ra quyết định 4 lớp không tạo thêm
+    giá trị hành động tương xứng với chi phí phức tạp.
+
+[ALT] Hồi quy điểm số (dự đoán điểm số liên tục thay vì lớp):
+  - Vì sao loại: (a) mục tiêu nghiệp vụ là QUYẾT ĐỊNH nhị phân (can thiệp hay
+    không), không phải ước lượng điểm chính xác; (b) một phần nhãn là Withdrawn —
+    sinh viên bỏ học thường KHÔNG có điểm cuối, nên "điểm" không tồn tại đầy đủ để
+    làm mục tiêu hồi quy; (c) hồi quy đòi hỏi tiêu chí đánh giá và diễn giải khác,
+    không khớp khung so sánh thuật toán theo F1/ROC-AUC của RQ1.
+
+[ALT] Gộp khác đi (ví dụ Distinction thành một lớp 'xuất sắc' riêng, hoặc tách
+Fail và Withdrawn): bị loại vì không phục vụ thêm cho hành động can thiệp và làm
+mất tính nhị phân gọn gàng cần cho XAI.
+
+
+--- 3.5. Phân tích phân bố nhãn & hệ quả lên chỉ số đánh giá ---
+
+[DA] Phân bố nhãn nhị phân: at-risk 52,8% — gần như cân bằng, tỉ số mất cân bằng
+chỉ 1,118 (lớp đa số chỉ nhiều hơn lớp thiểu số khoảng 11,8%). Đây là mất cân bằng
+RẤT NHẸ, khác hẳn các bài toán mất cân bằng nặng (ví dụ phát hiện gian lận với tỉ
+lệ 1:1000).
+
+[ĐN] Mất cân bằng lớp (class imbalance) là khi một lớp chiếm tỉ lệ lớn hơn hẳn lớp
+kia. Khi mất cân bằng, độ chính xác (accuracy) trở nên gây hiểu lầm: một mô hình
+"luôn đoán lớp đa số" có thể đạt accuracy cao mà chẳng phát hiện được lớp thiểu số.
+
+[WHY] Vì sao KHÔNG chỉ dùng accuracy, mà dùng thêm F1 / ROC-AUC / PR-AUC / recall
+của lớp nguy cơ?
+  - Ngay cả với mất cân bằng nhẹ, điều ta thực sự quan tâm là BẮT ĐƯỢC sinh viên
+    nguy cơ (lớp 1), tức ưu tiên recall của lớp nguy cơ (đừng bỏ sót người cần
+    giúp).
+  - F1 cân bằng giữa precision và recall — tránh việc cảnh báo tràn lan (precision
+    thấp) hoặc bỏ sót (recall thấp).
+  - ROC-AUC đo khả năng PHÂN BIỆT hai lớp ở mọi ngưỡng, không phụ thuộc một ngưỡng
+    cố định.
+  - PR-AUC (precision-recall AUC) nhạy với lớp thiểu số hơn ROC-AUC, hữu ích để
+    nhìn rõ chất lượng phát hiện lớp nguy cơ.
+  - [DA liên hệ RQ3] Vì mất cân bằng chỉ ở mức nhẹ (1,118), RQ3 đặt câu hỏi: các
+    kỹ thuật xử lý mất cân bằng (SMOTE, ADASYN, class-weight) có thực sự cải thiện
+    hay không, hay là không cần thiết? Chính vì mất cân bằng nhẹ mà đây là câu hỏi
+    nghiên cứu thú vị, chứ không phải mặc định cứ phải tái cân bằng.
+
+[EVAL] Thông điệp bảo vệ: "Bộ chỉ số đa dạng (F1, ROC-AUC, PR-AUC, recall lớp
+nguy cơ) được chọn vì mục tiêu là phát hiện đúng sinh viên cần giúp, và vì accuracy
+đơn lẻ không phản ánh điều đó kể cả khi dữ liệu chỉ mất cân bằng nhẹ."
+
+(Lưu ý phạm vi: chi tiết tính toán và biểu đồ các chỉ số thuộc Tập 6–7; ở đây chỉ
+nêu lý do vì sao chọn chúng từ góc nhìn định nghĩa bài toán.)
+
+
+--- 3.6. Data dictionary / data specification: viết trước khi code ---
+
+[ĐN] Data dictionary (từ điển dữ liệu) / data specification (đặc tả dữ liệu) là
+tài liệu mô tả CHÍNH XÁC từng cột của bảng dữ liệu: tên cột, kiểu dữ liệu, ý nghĩa,
+miền giá trị hợp lệ, nguồn (bảng gốc), cách tính (nếu là đặc trưng dẫn xuất), và
+ghi chú về giá trị thiếu/đặc biệt.
+
+Ví dụ minh hoạ một vài dòng của data dictionary (ví dụ minh hoạ, không phải bảng
+thật của dự án):
+  +--------------+----------+-------------------------------+----------------+
+  | Tên cột      | Kiểu     | Ý nghĩa                       | Nguồn          |
+  +--------------+----------+-------------------------------+----------------+
+  | id_student   | int      | Mã sinh viên (ẩn danh)        | studentInfo    |
+  | final_result | category | Kết quả gốc 4 lớp             | studentInfo    |
+  | at_risk      | int 0/1  | 1 nếu Fail/Withdrawn          | suy ra         |
+  | sum_click    | int      | Tổng click (đặc trưng dẫn xuất)| studentVle (TH)|
+  +--------------+----------+-------------------------------+----------------+
+  (TH = tổng hợp / aggregate)
+
+[WHY] Vì sao viết data dictionary TRƯỚC khi code là chuẩn mực?
+  - Là "hợp đồng" thống nhất trong nhóm: mọi người hiểu cùng một định nghĩa cho
+    mỗi cột, tránh mỗi người tính một kiểu.
+  - Bắt ta nghĩ rõ về grain, kiểu dữ liệu, miền giá trị và rủi ro rò rỉ TRƯỚC khi
+    viết code — phòng lỗi từ gốc.
+  - Phục vụ truy vết và tái lập (đã nói ở Chương 1): mỗi cột trong báo cáo đều có
+    xuất xứ rõ ràng.
+  - Khi bị giáo viên hỏi "cột này từ đâu ra, tính thế nào?", ta chỉ vào đúng dòng
+    trong từ điển — bảo vệ quyết định một cách chuyên nghiệp.
+
+[NEXT] Data dictionary đầy đủ (kiểu cụ thể, mã hoá, chuẩn hoá, xử lý thiếu) sẽ
+được hoàn thiện ở các Tập 3–4; ở Tập 1 ta chỉ cần hiểu KHÁI NIỆM và vì sao nó là
+chuẩn mực.
+
+★Q/A — Câu hỏi phản biện cho Chương 3
+  Q1: "Vì sao em gộp 4 lớp thành 2 lớp, có làm mất thông tin không?"
+  A1: Có mất một phần thông tin chi tiết, nhưng đổi lại nhãn nhị phân khớp đúng
+      hành động can thiệp (làm/không làm), tránh lớp Distinction quá nhỏ gây bất
+      ổn, và giúp giải thích (XAI) gọn hơn cho RQ2. Lợi ích thực tế lớn hơn phần
+      thông tin chi tiết bị bỏ.
+
+  Q2: "Vì sao Withdrawn bị coi là nguy cơ chứ không phải nhóm trung lập?"
+  A2: Vì bỏ học là kết cục không hoàn thành môn, giống như trượt, và chính là nhóm
+      nhà trường cần phát hiện sớm để giữ chân. Xếp Withdrawn ngoài nhóm nguy cơ
+      sẽ bỏ sót đối tượng quan trọng nhất, đi ngược mục tiêu can thiệp sớm.
+
+  Q3: "Dữ liệu gần cân bằng (52,8%), vậy có cần SMOTE/ADASYN không?"
+  A3: Chưa chắc cần — và đó chính là RQ3. Tỉ số mất cân bằng chỉ 1,118 (rất nhẹ),
+      nên ta đặt nó thành câu hỏi nghiên cứu: so sánh có/không dùng SMOTE, ADASYN,
+      class-weight để xem chúng có thực sự cải thiện hay không, thay vì mặc định
+      áp dụng.
+
+  Q4: "Vì sao không chỉ báo accuracy cho gọn?"
+  A4: Vì mục tiêu là không bỏ sót sinh viên nguy cơ, mà accuracy không phản ánh
+      điều đó (mô hình đoán toàn lớp đa số vẫn có accuracy khá). Ta dùng thêm F1,
+      ROC-AUC, PR-AUC và recall của lớp nguy cơ để đo đúng cái ta quan tâm.
+
+  Q5: "Vì sao không làm hồi quy dự đoán điểm cho 'mịn' hơn?"
+  A5: Vì hành động thực tế là quyết định nhị phân (can thiệp hay không), và sinh
+      viên Withdrawn thường không có điểm cuối để làm mục tiêu hồi quy. Hồi quy
+      cũng không khớp khung đánh giá phân loại của RQ1.
+
+
+
+==============================================================================
+KẾT TẬP 1
+==============================================================================
+Bạn đã nắm: (1) khoa học dữ liệu và vì sao chuẩn bị dữ liệu là khâu quyết định
+(GIGO, 70–80% công sức); quy trình CRISP-DM 6 giai đoạn, định vị Data Task = giai
+đoạn Data Preparation, và 3 ràng buộc time-aware / explainable / anti-leakage.
+(2) Cấu trúc quan hệ của OULAD: 7 bảng, grain từng bảng, khoá JOIN chung, và lý do
+gộp về grain "1 sinh viên × 1 lượt mở môn" (32.593 × 33). (3) Định nghĩa bài toán:
+phân loại nhị phân at_risk (Fail/Withdrawn = 1), phân bố 52,8% mất cân bằng nhẹ,
+và vì sao đánh giá bằng F1/ROC-AUC/PR-AUC/recall thay vì accuracy đơn lẻ.
+
+Tập tiếp theo (Tập 2) sẽ bàn về hạ tầng lưu trữ (ClickHouse/Parquet) để xử lý bảng
+clickstream 10,6 triệu dòng một cách hiệu quả.

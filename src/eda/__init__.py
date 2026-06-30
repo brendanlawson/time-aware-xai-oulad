@@ -1,1 +1,1 @@
-"""EDA layer: reusable plotting style and analysis functions for Chapter 4."""
+"""EDA layer: statistically grounded exploratory analysis + chart style."""

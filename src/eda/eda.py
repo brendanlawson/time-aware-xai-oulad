@@ -1,11 +1,10 @@
 """Exploratory Data Analysis for Chapter 4 — professional, statistically grounded.
 
-Covers Task 3 EDA work items (STT 27, 28, 35-38) at the depth expected for an
-IEEE-style report: data-quality profiling, univariate description with shape
-statistics, bivariate analysis backed by hypothesis tests and effect sizes,
-multivariate correlation with a leakage check, and a time-aware discrimination
-analysis that tracks how class separability grows across the six checkpoints
-(directly informing RQ1).
+Covers the Task 3 EDA work items at the depth expected for an IEEE-style report:
+data-quality profiling, univariate description with shape statistics, bivariate
+analysis backed by hypothesis tests and effect sizes, multivariate correlation
+with a leakage check, and a time-aware discrimination analysis that tracks how
+class separability grows across the six checkpoints (directly informing RQ1).
 
 Each function returns a findings dict and writes figures to reports/figures/ and
 result tables to reports/tables/. The 02_eda notebook narrates these outputs.
@@ -16,29 +15,27 @@ Run:  python -m src.eda.eda
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
+import seaborn as sns
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import matplotlib.pyplot as plt  # noqa: E402
-import seaborn as sns  # noqa: E402
-from scipy import stats  # noqa: E402
-
-from src.data.io_utils import CHECKPOINTS_DIR, INTERIM_DIR  # noqa: E402
-from src.data.time_utils import CHECKPOINTS  # noqa: E402
-from src.eda.plot_style import (  # noqa: E402
+from src.config import (
+    CHECKPOINTS,
+    CHECKPOINTS_DIR,
+    INTERIM_DATA_DIR,
+    REPORTS_DIR,
+    TABLES_DIR,
+)
+from src.eda.plot_style import (
     CLASS_COLOURS,
     CLASS_LABELS,
     apply_style,
     savefig,
     tidy_axis,
 )
-
-REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports"
-TABLES_DIR = REPORTS_DIR / "tables"
 
 # Feature groups (used to colour plots and aggregate discrimination by group).
 DEMOGRAPHIC_NUM = ["num_of_prev_attempts", "studied_credits", "date_registration"]
@@ -96,14 +93,12 @@ GROUP_COLOUR = {
 }
 
 
-# --------------------------------------------------------------------------- #
-# Loading
-# --------------------------------------------------------------------------- #
-def load_master(path: Path = INTERIM_DIR / "master_raw.parquet") -> pd.DataFrame:
+# --- loaders ------------------------------------------------------------------
+def load_master(path=INTERIM_DATA_DIR / "master_raw.parquet") -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-def load_checkpoints(checkpoints_dir: Path = CHECKPOINTS_DIR) -> pd.DataFrame | None:
+def load_checkpoints(checkpoints_dir=CHECKPOINTS_DIR) -> "pd.DataFrame | None":
     frames = []
     for t in CHECKPOINTS:
         p = checkpoints_dir / f"dataset_t{t}.parquet"
@@ -113,6 +108,7 @@ def load_checkpoints(checkpoints_dir: Path = CHECKPOINTS_DIR) -> pd.DataFrame | 
     return pd.concat(frames, ignore_index=True)
 
 
+# --- helpers ------------------------------------------------------------------
 def _save_table(df: pd.DataFrame, name: str, index: bool = True) -> None:
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(TABLES_DIR / f"{name}.csv", index=index, encoding="utf-8-sig")
@@ -162,9 +158,7 @@ def data_quality(master: pd.DataFrame) -> dict:
 
     miss_cols = profile[profile["n_missing"] > 0]
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.barh(
-        miss_cols.index[::-1], miss_cols["pct_missing"][::-1], color=CLASS_COLOURS[1]
-    )
+    ax.barh(miss_cols.index[::-1], miss_cols["pct_missing"][::-1], color=CLASS_COLOURS[1])
     ax.set_xlabel("% missing")
     ax.set_title("Missing values by column (only columns with gaps)")
     savefig(fig, "quality_missingness")
@@ -189,12 +183,7 @@ def univariate(master: pd.DataFrame) -> dict:
     _save_table(desc, "univariate_numeric")
 
     for col in CATEGORICAL_MAIN:
-        freq = (
-            master[col]
-            .value_counts(dropna=False)
-            .rename_axis(col)
-            .reset_index(name="count")
-        )
+        freq = master[col].value_counts(dropna=False).rename_axis(col).reset_index(name="count")
         freq["pct"] = (freq["count"] / len(master) * 100).round(2)
         _save_table(freq, f"freq_{col}", index=False)
 
@@ -255,12 +244,7 @@ def univariate(master: pd.DataFrame) -> dict:
     plt.close(fig)
 
     return {
-        "most_skewed": desc["skew"]
-        .abs()
-        .sort_values(ascending=False)
-        .head(5)
-        .round(2)
-        .to_dict(),
+        "most_skewed": desc["skew"].abs().sort_values(ascending=False).head(5).round(2).to_dict(),
         "most_leptokurtic": desc["kurtosis"]
         .sort_values(ascending=False)
         .head(5)
@@ -290,9 +274,7 @@ def target_distribution(master: pd.DataFrame) -> dict:
     axes[1].bar(
         binary.index,
         binary.values,
-        color=[
-            CLASS_COLOURS[1] if "At" in i else CLASS_COLOURS[0] for i in binary.index
-        ],
+        color=[CLASS_COLOURS[1] if "At" in i else CLASS_COLOURS[0] for i in binary.index],
     )
     axes[1].set_title(f"at_risk (positive rate = {rate:.1%})")
     fig.suptitle("Target distribution and class imbalance", fontweight="bold")
@@ -391,9 +373,7 @@ def numeric_vs_target(master: pd.DataFrame) -> dict:
     plt.close(fig)
 
     return {
-        "top5_by_cohens_d": table.head(5)[["feature", "cohens_d", "p_adj_bh"]].to_dict(
-            "records"
-        ),
+        "top5_by_cohens_d": table.head(5)[["feature", "cohens_d", "p_adj_bh"]].to_dict("records"),
         "n_significant": int(table["significant_(q<0.05)"].sum()),
         "n_tested": int(len(table)),
     }
@@ -417,11 +397,7 @@ def categorical_vs_target(master: pd.DataFrame) -> dict:
                 "cramers_v": round(_cramers_v(ct.values), 3),
             }
         )
-    table = (
-        pd.DataFrame(rows)
-        .sort_values("cramers_v", ascending=False)
-        .reset_index(drop=True)
-    )
+    table = pd.DataFrame(rows).sort_values("cramers_v", ascending=False).reset_index(drop=True)
     _save_table(table, "bivariate_categorical_tests", index=False)
 
     overall = master["at_risk"].mean()
@@ -468,9 +444,7 @@ def correlation(master: pd.DataFrame) -> dict:
             cbar_kws={"label": f"{method.title()} r", "shrink": 0.82},
             ax=ax,
         )
-        ax.set_title(
-            f"{method.title()} correlation of numeric features (incl. at_risk)", pad=12
-        )
+        ax.set_title(f"{method.title()} correlation of numeric features (incl. at_risk)", pad=12)
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
         plt.setp(ax.get_yticklabels(), rotation=0)
         savefig(fig, fname)
@@ -491,9 +465,7 @@ def correlation(master: pd.DataFrame) -> dict:
     ]
     _save_table(pd.DataFrame(strong), "correlation_strong_pairs", index=False)
 
-    target_corr = (
-        pear["at_risk"].drop("at_risk").sort_values(key=np.abs, ascending=False)
-    )
+    target_corr = pear["at_risk"].drop("at_risk").sort_values(key=np.abs, ascending=False)
     _save_table(
         target_corr.round(3).rename("pearson_r_with_at_risk").to_frame(),
         "correlation_with_target",
@@ -523,7 +495,7 @@ def correlation(master: pd.DataFrame) -> dict:
 # --------------------------------------------------------------------------- #
 # 7. Time-aware analysis: how class separability grows across checkpoints
 # --------------------------------------------------------------------------- #
-def time_aware(checkpoints: pd.DataFrame | None) -> dict:
+def time_aware(checkpoints: "pd.DataFrame | None") -> dict:
     if checkpoints is None:
         return {"status": "checkpoints_not_found"}
     apply_style()
@@ -549,9 +521,7 @@ def time_aware(checkpoints: pd.DataFrame | None) -> dict:
         ax.set_title(f"Mean {col}")
         ax.set_xlabel("Course progress (%)")
         ax.legend()
-    fig.suptitle(
-        "Mean feature trajectory by class across checkpoints", fontweight="bold"
-    )
+    fig.suptitle("Mean feature trajectory by class across checkpoints", fontweight="bold")
     savefig(fig, "time_mean_trajectory")
     plt.close(fig)
 
@@ -635,20 +605,16 @@ def withdrawn_analysis(master: pd.DataFrame) -> dict:
     savefig(fig, "withdrawn_activity_decay")
     plt.close(fig)
     return {
-        "median_days_since_last_activity": m.groupby("status")[
-            "days_since_last_activity"
-        ]
+        "median_days_since_last_activity": m.groupby("status")["days_since_last_activity"]
         .median()
         .round(1)
         .to_dict(),
-        "median_total_clicks": m.groupby("status")["total_clicks"]
-        .median()
-        .round(1)
-        .to_dict(),
+        "median_total_clicks": m.groupby("status")["total_clicks"].median().round(1).to_dict(),
     }
 
 
 def run_all() -> dict:
+    """Apply the style, load data, run every analysis, dump a findings JSON."""
     plt.switch_backend("Agg")
     master = load_master()
     checkpoints = load_checkpoints()

@@ -1,0 +1,802 @@
+================================================================================
+HƯỚNG DẪN ĐẦY ĐỦ: LÀM VÀ ĐÁNH GIÁ DATA TASK (TASK 3)
+Dự án DSP391m – Nhóm 1 – FPT University
+Đề tài: "Time-Aware Explainable ML for Early At-Risk Student Prediction on OULAD"
+(Học máy giải thích được, nhận biết theo thời gian, phát hiện sớm sinh viên nguy cơ)
+================================================================================
+
+Người đọc mục tiêu: bạn CHƯA có nền tảng vững về data science, cần hiểu mình đang
+làm gì, vì sao làm thế, và phải trình bày + bảo vệ được trước giáo viên.
+
+Cách dùng tài liệu này:
+- Đọc TUẦN TỰ từ Phần 0 đến Phần 13. Mỗi phần xây trên phần trước.
+- Mỗi quyết định kỹ thuật đều theo khuôn: (a) LÀM GÌ → (b) VÌ SAO → (c) PHƯƠNG
+  ÁN KHÁC và vì sao không chọn → (d) ĐÁNH GIÁ hiệu quả → (e) PHỤC VỤ bước sau
+  thế nào.
+- Mọi con số trong tài liệu là số THẬT của dự án (khớp với
+  reports/eda_findings.json và reports/data_understanding/verified_numbers.json),
+  nên bạn nói ra là kiểm chứng được.
+- Các câu "NÓI VỚI CÔ" là gợi ý lời trình bày bạn có thể dùng nguyên văn.
+
+Ký hiệu nhanh:
+  → kết luận / hệ quả        ★ điểm dễ bị hỏi khi bảo vệ
+  [SỐ] con số thật cần nhớ   [WHY] lý do cốt lõi
+
+================================================================================
+PHẦN 0 — BỨC TRANH TOÀN CẢNH: DATA SCIENCE LÀ GÌ, TA ĐANG Ở ĐÂU?
+================================================================================
+
+0.1. Một dự án data science KHÔNG phải "chạy mô hình". Nó là một chuỗi giai đoạn
+chuẩn, gọi là CRISP-DM (Cross-Industry Standard Process for Data Mining) — quy
+trình công nghiệp được dùng phổ biến nhất thế giới:
+
+   1. Business Understanding  – Hiểu bài toán nghiệp vụ.
+   2. Data Understanding      – Hiểu dữ liệu mình có.
+   3. Data Preparation        – Chuẩn bị dữ liệu (THU THẬP + LÀM SẠCH + BIẾN ĐỔI
+                                + CHIA TẬP).  ←★ ĐÂY LÀ TASK 3 CỦA TA.
+   4. Modeling                – Huấn luyện mô hình.
+   5. Evaluation              – Đánh giá mô hình.
+   6. Deployment              – Triển khai (ở ta là dashboard).
+
+[WHY] Vì sao chia giai đoạn? Vì 70–80% công sức của một dự án thực tế nằm ở
+giai đoạn 3 (Data Preparation). "Garbage in, garbage out": mô hình giỏi tới đâu
+cũng vô dụng nếu dữ liệu bẩn, rò rỉ, hoặc chia tập sai. Task 3 chính là phần
+quyết định chất lượng của TẤT CẢ các phần sau.
+
+0.2. Bài toán của nhóm (nói gọn để định hướng mọi quyết định sau):
+- Mục tiêu: dự đoán SỚM (không đợi đến cuối kỳ) sinh viên nào có nguy cơ
+  trượt/bỏ học, để giảng viên can thiệp kịp thời.
+- Dữ liệu: OULAD — dữ liệu học tập trực tuyến công khai của Open University.
+- Đặc thù 1 — "Sớm": ta phải mô phỏng việc đứng ở mốc 10%, 20%, ... của khoá học
+  và chỉ dùng thông tin TỚI thời điểm đó. → sinh ra khái niệm "checkpoint theo
+  thời gian" và nỗi ám ảnh "chống rò rỉ thời gian" (temporal leakage).
+- Đặc thù 2 — "Giải thích được" (Explainable AI): không chỉ dự đoán đúng, mà phải
+  giải thích VÌ SAO một sinh viên bị gắn cờ. → ảnh hưởng tới cách ta mã hoá biến
+  (xem Phần 6: vì sao giữ đủ cột one-hot).
+
+0.3. Đường đi của dữ liệu trong Task 3 (nhớ sơ đồ này, vẽ lên slide):
+
+   7 file CSV thô
+        │  (gộp 7 bảng + tổng hợp về 1 dòng / 1 sinh viên / 1 lượt mở môn)
+        ▼
+   master_raw  (32.593 dòng × 33 cột)        ← bảng "1 sinh viên = 1 dòng"
+        │  (cắt theo thời gian tại 6 mốc 10/20/40/60/80/100%)
+        ▼
+   6 bộ dữ liệu checkpoint
+        │  (làm sạch + mã hoá + scale → ma trận số; chia train/test)
+        ▼
+   Ma trận đặc trưng 49 cột  +  tập train / test cố định
+        │
+        ▼
+   (sẵn sàng cho giai đoạn Modeling)
+
+[SỐ] Bốn con số xương sống phải thuộc lòng:
+   32.593 dòng · 28.785 sinh viên · 22 lượt mở môn · nhãn at-risk = 52,8%.
+
+★ Nếu cô hỏi "em đang ở đâu trong dự án?": "Em làm giai đoạn Data Preparation
+của CRISP-DM — tức Task 3: thu thập, làm sạch, biến đổi/chuẩn hoá và chia tập
+dữ liệu, cộng với EDA để hiểu dữ liệu trước khi mô hình hoá."
+
+================================================================================
+PHẦN 1 — XÁC ĐỊNH DỮ LIỆU CẦN CÓ (Task 3, yêu cầu 1)
+================================================================================
+
+1.1. Câu hỏi đầu tiên của MỌI dự án: "Để trả lời câu hỏi nghiên cứu, ta cần
+biến gì?" Ta KHÔNG gom dữ liệu bừa rồi mới nghĩ; ta đi ngược từ mục tiêu.
+
+Mục tiêu = dự đoán nguy cơ. Theo lý thuyết learning analytics, nguy cơ của một
+sinh viên được phản ánh qua BA nhóm tín hiệu:
+
+   (A) Nhân khẩu học (Demographics): họ là ai?
+       → giới tính, vùng, trình độ học vấn trước đó, độ tuổi, hoàn cảnh thiệt
+         thòi (imd_band), khuyết tật, số lần học lại.
+       Nguồn: bảng studentInfo.
+
+   (B) Mức độ tương tác (Engagement): họ có "xuất hiện" và hoạt động không?
+       → tổng số click, số ngày hoạt động, số ngày kể từ lần hoạt động cuối,
+         click theo từng loại tài nguyên (forum, tài liệu, quiz...).
+       Nguồn: bảng studentVle (clickstream) + vle (loại tài nguyên).
+
+   (C) Kết quả học tập (Performance): họ làm bài thế nào?
+       → số bài đã nộp, điểm trung bình, điểm có trọng số, có nộp trễ không.
+       Nguồn: bảng studentAssessment + assessments.
+
+1.2. Biến mục tiêu (TARGET) — đây là quyết định quan trọng nhất, định nghĩa
+"thành công" của cả dự án:
+
+   LÀM GÌ: final_result có 4 giá trị {Distinction, Pass, Fail, Withdrawn}.
+           Ta gộp thành nhãn nhị phân:
+              at_risk = 1  nếu final_result ∈ {Fail, Withdrawn}
+              at_risk = 0  nếu final_result ∈ {Pass, Distinction}
+
+   [WHY] Vì sao nhị phân, không giữ 4 lớp?
+   - Mục tiêu nghiệp vụ là CAN THIỆP: giảng viên chỉ cần biết "cần giúp / không
+     cần giúp", không cần phân biệt Pass với Distinction. Bài toán nhị phân khớp
+     đúng hành động thực tế.
+   - 4 lớp sẽ làm mất cân bằng nặng hơn (Distinction chỉ 3.024 — quá ít để học
+     tốt) và làm phần giải thích (XAI) rối hơn.
+
+   [WHY] Vì sao Withdrawn (bỏ học) được xếp vào "nguy cơ"?
+   - Bỏ học là một dạng thất bại của hành trình học tập — đúng đối tượng cần can
+     thiệp sớm. Bằng chứng số (Phần 9) cho thấy nhóm Withdrawn có hành vi rất
+     khác biệt (ngừng hoạt động sớm), nên gộp vào nguy cơ là hợp lý cả về nghiệp
+     vụ lẫn dữ liệu.
+
+   ★ Đây là điểm hay bị hỏi. Trả lời: "Nhãn nhị phân vì hành động can thiệp là
+     nhị phân; Withdrawn xếp vào nguy cơ vì bỏ học là kết cục cần phòng ngừa, và
+     dữ liệu xác nhận nhóm này tách biệt rõ."
+
+1.3. Sản phẩm của bước này trong repo: docs/01_data_specification/
+(Data_Specification, Target_Variable_Definition, Data_Dictionary, Variable_Typing)
+— tức ta đã VIẾT RA rõ ràng từng biến, kiểu, ý nghĩa trước khi đụng vào code.
+Đó là chuẩn mực: có "data dictionary" (từ điển dữ liệu) là dấu hiệu làm bài bản.
+
+================================================================================
+PHẦN 2 — PHƯƠNG PHÁP THU THẬP DỮ LIỆU (Task 3, yêu cầu 2)
+================================================================================
+
+2.1. LÀM GÌ: Ta KHÔNG tự thu thập dữ liệu mới. Ta dùng bộ dữ liệu thứ cấp công
+khai OULAD (Open University Learning Analytics Dataset), tải từ nguồn chính thức
+(analyse.kmi.open.ac.uk) hoặc bản mirror trên Kaggle.
+
+2.2. [WHY] Vì sao dùng dữ liệu công khai có sẵn thay vì tự thu thập?
+
+   (1) TÁI LẬP (reproducibility) — chuẩn mực số 1 của khoa học. Bất kỳ ai cũng
+       tải đúng bộ dữ liệu này và chạy lại được kết quả của ta. Tự thu thập dữ
+       liệu trường mình thì không ai kiểm chứng lại được.
+   (2) SO SÁNH ĐƯỢC (benchmarking). OULAD là benchmark chuẩn trong learning
+       analytics; nhiều bài báo (Tomasevic 2020, Adnan 2021...) dùng nó. Dùng
+       chung dữ liệu → ta so được kết quả của mình với họ một cách công bằng.
+   (3) ĐẠO ĐỨC & PHÁP LÝ. OULAD đã được ẩn danh tại nguồn, cấp phép CC-BY 4.0
+       (được dùng tự do nếu ghi nguồn). Tự thu thập dữ liệu sinh viên thật sẽ
+       vướng quyền riêng tư, cần xin phép, IRB... — vượt phạm vi đồ án.
+   (4) QUY MÔ & CHẤT LƯỢNG. 32.593 sinh viên, 10,6 triệu dòng clickstream — quy
+       mô này một nhóm sinh viên không thể tự tạo ra trong một học kỳ.
+
+2.3. Phương pháp thu thập = "tải file + xác minh toàn vẹn". Đây là điểm chuyên
+nghiệp: ta không chỉ tải, mà ghi lại CHECKSUM (md5) của từng file trong
+data_manifest.txt. → đảm bảo file ta dùng đúng y file gốc, không bị hỏng/sửa.
+
+   ĐÁNH GIÁ hiệu quả thu thập: 7/7 bảng tải đủ, checksum khớp, tổng ~10,6 triệu
+   dòng đúng như tài liệu OULAD công bố → dữ liệu đầu vào tin cậy.
+
+2.4. Bảy bảng quan hệ (relational tables) và vai trò:
+   - studentInfo          : 1 dòng / sinh viên / lượt mở môn → CHỨA NHÃN. (lõi)
+   - studentVle           : clickstream, 10,6 triệu dòng → tín hiệu Engagement.
+   - vle                  : từ điển loại tài nguyên (id_site → activity_type).
+   - studentAssessment    : điểm từng bài nộp → tín hiệu Performance.
+   - assessments          : metadata bài (loại TMA/CMA/Exam, trọng số, hạn).
+   - studentRegistration  : ngày đăng ký / huỷ đăng ký.
+   - courses              : độ dài mỗi lượt mở môn (ngày) → để quy ngày ra %.
+
+   [WHY] Cấu trúc 7 bảng quan hệ (giống cơ sở dữ liệu) nghĩa là ta phải JOIN
+   chúng lại theo khoá chung — đó là việc của Phần 4.
+
+★ Nếu cô hỏi "sao không tự khảo sát?": nhấn 4 lý do ở 2.2, đặc biệt là tái lập
+  và đạo đức — đó là tiêu chuẩn nghiên cứu.
+
+================================================================================
+PHẦN 3 — "VẤN ĐỀ DỮ LIỆU LỚN" & VÌ SAO DÙNG CLICKHOUSE
+================================================================================
+(Phần này giải thích một điểm nổi bật của nhóm — đừng bỏ qua, cô rất dễ hỏi.)
+
+3.1. Vấn đề: bảng studentVle có [SỐ] 10.655.280 dòng (~433 MB). Đây là chỗ trực
+giác sai:
+   - Excel: trần ~1 triệu dòng → KHÔNG mở nổi.
+   - pandas.read_csv cả file: mỗi câu hỏi nhỏ phải đọc lại 433 MB và phình nhiều
+     GB RAM. Khi EDA ta hỏi hàng chục câu → cách này sụp đổ (chậm, hết RAM).
+
+3.2. GIẢI PHÁP (ý tưởng cốt lõi, rất "international standard"):
+   "Đừng kéo dữ liệu lên RAM. Hãy ĐẨY CÂU HỎI (SQL) xuống chỗ dữ liệu nằm."
+   Đây là triết lý của mọi hệ phân tích dữ liệu lớn (OLAP).
+
+   Công cụ chọn: ClickHouse-local — một database dạng cột (columnar), chạy SQL
+   trực tiếp trên file CSV/Parquet, KHÔNG cần dựng server.
+
+   [WHY] Vì sao ClickHouse, không phải Spark hay pandas?
+   ┌─────────────────┬───────────────────────────────────┬──────────────┐
+   │ Cách            │ Đặc điểm                          │ Phù hợp?     │
+   ├─────────────────┼───────────────────────────────────┼──────────────┤
+   │ pandas (nạp cả) │ Đơn giản, nhưng tốn RAM, đọc lại   │ Không (10M)  │
+   │ ClickHouse-local│ 1 file chạy, SQL thẳng, cực nhanh  │ CÓ — ta chọn │
+   │ Apache Spark    │ Mạnh cho cụm nhiều máy; nặng, chậm │ Quá mức/1 PC │
+   └─────────────────┴───────────────────────────────────┴──────────────┘
+
+3.3. Mẹo tăng tốc kinh điển: chuyển CSV → Parquet (định dạng cột, có kiểu, nén).
+   ĐÁNH GIÁ hiệu quả (đo thật):
+       CSV     : 433 MB  · count() ≈ 14,6 giây
+       Parquet : 22,9 MB · count() ≈ 0,55 giây
+       → nhỏ hơn ~20×, nhanh hơn ~26×.
+   [WHY] Vì các truy vấn EDA lặp lại hàng chục lần; bỏ một lần chuyển đổi để mỗi
+   truy vấn sau gần như tức thời là đánh đổi cực lời.
+
+3.4. Bài học #1 (kể được như một "câu chuyện" khi trình bày): khi DESCRIBE file
+CSV, ClickHouse đoán mọi cột là String → max(date) trả về "99" (sai, vì so sánh
+theo thứ tự chữ "9">"2"). → Bài học: với dữ liệu lớn, KHÔNG tin kiểu mặc định,
+phải KHAI BÁO KIỂU tường minh. Sau khi khai báo đúng: date chạy từ -25 (trước
+khai giảng) đến 269 (cuối môn), trung bình 3,72 click/sự kiện.
+
+★ Câu hỏi tủ: "10 triệu dòng thì xử lý sao?" → Trả lời: "Bằng query trên engine
+  cột (ClickHouse), không mở file. Dữ liệu nằm yên trên đĩa dạng Parquet, Python
+  chỉ gửi SQL và nhận về vài dòng kết quả tóm tắt."
+
+================================================================================
+PHẦN 4 — DỰNG BẢNG MASTER (notebooks/01_build_master_table.ipynb)
+================================================================================
+
+4.1. Khái niệm sống còn: GRAIN (hạt dữ liệu) = "một dòng đại diện cho cái gì?"
+   Ở bảng master, GRAIN = MỘT SINH VIÊN TRONG MỘT LƯỢT MỞ MÔN.
+   Khoá: (code_module, code_presentation, id_student).
+   → 32.593 dòng. (Một sinh viên có thể học nhiều môn/nhiều kỳ → 28.785 người
+     sinh ra 32.593 dòng.)
+
+   [WHY] Vì sao chọn grain này? Vì NHÃN (final_result) tồn tại ở đúng mức này:
+   mỗi sinh viên có một kết quả cho mỗi lần học một môn. Mô hình dự đoán ở mức
+   "sinh viên–môn", nên mỗi dòng huấn luyện phải là một "sinh viên–môn".
+
+4.2. Việc chính: từ 7 bảng có grain KHÁC NHAU (clickstream có grain "mỗi cú
+click"; điểm có grain "mỗi bài nộp"...) → phải TỔNG HỢP (aggregate) tất cả về
+grain "sinh viên–môn" rồi JOIN lại.
+
+   Ví dụ tổng hợp clickstream:
+      total_clicks   = sum(sum_click)              -- tổng click cả kỳ
+      n_days_active  = count(distinct ngày có click)
+      days_since_last_activity = cutoff - ngày click cuối  -- "đã im lặng bao lâu"
+      clicks_forumng, clicks_resource, ...         -- click theo từng loại
+
+   [WHY] Vì sao tạo các biến phái sinh này (feature engineering)?
+   - days_since_last_activity ("đã im lặng bao lâu") là tín hiệu nghiệp vụ mạnh
+     nhất cho việc bỏ học — và dữ liệu xác nhận (Cohen's d = 2,55, mạnh nhất).
+   - n_days_active đo "đều đặn" tốt hơn total_clicks (một người click dồn 1 ngày
+     khác hẳn người vào học 50 ngày).
+   - Tách click theo loại tài nguyên để mô hình + XAI biết loại hoạt động nào
+     quan trọng (forum? quiz? tài liệu?).
+
+4.3. ĐÁNH GIÁ tính đúng của việc dựng bảng (sanity checks — luôn phải làm):
+   - Số dòng sau JOIN = đúng 32.593 (bằng số dòng studentInfo) → JOIN không nhân
+     đôi/đánh rơi dòng. ★ Đây là kiểm tra quan trọng nhất sau mỗi JOIN.
+   - 3.365 dòng có 0 click → KHÔNG phải lỗi, mà là sinh viên thật sự không hoạt
+     động (chính là nhóm nguy cơ cao). Sẽ điền 0, không xoá.
+   - 26.074 sinh viên có click < 28.785 sinh viên tổng → khớp với việc một số
+     người không bấm gì. Logic nhất quán.
+
+   Kết quả: master_raw = 32.593 × 33 cột.
+
+================================================================================
+PHẦN 5 — LÀM SẠCH DỮ LIỆU (Task 3, yêu cầu 3)
+================================================================================
+Làm sạch = xử lý 3 thứ: (A) trùng lặp, (B) thiếu, (C) ngoại lai. Nguyên tắc
+xuyên suốt: MỖI hành động đều bắt nguồn từ một bằng chứng đã thấy, không làm
+theo công thức mù.
+
+5.A. TRÙNG LẶP (duplicates)
+   LÀM GÌ: kiểm tra trùng trên khoá (code_module, code_presentation, id_student).
+   KẾT QUẢ: 0 dòng trùng.
+   [WHY] Phải kiểm vì trùng lặp làm mô hình "học vẹt" những dòng lặp và làm sai
+   thống kê. Ở đây sạch sẵn → không cần xoá gì, nhưng vẫn phải CHỨNG MINH là 0.
+
+5.B. GIÁ TRỊ THIẾU (missing values) — phần tinh tế nhất.
+   Nguyên tắc vàng: KHÔNG hỏi "điền bằng gì?" trước; phải hỏi "VÌ SAO thiếu?"
+   (cơ chế thiếu). Cơ chế quyết định cách xử lý. Ba cơ chế kinh điển:
+     - MCAR (thiếu hoàn toàn ngẫu nhiên): thiếu vô tình, không liên quan gì.
+     - MAR  (thiếu có điều kiện): thiếu phụ thuộc biến khác quan sát được.
+     - MNAR / thiếu CẤU TRÚC: thiếu vì bản chất nó không tồn tại.
+
+   Ba cột thiếu trong dữ liệu của ta và cách xử lý CÓ LÝ DO:
+
+   ┌────────────────────┬───────┬──────────────────────────────────────────────┐
+   │ Cột                │ %thiếu│ Cơ chế → Cách xử lý & VÌ SAO                  │
+   ├────────────────────┼───────┼──────────────────────────────────────────────┤
+   │ date_unregistration│ 69,1% │ Thiếu CẤU TRÚC: chỉ tồn tại nếu SV rút môn.   │
+   │ (22.521 dòng)      │       │ Người không rút thì vốn dĩ KHÔNG có ngày này. │
+   │                    │       │ → KHÔNG điền; loại khỏi đặc trưng. Điền sẽ là │
+   │                    │       │   bịa dữ liệu.                                │
+   ├────────────────────┼───────┼──────────────────────────────────────────────┤
+   │ imd_band           │ 3,41% │ MAR/MCAR: thiếu chỉ số thiệt thòi vùng.       │
+   │ (1.111 dòng)       │       │ → Thêm một HẠNG "Unknown". VÌ SAO không điền  │
+   │                    │       │   mức trung bình? Vì sẽ BỊA ra mức thiệt thòi │
+   │                    │       │   ta không biết; "Unknown" để mô hình tự học  │
+   │                    │       │   xem việc thiếu có ý nghĩa không.            │
+   ├────────────────────┼───────┼──────────────────────────────────────────────┤
+   │ date_registration  │ 0,14% │ MCAR (chỉ 45 dòng, vụn vặt).                  │
+   │ (45 dòng)          │       │ → Điền MEDIAN CỦA TẬP TRAIN. Dùng median (ko  │
+   │                    │       │   mean) vì biến lệch; dùng train-only để       │
+   │                    │       │   chống rò rỉ (Phần 8).                        │
+   └────────────────────┴───────┴──────────────────────────────────────────────┘
+
+   Với điểm bài nộp thiếu (sinh viên không nộp): điền 0 + thêm CỜ not_submitted.
+   [WHY] "Không nộp" mang thông tin (dấu hiệu nguy cơ!), nên ta vừa điền 0 để có
+   số, vừa giữ một cột cờ 0/1 để mô hình biết "đây là không-nộp chứ không phải
+   nộp được 0 điểm".
+
+   ĐÁNH GIÁ: sau xử lý → 0 NaN ở mọi cột đặc trưng. (Kiểm bằng assert trong code.)
+
+5.C. NGOẠI LAI (outliers) — quyết định quan trọng: KHÔNG XOÁ DÒNG NÀO.
+   [WHY tổng] Một sinh viên click cực nhiều là dữ liệu THẬT và HỢP LỆ, không phải
+   lỗi nhập liệu. Xoá họ = vứt thông tin thật + làm lệch mẫu. Thay vì xoá, ta
+   BIẾN ĐỔI để giảm ảnh hưởng của đuôi dài.
+
+   Bằng chứng dẫn tới quyết định (đo thật): biến click lệch phải rất nặng —
+   total_clicks: mean 1.355 ≫ median 740, skew ≈ 2,94, max 24.139.
+   clicks_resource thậm chí skew 34,7 / kurtosis 2125 (đuôi cực dài).
+   → "mean ≫ median và skew > 0" là vân tay của LỆCH PHẢI (right-skew) nặng.
+
+   Ba cách xử lý KHÁC NHAU cho ba loại biến (chọn theo bản chất biến):
+     (1) Biến đếm click (skew nặng, đuôi dài, không có chặn trên tự nhiên):
+         → log1p (lấy log(1+x)). VÌ SAO: nén đuôi dài lại, GIỮ NGUYÊN thứ hạng
+           (ai nhiều vẫn nhiều), không mất dòng nào, và đưa phân phối gần chuẩn
+           hơn → nhiều mô hình & scaler hoạt động tốt hơn. Dùng log1p (không
+           log) để xử lý được giá trị 0 (log(0) = vô cực).
+     (2) Biến có chặn tự nhiên (điểm 0–100, số tín chỉ, số lần thi lại):
+         → winsorize 1% (kẹp 1% giá trị cực hai đầu về ngưỡng phân vị 1%/99%).
+           VÌ SAO: chỉ làm dịu vài giá trị cá biệt, không bóp méo cả phân phối
+           như log.
+     (3) Biến không có outlier thật (vd mean_score_to_date):
+         → ĐỂ NGUYÊN. VÌ SAO: biên IQR của nó vượt cả 0–100, tức theo định nghĩa
+           thống kê không có điểm nào nằm ngoài → ép biến đổi là vô nghĩa.
+
+   ★ Thông điệp bảo vệ: "Em không xoá outlier vì chúng là hành vi thật. Em chọn
+     phép biến đổi theo BẢN CHẤT từng biến: log1p cho biến đếm lệch nặng,
+     winsorize cho biến có chặn, để nguyên biến vốn không lệch."
+
+   QUY TẮC VÀNG (lặp lại ở Phần 8): mọi ngưỡng (median điền khuyết, mốc
+   winsorize, tham số scaler) đều HỌC CHỈ TRÊN TẬP TRAIN rồi áp lên test.
+
+Sản phẩm tài liệu: docs/03_cleaning/ (Cleaning_Methods, Leakage_Prevention_Rules).
+
+================================================================================
+PHẦN 6 — CHUẨN HOÁ & BIẾN ĐỔI DỮ LIỆU (Task 3, yêu cầu 4)
+================================================================================
+(notebooks/04_preprocessing.ipynb — biến bảng người-đọc-được thành ma trận số
+mà thuật toán đọc được.)
+
+6.1. [WHY tổng] Thuật toán ML chỉ ăn SỐ. "Scotland", "Y/N", "HE Qualification"
+là chữ → phải mã hoá. Hơn nữa các biến có thang đo rất khác nhau (click hàng
+nghìn vs điểm 0–100) → phải đưa về cùng thang (scale) để mô hình công bằng.
+
+6.2. Ý tưởng then chốt: KIỂU BIẾN quyết định CÁCH MÃ HOÁ. Ta phân 28 đặc trưng
+thành 5 kiểu, mỗi kiểu một bộ mã hoá phù hợp:
+
+ ┌──────────────────────┬─────┬───────────────────────┬─────────────────────────┐
+ │ Kiểu biến            │ Số  │ Bộ mã hoá / scaler    │ VÌ SAO chọn             │
+ ├──────────────────────┼─────┼───────────────────────┼─────────────────────────┤
+ │ Định lượng (numeric) │ 19  │ StandardScaler        │ Đưa về TB 0, ĐLC 1 →    │
+ │                      │     │ (z = (x-μ)/σ)         │ các biến cùng thang;    │
+ │                      │     │                       │ cần cho LR, SVM, ANN,   │
+ │                      │     │                       │ và SHAP/khoảng cách.    │
+ │ Thứ bậc (ordinal)    │ 3   │ OrdinalEncoder        │ Có THỨ TỰ (vd trình độ  │
+ │ vd education, imd    │     │ (giữ thứ tự; lạ→ -1)  │ học vấn thấp→cao) → mã  │
+ │                      │     │                       │ 0,1,2... giữ thứ tự đó. │
+ │ Danh định (nominal)  │ 3   │ OneHotEncoder         │ KHÔNG có thứ tự (vùng   │
+ │ region, module, kỳ   │     │ (drop=None,           │ A không "lớn hơn" B) →  │
+ │                      │     │  handle_unknown=ignore│ tách mỗi giá trị thành  │
+ │                      │     │ )                     │ 1 cột 0/1, tránh áp đặt │
+ │                      │     │                       │ thứ tự giả.             │
+ │ Nhị phân (binary)    │ 2   │ BinaryEncoder (Y→1)   │ 2 giá trị → 1 cột 0/1.  │
+ │ Chỉ báo (indicator)  │ 1   │ passthrough           │ Đã là 0/1 sẵn (cờ).     │
+ └──────────────────────┴─────┴───────────────────────┴─────────────────────────┘
+
+   One-hot mở rộng: region 13 + module 7 + kỳ 4 cột.
+   Tổng cột cuối: 19 + 3 + 2 + 1 + 13 + 7 + 4 = [SỐ] 49 cột, không NaN.
+
+6.3. Hai quyết định tinh tế cần giải thích được:
+
+   (a) Vì sao StandardScaler (z-score) chứ không Min-Max?
+       - Min-Max ép về [0,1] nhưng RẤT nhạy với outlier (một giá trị cực lớn ép
+         tất cả còn lại về gần 0). Sau khi đã log1p, StandardScaler cho phân phối
+         đẹp và ổn định hơn. Z-score cũng tự nhiên cho các mô hình tuyến tính và
+         cho diễn giải SHAP.
+
+   (b) Vì sao OneHotEncoder để drop=None (GIỮ ĐỦ mọi cột, không bỏ 1 cột tham
+       chiếu)?  ←★ đây là điểm "đặc thù dự án", rất đáng nói.
+       - Thông thường người ta drop 1 cột để tránh đa cộng tuyến cho hồi quy.
+       - NHƯNG dự án này là EXPLAINABLE AI: ta cần SHAP/LIME giải thích đóng góp
+         của TỪNG vùng/môn. Nếu bỏ một hạng tham chiếu, hạng đó "biến mất" khỏi
+         lời giải thích → mâu thuẫn với mục tiêu giải thích được. Vậy ta CHỦ ĐỘNG
+         giữ đủ, đánh đổi một chút dư thừa để lấy khả năng giải thích trọn vẹn.
+       - handle_unknown=ignore: nếu tập test có giá trị chưa từng thấy ở train,
+         không vỡ pipeline (mã thành toàn 0) — đảm bảo robust.
+
+6.4. ĐÁNH GIÁ hiệu quả biến đổi:
+   - Sau biến đổi: 0 NaN, mọi cột là số, biến đếm đã gần chuẩn hơn (skew giảm
+     mạnh sau log1p), các biến cùng thang (μ≈0, σ≈1).
+   - Trình tự được vẽ thành sơ đồ (reports/figures/preprocessing_sequence.png) để
+     ai cũng kiểm được thứ tự: tách train/test → fit trên train → transform cả
+     hai. THỨ TỰ này chính là chống rò rỉ.
+
+Sản phẩm tài liệu: docs/04_transformation/ (Transformation_Standardisation,
+Preprocessing_Sequence, Feature_Naming_Convention).
+
+================================================================================
+PHẦN 7 — CẮT THEO THỜI GIAN: 6 CHECKPOINT (notebooks/03_make_checkpoints.ipynb)
+================================================================================
+
+7.1. [WHY] Mục tiêu là dự đoán SỚM. Để mô phỏng "đứng ở 10% khoá học", ta chỉ
+được dùng dữ liệu XẢY RA TRƯỚC mốc đó. Vậy ta tạo 6 phiên bản dữ liệu, cắt tại
+t = 10, 20, 40, 60, 80, 100% độ dài khoá.
+
+7.2. Cách tính ngày cắt:
+   cutoff_day = round(module_presentation_length × t / 100)
+   (vì mỗi lượt mở môn dài khác nhau, 234–269 ngày → cutoff tính riêng cho từng
+    môn-kỳ; xem data/checkpoint_map.csv.)
+   Ở mỗi checkpoint, mọi đặc trưng engagement/performance chỉ tính trên các sự
+   kiện có date ≤ cutoff_day.
+
+7.3. [WHY 6 mốc, và vì sao 10/20/40/60/80/100?]
+   - Cần nhiều mốc để vẽ ĐƯỜNG hiệu năng-theo-thời-gian và tìm "mốc sớm nhất còn
+     đáng tin" (RQ1). Một mốc thì không thấy xu hướng.
+   - Dày ở đầu (10, 20) vì giá trị nghiệp vụ của "phát hiện sớm" nằm ở đầu kỳ;
+     thưa dần về sau (40,60,80) vì cuối kỳ thông tin gần như đủ; 100% là mốc tham
+     chiếu "biết hết".
+
+7.4. ĐÁNH GIÁ tính đúng (kiểm bằng số sự kiện còn lại theo mốc):
+       Mốc t%:        10    20    40    60    80    100
+       Triệu sự kiện: 2,72  4,12  5,96  7,93  9,43  10,66
+       % toàn bộ:     25,5  38,7  56,0  74,4  88,5  100
+   → Số sự kiện CHỈ TĂNG theo t, và mốc 100% giữ trọn 10,66 triệu. Đúng yêu cầu:
+     không bản ghi nào vượt cutoff, dữ liệu không "rò" từ tương lai về.
+
+[CHECKPOINT — lưu ý quy tắc của bạn] make_checkpoints chạy idempotent + resume
+được: đã sinh checkpoint nào thì bỏ qua, chạy lại không làm lại từ đầu, ghi atomic.
+Đây đúng quy tắc "script dài phải checkpoint" — nói được điểm này là một điểm cộng.
+
+================================================================================
+PHẦN 8 — CHIA TẬP TRAIN/TEST & CHỐNG RÒ RỈ (Task 3, yêu cầu 5)
+================================================================================
+Đây là phần dễ làm SAI nhất trong cả ML, và là nơi thể hiện độ chuyên nghiệp.
+
+8.1. RÒ RỈ DỮ LIỆU (data leakage) là gì? Là khi thông tin của tập test "lọt" vào
+quá trình huấn luyện → mô hình trông có vẻ giỏi trên giấy nhưng thất bại ngoài
+thực tế. Ta phòng BA loại rò rỉ cùng lúc:
+
+8.2. Phép chia tôn trọng đồng thời 3 tính chất của dữ liệu:
+
+   (1) THEO NHÓM (group split theo id_student).
+       [WHY] Một sinh viên xuất hiện ở nhiều lượt mở môn (nhiều dòng). Nếu chia
+       ngẫu nhiên theo DÒNG, cùng một người có thể vào CẢ train lẫn test → mô
+       hình "đã thấy" người đó → rò rỉ nhóm (group leakage). Vậy chia theo NGƯỜI:
+       một sinh viên hoặc toàn bộ ở train, hoặc toàn bộ ở test.
+
+   (2) PHÂN TẦNG (stratify theo at_risk).
+       [WHY] Giữ tỉ lệ nguy cơ (52,8%) GIỐNG NHAU ở train và test, để test phản
+       ánh đúng phân bố thật và đánh giá không bị thiên lệch.
+
+   (3) THEO THỜI GIAN (test giống HỆT ở cả 6 mốc).
+       [WHY] Ta sẽ đánh giá mô hình ở 6 checkpoint. Nếu mỗi mốc một tập test khác
+       nhau thì 6 con số không so sánh được. Cố định ĐÚNG cùng tập test (cùng
+       danh sách id_student) cho cả 6 mốc → 6 điểm hiệu năng so sánh công bằng.
+
+8.3. QUY TẮC VÀNG chống rò rỉ qua tiền xử lý: TÁCH train/test TRƯỚC, rồi mọi thứ
+"học từ dữ liệu" (median điền khuyết, ngưỡng winsorize, μ/σ của scaler, bộ mã
+hoá) chỉ FIT TRÊN TRAIN, sau đó transform lên test.
+   [WHY] Nếu tính median/scaler trên CẢ tập (gồm test), thì thống kê của test đã
+   "rò" vào tiền xử lý → đánh giá lạc quan giả. Đây là lỗi kinh điển sinh viên
+   hay mắc.
+
+8.4. ĐÁNH GIÁ (kết quả hold-out 20%, seed 42):
+   - 26.104 dòng train / 6.489 dòng test / 5.756 sinh viên test.
+   - Tỉ lệ at-risk: train 0,530 vs test 0,520 → phân tầng chuẩn.
+   - 0 sinh viên trùng giữa train và test → không rò rỉ nhóm.
+   - Tập test (danh sách id_student) được COMMIT vào repo
+     (data/splits/test_student_ids.csv) → cố định, tái lập tuyệt đối.
+
+8.5. KIỂM THỬ TỰ ĐỘNG (điểm cộng lớn): tests/test_leakage.py chạy 19/19 test PASS,
+gồm: test các thống kê tiền xử lý chỉ học từ train; test "allow-list" chặn không
+cho cột rò rỉ (vd date_unregistration) lọt vào X; test ở mốc 100% số liệu khớp
+với master. → Chống rò rỉ không phải lời hứa, mà được MÁY kiểm chứng.
+
+★ Câu hỏi tủ: "Làm sao em chắc không rò rỉ?" → "Em chia theo sinh viên (0 trùng),
+  phân tầng theo nhãn, cố định tập test cho cả 6 mốc, fit mọi bộ biến đổi chỉ
+  trên train, và có 19 unit test tự động kiểm điều đó."
+
+Sản phẩm tài liệu: docs/05_splitting/ (Split_Strategy_Analysis).
+
+================================================================================
+PHẦN 9 — EDA: PHÂN TÍCH KHÁM PHÁ, GIẢI THÍCH TỪNG BIỂU ĐỒ
+            (notebooks/02_eda.ipynb → reports/figures/*.png)
+================================================================================
+[WHY EDA tồn tại] EDA = để DỮ LIỆU TỰ NÓI trước khi mô hình hoá. Mỗi biểu đồ
+phải trả lời một câu hỏi và DẪN tới một quyết định. Dưới đây, mỗi hình theo khuôn:
+  CÂU HỎI → BIỂU ĐỒ (vì sao loại này) → THẤY GÌ (số thật) → DẪN TỚI QUYẾT ĐỊNH GÌ.
+
+Nguyên tắc chọn biểu đồ (chuẩn quốc tế — nói được là rất "pro"):
+  - 1 biến SỐ, xem phân phối       → histogram + KDE, boxplot.
+  - 1 biến PHÂN LOẠI, xem tần suất → bar chart.
+  - SỐ vs NHÃN (so 2 nhóm)         → boxplot theo nhóm + Cohen's d (effect size).
+  - PHÂN LOẠI vs NHÃN              → tỉ lệ at-risk theo hạng + Cramér's V.
+  - SỐ vs SỐ (quan hệ)             → ma trận tương quan (heatmap).
+  - Theo THỜI GIAN                 → line chart (đường).
+
+--------------------------------------------------------------------------------
+9.1. target_distribution.png  — Phân bố biến mục tiêu
+--------------------------------------------------------------------------------
+CÂU HỎI: Bài toán cân bằng hay mất cân bằng?
+BIỂU ĐỒ: bar chart 4 lớp + nhóm nhị phân. (Bar vì biến phân loại.)
+THẤY GÌ: Pass 12.361 · Withdrawn 10.156 · Fail 7.052 · Distinction 3.024.
+   at-risk = 52,8%, tỉ số mất cân bằng chỉ 1,12 (lệch NHẸ).
+DẪN TỚI: vì gần cân bằng (không phải 1:99), nên đây KHÔNG phải bài toán mất cân
+   bằng cực đoan; tuy vậy RQ3 vẫn thử SMOTE/ADASYN/class-weight để đo ảnh hưởng.
+   Đồng thời: vì 2 lớp gần bằng nhau, ACCURACY đơn thuần vẫn dễ gây hiểu lầm →
+   sẽ báo cáo F1, ROC-AUC, PR-AUC, recall của lớp nguy cơ (không chỉ accuracy).
+★ Đính chính: tỉ lệ thật là 52,8%, KHÔNG phải 68/32 như slide minh hoạ chung của
+  môn — luôn dùng số THẬT của dữ liệu mình.
+
+--------------------------------------------------------------------------------
+9.2. quality_missingness.png  — Bản đồ thiếu dữ liệu
+--------------------------------------------------------------------------------
+CÂU HỎI: Thiếu ở đâu, bao nhiêu, theo kiểu gì?
+BIỂU ĐỒ: bar/heatmap % thiếu theo cột.
+THẤY GÌ: date_unregistration 69,1% · imd_band 3,41% · date_registration 0,14%.
+DẪN TỚI: chiến lược xử lý thiếu THEO CƠ CHẾ ở Phần 5 (loại cột thiếu-cấu-trúc;
+   "Unknown" cho imd_band; median-train cho date_registration). Hình này là BẰNG
+   CHỨNG trực quan biện minh cho quyết định đó.
+
+--------------------------------------------------------------------------------
+9.3. univariate_hist_kde.png + univariate_boxplots.png  — Phân phối từng biến số
+--------------------------------------------------------------------------------
+CÂU HỎI: Các biến số có dạng phân phối thế nào (chuẩn? lệch? có đuôi?)
+BIỂU ĐỒ: histogram + KDE (thấy hình dạng) và boxplot (thấy outlier + IQR).
+THẤY GÌ: các biến click LỆCH PHẢI rất nặng — clicks_resource skew 34,7;
+   total_clicks skew ~3. Đuôi dài, vài giá trị cực lớn.
+DẪN TỚI: → quyết định log1p cho biến đếm (Phần 5C). Đây là hình "biện minh trực
+   quan" cho phép biến đổi. Boxplot cũng cho thấy biến nào KHÔNG có outlier (để
+   nguyên).
+[WHY chọn hist+KDE thay vì chỉ số liệu] Vì hình dạng phân phối (một đỉnh? hai
+   đỉnh? lệch?) quyết định phép biến đổi; con số skew một mình không kể được hình.
+
+--------------------------------------------------------------------------------
+9.4. univariate_categorical_freq.png  — Tần suất biến phân loại
+--------------------------------------------------------------------------------
+CÂU HỎI: Mỗi biến phân loại có những hạng nào, hạng nào hiếm?
+BIỂU ĐỒ: bar chart tần suất.
+DẪN TỚI: phát hiện hạng hiếm (ảnh hưởng cách one-hot, handle_unknown), và kiểm
+   "Unknown" của imd_band đã xuất hiện đúng.
+
+--------------------------------------------------------------------------------
+9.5. bivariate_top_boxplots.png + bivariate_effect_sizes.png  — Biến số vs NHÃN
+--------------------------------------------------------------------------------
+CÂU HỎI: Biến số nào PHÂN BIỆT nhóm nguy cơ / không nguy cơ mạnh nhất?
+BIỂU ĐỒ: boxplot tách theo nhãn (thấy hai nhóm tách nhau cỡ nào) + biểu đồ
+   Cohen's d (effect size — đo "khoảng cách hai nhóm theo độ lệch chuẩn").
+[WHY dùng Cohen's d, không dùng p-value?] Với 32.593 mẫu, p-value gần như luôn
+   < 0,05 (cỡ mẫu lớn khiến mọi khác biệt đều "có ý nghĩa thống kê") → p-value vô
+   dụng để xếp hạng. Cohen's d đo ĐỘ LỚN thực tế của khác biệt (0,2 nhỏ / 0,5
+   vừa / 0,8 lớn) → mới là cái cần để chọn đặc trưng. Ta vẫn báo p-value (đã hiệu
+   chỉnh Benjamini-Hochberg cho đa kiểm định): 19/19 biến có ý nghĩa.
+THẤY GÌ (top theo Cohen's d):
+   days_since_last_activity 2,55 · n_assessments_submitted 2,05 ·
+   weighted_score_to_date 1,96 · n_days_active 1,58 · mean_score_to_date 1,58.
+DẪN TỚI: đây là các đặc trưng hứa hẹn nhất cho mô hình; "đã im lặng bao lâu" và
+   "nộp bao nhiêu bài" là tín hiệu nguy cơ mạnh nhất → đặt giả thuyết cho RQ1.
+
+--------------------------------------------------------------------------------
+9.6. bivariate_categorical_rate.png  — Biến phân loại vs NHÃN
+--------------------------------------------------------------------------------
+CÂU HỎI: Yếu tố nhân khẩu (giới, vùng, học vấn...) ảnh hưởng nguy cơ tới đâu?
+BIỂU ĐỒ: tỉ lệ at-risk theo từng hạng + Cramér's V (đo liên hệ biến phân loại–nhãn).
+THẤY GÌ: Cramér's V cao nhất chỉ 0,15 (highest_education), imd_band 0,149, còn
+   lại ≤ 0,08 (gender chỉ 0,022 — gần như không liên quan).
+DẪN TỚI (phát hiện LỚN): HÀNH VI ÁP ĐẢO NHÂN KHẨU. Cohen's d của biến hành vi
+   tới 2,55, trong khi Cramér's V của nhân khẩu ≤ 0,15. → Nguy cơ được quyết định
+   bởi SINH VIÊN LÀM GÌ (hành vi), không phải HỌ LÀ AI (nhân khẩu). Đây vừa là
+   kết quả khoa học mạnh, vừa là thông điệp công bằng (fairness): mô hình dựa
+   chủ yếu vào hành vi có thể thay đổi, không phải đặc điểm cá nhân cố định.
+
+--------------------------------------------------------------------------------
+9.7. corr_pearson.png + corr_spearman.png + corr_with_target.png  — Tương quan
+--------------------------------------------------------------------------------
+CÂU HỎI: Các biến số liên hệ nhau ra sao? Có cặp nào trùng lặp thông tin
+   (đa cộng tuyến)? Có biến nào "rò rỉ nhãn" không?
+BIỂU ĐỒ: heatmap tương quan (Pearson = quan hệ tuyến tính; Spearman = quan hệ
+   đơn điệu, bền với lệch & outlier) + bar tương quan với nhãn.
+[WHY cả Pearson lẫn Spearman?] Dữ liệu lệch nặng → Pearson có thể méo; Spearman
+   (dựa hạng) bền hơn. Báo cả hai cho thấy kết luận không phụ thuộc lựa chọn.
+THẤY GÌ:
+   - Tương quan mạnh với nhãn: days_since_last_activity 0,78 ·
+     n_assessments_submitted 0,72 · weighted_score_to_date 0,71.
+   - Cặp cộng tuyến ≥ 0,8: (n_days_active, total_clicks) 0,84;
+     (days_since_last_activity, n_assessments_submitted) −0,83.
+   - KHÔNG cặp nào ≥ 0,95 → KHÔNG có đặc trưng rò rỉ nhãn.
+DẪN TỚI:
+   - 0,84 và 0,83 là cộng tuyến cao → cảnh báo cho mô hình tuyến tính (hệ số sẽ
+     bất ổn) và cho XAI (SHAP chia công giữa biến tương quan). Sẽ cân nhắc bỏ bớt
+     hoặc dùng mô hình cây (ít nhạy cộng tuyến).
+   - Không có cặp ≥ 0,95 → yên tâm không có biến "ăn gian" tiết lộ nhãn (vd nếu
+     vô tình đưa final_result đã mã hoá vào X).
+★ "Rò rỉ qua đặc trưng" khác với "rò rỉ qua chia tập" — heatmap này canh loại
+  thứ nhất; Phần 8 canh loại thứ hai.
+
+--------------------------------------------------------------------------------
+9.8. time_discrimination_curve.png  — Tín hiệu xuất hiện SỚM tới đâu? (RQ1)
+--------------------------------------------------------------------------------
+CÂU HỎI (đắt giá nhất của đề tài): ở mốc nào tín hiệu đủ mạnh để dự đoán đáng tin?
+BIỂU ĐỒ: line chart — trục x = mốc thời gian (10→100%), trục y = Cohen's d của
+   từng đặc trưng. (Line vì đại lượng thay đổi theo thời gian.)
+THẤY GÌ (Cohen's d theo mốc):
+   days_since_last_activity: 0,91→1,17→1,56→1,92→2,30→2,55
+   n_days_active:            0,83→0,99→1,17→1,37→1,50→1,58
+   mean_score_to_date:       0,80→1,11→1,49→1,56→1,57→1,58
+   → n_days_active và days_since_last_activity đã đạt hiệu ứng LỚN (d ≥ 0,8)
+     NGAY TỪ MỐC 10%; nhóm điểm đạt từ 20%.
+DẪN TỚI (kết quả nền tảng của cả dự án): TÍN HIỆU HỮU ÍCH TỒN TẠI RẤT SỚM → việc
+   "phát hiện sớm" là KHẢ THI và có cơ sở dữ liệu, không phải mong muốn suông.
+   Đây là biện minh định lượng cho toàn bộ hướng "time-aware".
+
+--------------------------------------------------------------------------------
+9.9. time_mean_trajectory.png  — Quỹ đạo trung bình theo thời gian
+--------------------------------------------------------------------------------
+CÂU HỎI: Hai nhóm (nguy cơ / không) "tách nhau" ra theo thời gian như thế nào?
+BIỂU ĐỒ: line chart trung bình đặc trưng theo mốc, tách theo nhãn.
+DẪN TỚI: minh hoạ trực quan vì sao d tăng theo thời gian (hai đường ngày càng
+   xa nhau) → củng cố 9.8.
+
+--------------------------------------------------------------------------------
+9.10. withdrawn_activity_decay.png  — "Chân dung" nhóm bỏ học
+--------------------------------------------------------------------------------
+CÂU HỎI: Nhóm Withdrawn khác Fail và khác Pass ở đâu? (vì sao gộp vào nguy cơ?)
+BIỂU ĐỒ: phân rã hoạt động theo nhóm kết quả.
+THẤY GÌ (median days_since_last_activity): Pass/không-nguy-cơ ≈ 11 ngày ·
+   Fail 116 ngày · Withdrawn 233 ngày. (median total_clicks: không-nguy-cơ 1.425
+   · Fail 317 · Withdrawn chỉ 89.)
+DẪN TỚI: Withdrawn = ngừng hoạt động SỚM và DỨT KHOÁT (im lặng ~233 ngày, gần như
+   không click). → biện minh việc xếp Withdrawn vào nguy cơ, và xác nhận
+   days_since_last_activity là tín hiệu "vàng". Cũng giải thích vì sao phân phối
+   biến này LƯỠNG ĐỈNH (hai cụm: người đang học vs người đã bỏ).
+
+--------------------------------------------------------------------------------
+9.11. preprocessing_sequence.png  — Sơ đồ trình tự tiền xử lý
+--------------------------------------------------------------------------------
+CÂU HỎI: Pipeline làm theo thứ tự nào (để tái lập & chứng minh không rò rỉ)?
+BIỂU ĐỒ: sequence/flow diagram.
+DẪN TỚI: tài liệu hoá thứ tự "split → fit trên train → transform cả hai" → bằng
+   chứng quy trình đúng chuẩn, để cô và người đọc khác kiểm được.
+
+★ Thông điệp xuyên suốt EDA để chốt khi trình bày: "Mỗi biểu đồ em chọn để TRẢ
+  LỜI MỘT CÂU HỎI và DẪN TỚI MỘT QUYẾT ĐỊNH cụ thể — phân phối lệch → log1p;
+  effect size → chọn đặc trưng; tương quan → cảnh báo cộng tuyến & soát rò rỉ;
+  đường thời gian → chứng minh phát hiện sớm khả thi."
+
+================================================================================
+PHẦN 10 — ĐÁNH GIÁ CHẤT LƯỢNG: LÀM SAO BIẾT MÌNH LÀM ĐÚNG?
+================================================================================
+Đây là phần bạn nói bạn "không có khả năng đánh giá". Dưới đây là KHUNG ĐÁNH GIÁ
+chuẩn, theo 6 chiều chất lượng dữ liệu (data quality dimensions) — dùng để tự
+chấm và để trả lời khi cô hỏi "làm sao em biết dữ liệu tốt?":
+
+   1. COMPLETENESS (đầy đủ): sau xử lý → 0 NaN ở mọi cột đặc trưng. ✔
+      Cách kiểm: assert df[features].isna().sum().sum() == 0.
+   2. UNIQUENESS (không trùng): 0 dòng trùng trên khoá. ✔
+   3. VALIDITY (hợp lệ): date trong [-25, 269]; điểm trong [0,100]; nhãn ∈ {0,1};
+      mỗi biến đúng miền giá trị. ✔ (đã kiểm khi khai báo kiểu & profile.)
+   4. CONSISTENCY (nhất quán): số dòng master = 32.593 = số dòng studentInfo;
+      tổng click ở mốc 100% = tổng toàn bộ clickstream. ✔
+   5. ACCURACY (chính xác): mọi con số khớp giữa pipeline, eda_findings.json và
+      verified_numbers.json (tái lập được, không "chế số"). ✔
+   6. TIMELINESS / NO-LEAKAGE (đúng thời gian, không rò): số sự kiện chỉ tăng theo
+      mốc; 19/19 test rò rỉ pass. ✔
+
+Ba "tầng phòng thủ" đánh giá (defence in depth) — nói được là rất chuyên nghiệp:
+   (a) SANITY CHECK thủ công: số dòng sau mỗi JOIN, tổng kiểm chéo.
+   (b) ASSERT trong code: tự dừng nếu có NaN/sai miền.
+   (c) UNIT TEST tự động (pytest, 19 test): chống rò rỉ, khớp số ở mốc 100%.
+
+ĐÁNH GIÁ riêng cho từng QUYẾT ĐỊNH (mẫu lập luận "hiệu quả của hành động"):
+   - log1p hiệu quả? → so skew TRƯỚC/SAU: total_clicks skew từ ~3 giảm về gần 0;
+     không mất dòng nào → đạt mục tiêu "nén đuôi, giữ thứ hạng".
+   - "Unknown" cho imd_band hiệu quả? → không bịa mức thiệt thòi, vẫn giữ 1.111
+     dòng; mô hình tự quyết "thiếu có ý nghĩa không".
+   - Chia theo nhóm hiệu quả? → 0 sinh viên trùng (đo trực tiếp).
+   - Phân tầng hiệu quả? → tỉ lệ at-risk train 0,530 vs test 0,520 (lệch < 0,01).
+
+================================================================================
+PHẦN 11 — TỔNG HỢP PHÁT HIỆN & GIẢ THUYẾT CHO GIAI ĐOẠN MÔ HÌNH
+================================================================================
+EDA không kết thúc bằng "đẹp", mà bằng GIẢ THUYẾT cho bước sau:
+
+   H1. Tín hiệu HÀNH VI (đặc biệt days_since_last_activity, n_assessments_submitted,
+       điểm) áp đảo nhân khẩu (d tới 2,55 vs Cramér's V ≤ 0,15) → mô hình nên
+       lấy hành vi làm lõi; tốt cho cả độ chính xác lẫn công bằng.
+   H2. Phát hiện sớm khả thi: hiệu ứng lớn (d ≥ 0,8) xuất hiện từ mốc 10–20% →
+       kỳ vọng mô hình ở mốc sớm vẫn đạt hiệu năng dùng được (kiểm ở RQ1).
+   H3. Có cộng tuyến (2 cặp ≥ 0,8) nhưng không rò rỉ (không cặp ≥ 0,95) → ưu tiên
+       mô hình cây (RF/XGBoost/LightGBM) ít nhạy cộng tuyến; cẩn thận khi diễn
+       giải SHAP với biến tương quan.
+   H4. Mất cân bằng nhẹ (52,8%) → so sánh no-resample / class-weight / SMOTE /
+       ADASYN (RQ3), và báo F1/PR-AUC/recall lớp nguy cơ thay vì chỉ accuracy.
+
+→ Đây chính là cây cầu nối Task 3 (data) sang Task 4 (modeling): EDA đã CHỈ ĐƯỜNG.
+
+================================================================================
+PHẦN 12 — CÁCH TRÌNH BÀY & BẢO VỆ TRƯỚC GIÁO VIÊN
+================================================================================
+
+12.1. Bố cục bài nói gợi ý (10–12 phút):
+   (1) Bài toán & nhãn (Phần 0–1): 1 slide. "Dự đoán sớm nguy cơ; nhãn nhị phân
+       Fail/Withdrawn = at-risk; 52,8%."
+   (2) Dữ liệu & thu thập (Phần 2): vì sao OULAD công khai (tái lập, so sánh,
+       đạo đức). 1 slide.
+   (3) Thách thức 10,6 triệu dòng & ClickHouse (Phần 3): câu chuyện "max(date)=99"
+       + bảng tốc độ CSV vs Parquet. 1 slide — đây là điểm gây ấn tượng.
+   (4) Pipeline làm sạch/biến đổi/chia tập (Phần 4–8): 1 sơ đồ luồng + 3 quyết
+       định có lý do (missing theo cơ chế; log1p; chia theo nhóm + fit-train-only).
+   (5) EDA & phát hiện (Phần 9, 11): 3 hình mạnh nhất — target_distribution,
+       bivariate_effect_sizes, time_discrimination_curve. Chốt 2 phát hiện: hành
+       vi áp đảo nhân khẩu; phát hiện sớm khả thi.
+   (6) Đánh giá chất lượng (Phần 10): "0 NaN, 0 trùng, 0 SV rò rỉ, 19/19 test."
+
+12.2. NGÂN HÀNG CÂU HỎI – TRẢ LỜI (luyện thuộc ý):
+   Q: Vì sao gộp 4 lớp thành nhị phân?
+   A: Hành động can thiệp là nhị phân; tránh lớp Distinction quá nhỏ; XAI gọn hơn.
+   Q: Vì sao Withdrawn là nguy cơ?
+   A: Bỏ học là kết cục cần phòng; dữ liệu cho thấy nhóm này ngừng hoạt động sớm
+      và dứt khoát (median im lặng 233 ngày).
+   Q: Outlier sao không xoá?
+   A: Là hành vi thật, không phải lỗi; xoá là mất thông tin & lệch mẫu. Em biến
+      đổi theo bản chất biến (log1p / winsorize / để nguyên).
+   Q: Làm sao chống rò rỉ?
+   A: Chia theo sinh viên (0 trùng) + phân tầng + test cố định 6 mốc; fit median/
+      scaler/encoder chỉ trên train; 19 unit test tự kiểm.
+   Q: Vì sao dùng Cohen's d mà không phải p-value?
+   A: n=32.593 nên p-value gần như luôn có ý nghĩa; cần ĐỘ LỚN hiệu ứng để xếp
+      hạng đặc trưng → Cohen's d (vẫn báo p hiệu chỉnh BH: 19/19 có ý nghĩa).
+   Q: Vì sao giữ đủ cột one-hot (không drop)?
+   A: Dự án là Explainable AI; bỏ hạng tham chiếu sẽ giấu nó khỏi SHAP/LIME.
+   Q: Mất cân bằng không?
+   A: Nhẹ (52,8%, tỉ số 1,12); vẫn thử resampling ở RQ3 và báo F1/PR-AUC/recall.
+   Q: Vì sao 6 mốc thời gian?
+   A: Để vẽ đường hiệu năng-theo-thời-gian và tìm mốc sớm nhất đáng tin (RQ1);
+      dày ở đầu vì giá trị "sớm" nằm ở đầu kỳ.
+
+12.3. Ba con số "đinh" để lặp lại khi bí: 32.593 dòng · at-risk 52,8% ·
+   days_since_last_activity Cohen's d = 2,55 (mạnh nhất, sớm từ mốc 10%).
+
+================================================================================
+PHẦN 13 — TÁI LẬP TOÀN BỘ & THUẬT NGỮ
+================================================================================
+
+13.1. Chạy lại từ đầu (đúng thứ tự):
+   python setup_raw_data.py                    # kiểm 7 CSV gốc + checksum
+   python -m src.data.time_utils               # sinh data/checkpoint_map.csv
+   python -m src.data.build_master_table       # master_raw.parquet
+   python -m src.data.make_checkpoints         # 6 checkpoint (idempotent, resume)
+   python -m src.evaluation.make_split --materialise   # chia train/test cố định
+   python -m src.eda.eda                        # biểu đồ + bảng + eda_findings.json
+   pytest tests/test_leakage.py                 # 19 test rò rỉ/chia tập (phải pass)
+   (Notebook tương ứng: 00_data_understanding · 01_build_master_table ·
+    02_eda · 03_make_checkpoints · 04_preprocessing.)
+   Lưu ý môi trường: sinh hình matplotlib nên chạy ở base conda env (env 'dsp'
+   crash khi savefig — xem MEMORY).
+
+13.2. TỪ ĐIỂN THUẬT NGỮ (đọc trước nếu thấy lạ):
+   - Grain (hạt dữ liệu): một dòng đại diện cho cái gì. Ở đây = 1 SV–1 môn–1 kỳ.
+   - Target / nhãn: biến cần dự đoán (at_risk 0/1).
+   - Feature (đặc trưng): biến đầu vào của mô hình.
+   - Feature engineering: tạo biến mới từ biến gốc (vd days_since_last_activity).
+   - Leakage (rò rỉ): thông tin tương lai/test lọt vào huấn luyện → đánh giá ảo.
+   - Imbalance (mất cân bằng): hai lớp chênh lệch nhiều về số lượng.
+   - Skewness (độ lệch): phân phối lệch trái/phải; >0 = lệch phải (đuôi bên phải).
+   - Kurtosis: độ "nhọn"/đuôi nặng của phân phối.
+   - log1p: phép log(1+x), nén giá trị lớn, xử lý được số 0.
+   - Winsorize: kẹp giá trị cực hai đầu về ngưỡng phân vị (vd 1%/99%).
+   - StandardScaler / z-score: (x − trung bình)/độ lệch chuẩn → TB 0, ĐLC 1.
+   - One-hot encoding: biến mỗi giá trị phân loại thành một cột 0/1.
+   - Ordinal encoding: mã hoá biến CÓ thứ tự thành 0,1,2,...
+   - Cohen's d: thước đo ĐỘ LỚN khác biệt giữa hai nhóm (0,2 nhỏ/0,5 vừa/0,8 lớn).
+   - Cramér's V: thước đo liên hệ giữa hai biến phân loại (0→1).
+   - Pearson / Spearman: hệ số tương quan tuyến tính / theo hạng.
+   - Multicollinearity (đa cộng tuyến): hai biến đầu vào tương quan cao, trùng tin.
+   - Stratified split: chia tập giữ nguyên tỉ lệ lớp.
+   - Group split: chia tập sao cho một nhóm (sinh viên) không nằm cả 2 bên.
+   - Checkpoint (thời gian): bản dữ liệu cắt tại một mốc % khoá học.
+   - CRISP-DM: quy trình chuẩn 6 giai đoạn cho dự án khai phá dữ liệu.
+   - EDA: phân tích khám phá dữ liệu (để dữ liệu tự nói trước khi mô hình hoá).
+   - SHAP / LIME: phương pháp giải thích dự đoán của mô hình (giai đoạn sau).
+
+================================================================================
+KẾT: Mạch tư duy gói gọn một câu để nhớ
+================================================================================
+"Mỗi hành động trong Task 3 đều bắt nguồn từ một BẰNG CHỨNG đã quan sát, phục vụ
+một MỤC TIÊU rõ ràng (dự đoán sớm, giải thích được, không rò rỉ), và được KIỂM
+CHỨNG bằng số thật + unit test." Nắm mạch đó, bạn không chỉ làm được mà còn bảo
+vệ được mọi quyết định.
+================================================================================

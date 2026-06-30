@@ -1,1 +1,1 @@
-"""Data layer: collection, aggregation, master table, time-aware checkpoints."""
+"""Data layer: raw I/O, time utilities, feature aggregation, master table, checkpoints."""

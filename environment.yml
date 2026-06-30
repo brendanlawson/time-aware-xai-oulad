@@ -35,9 +35,16 @@ dependencies:
   - jupyter>=1.0
   - pytest>=8.2
 
+  # Tooling used by src/ (CLI, logging, progress, lint)
+  - typer>=0.12
+  - tqdm>=4.66
+  - ruff>=0.5
+
   # Packages best installed via pip
   - pip:
       - tensorflow>=2.16,<2.17
       - shap>=0.45,<0.46
       - lime>=0.2,<0.3
       - streamlit>=1.35
+      - loguru>=0.7
+      - python-dotenv>=1.0

@@ -1,0 +1,635 @@
+TẬP 7 — ĐÁNH GIÁ & BẢO VỆ
+
+
+===========================================================================
+LỜI MỞ ĐẦU CỦA TẬP 7
+===========================================================================
+
+Sáu tập trước đã đưa ta đi hết một vòng Data Task: từ bộ dữ liệu OULAD thô
+(Tập 1–2), qua làm sạch (Tập 3), biến đổi & chuẩn hoá (Tập 4), cắt theo thời
+gian & chia tập (Tập 5), rồi phân tích khám phá (Tập 6). Tới đây ta đã CÓ một
+sản phẩm: ma trận đặc trưng 49 cột, tập train/test cố định, và một xấp phát
+hiện EDA.
+
+Nhưng "làm xong" chưa phải là "bảo vệ được". Tập cuối cùng này trả lời ba câu
+hỏi sống còn khi đứng trước giáo viên:
+
+  1) CHẤT LƯỢNG DỮ LIỆU TA CÓ ĐỦ TỐT KHÔNG, VÀ ĐO BẰNG GÌ? (Ch.17) — ta dựng
+     một khung 6 chiều chất lượng dữ liệu, áp vào dự án bằng SỐ THẬT, và trình
+     bày 3 tầng phòng thủ chống rò rỉ — thứ làm nên độ tin cậy của toàn bộ
+     đánh giá về sau.
+
+  2) NHỮNG GÌ EDA TÌM RA DẪN TỚI ĐIỀU GÌ Ở GIAI ĐOẠN MÔ HÌNH? (Ch.18) — ta
+     biến mỗi phát hiện thành một GIẢ THUYẾT có thể kiểm chứng cho Task 4, mỗi
+     giả thuyết ghi rõ DỰA TRÊN bằng chứng EDA nào.
+
+  3) BỊ HỎI XOÁY THÌ TRẢ LỜI RA SAO? (Ch.19) — một ngân hàng câu hỏi phản biện
+     điển hình + câu trả lời mẫu ngắn gọn, dựa số thật, đóng khung theo "bốn
+     câu hỏi" của dự án.
+
+Tinh thần xuyên suốt vẫn là: KHÔNG hành động nào là "mặc định". Mỗi quyết định
+phải trả lời được bốn câu — làm GÌ, VÌ SAO, cách KHÁC bị loại vì sao, ĐÁNH GIÁ
+thế nào. Tập 7 chính là lúc ta thu hoạch: gom mọi quyết định rải rác thành một
+mạch lập luận liền lạc, kiểm chứng được.
+
+
+===========================================================================
+CHƯƠNG 17 — KHUNG ĐÁNH GIÁ CHẤT LƯỢNG DỮ LIỆU (6 CHIỀU + 3 TẦNG PHÒNG THỦ)
+===========================================================================
+
+
+---------------------------------------------------------------------------
+17.1 [ĐN] VÌ SAO CẦN MỘT KHUNG ĐÁNH GIÁ CHẤT LƯỢNG, KHÔNG CHỈ "NHÌN LÀ BIẾT"
+---------------------------------------------------------------------------
+
+[ĐN] CHẤT LƯỢNG DỮ LIỆU (data quality) không phải một con số duy nhất, mà là
+một tập NHIỀU CHIỀU độc lập. Một bảng dữ liệu có thể "đầy đủ" (không thiếu ô)
+nhưng vẫn "sai" (giá trị bất khả thi), hoặc "hợp lệ" nhưng "không nhất quán"
+(cùng một hạng ghi theo nhiều cách). Vì vậy, đánh giá chất lượng phải đi qua
+TỪNG chiều một cách có hệ thống, không gộp chung thành cảm giác "trông ổn".
+
+[WHY] Vì sao cần một khung rạch ròi? Vì khi bảo vệ, câu "dữ liệu của em sạch"
+là vô nghĩa nếu không nói được SẠCH THEO CHIỀU NÀO và ĐO BẰNG GÌ. Khung 6
+chiều dưới đây cho ta một danh sách kiểm (checklist) có thể chỉ vào từng dòng
+mà nói: "chiều này, dự án em đạt, bằng chứng là con số X".
+
+Sáu chiều chất lượng dữ liệu kinh điển (DAMA / ISO 8000 rút gọn):
+
+      +------------------+----------------------------------------------+
+      | Chiều            | Câu hỏi cốt lõi                              |
+      +------------------+----------------------------------------------+
+      | Completeness     | Dữ liệu có bị thiếu ô không? Thiếu vì sao?    |
+      | (tính đầy đủ)    |                                              |
+      +------------------+----------------------------------------------+
+      | Validity         | Giá trị có nằm trong miền hợp lệ không?       |
+      | (hợp lệ)         |                                              |
+      +------------------+----------------------------------------------+
+      | Consistency      | Cùng một thứ có được ghi nhất quán không?     |
+      | (nhất quán)      |                                              |
+      +------------------+----------------------------------------------+
+      | Uniqueness       | Có dòng trùng lặp theo khoá không?            |
+      | (duy nhất)       |                                              |
+      +------------------+----------------------------------------------+
+      | Accuracy         | Giá trị có phản ánh đúng thực tế không?       |
+      | (chính xác)      |                                              |
+      +------------------+----------------------------------------------+
+      | Timeliness/      | Dữ liệu có đúng thời điểm & còn liên quan tới |
+      | Relevance        | câu hỏi không?                               |
+      | (kịp thời/liên   |                                              |
+      |  quan)           |                                              |
+      +------------------+----------------------------------------------+
+
+
+---------------------------------------------------------------------------
+17.2 [DA] CHIỀU 1 — COMPLETENESS (TÍNH ĐẦY ĐỦ): "THIẾU CÓ NGHĨA" VS "THIẾU LỖI"
+---------------------------------------------------------------------------
+
+[DA] Ta soi đúng ba cột có ô trống trong bảng gốc (số thật của dự án):
+
+      +----------------------+----------+--------+----------------------+
+      | Cột                  | Số thiếu | Tỷ lệ  | Bản chất             |
+      +----------------------+----------+--------+----------------------+
+      | imd_band             | 1.111    | 3,41%  | thiếu thường (MAR/   |
+      |                      |          |        | MCAR) → hạng Unknown |
+      +----------------------+----------+--------+----------------------+
+      | date_registration    | 45       | 0,14%  | MCAR → điền median   |
+      |                      |          |        | của train            |
+      +----------------------+----------+--------+----------------------+
+      | date_unregistration  | 22.521   | 69,1%  | THIẾU CÓ NGHĨA       |
+      |                      |          |        | (structural) → loại  |
+      +----------------------+----------+--------+----------------------+
+
+[WHY] Điểm phải nói cho bằng được khi bảo vệ: con số 69,1% trông "kinh khủng"
+nhưng KHÔNG phải lỗi chất lượng. date_unregistration là NGÀY huỷ đăng ký; nó
+chỉ tồn tại nếu sinh viên ĐÃ huỷ. 69,1% trống nghĩa là 69,1% sinh viên KHÔNG
+huỷ đăng ký — ô trống là kết quả ĐÚNG. Đây là "thiếu CÓ NGHĨA" (meaningful /
+structural missingness): sự vắng mặt của giá trị tự nó là một thông tin, không
+phải dữ liệu bị mất. Đánh giá completeness mà chỉ đếm % NaN sẽ kết luận sai;
+phải hỏi "thiếu vì sao".
+
+→ Kết luận chiều completeness: sau xử lý (Unknown / median-train / loại cột),
+MỌI cột đặc trưng có 0 ô trống — khẳng định bằng assert cứng, không tin bằng
+mắt. Ba cách xử lý khác nhau cho ba cơ chế thiếu khác nhau, đúng tinh thần
+"một con dao không cắt được mọi thứ".
+
+
+---------------------------------------------------------------------------
+17.3 [DA] CHIỀU 2–3 — VALIDITY (HỢP LỆ) & CONSISTENCY (NHẤT QUÁN)
+---------------------------------------------------------------------------
+
+[DA] VALIDITY — mọi giá trị có nằm trong miền cho phép không? Ta kiểm các miền
+hợp lệ dựa trên số thật:
+
+      +-------------------------------+----------------------------------+
+      | Trường                        | Miền hợp lệ quan sát được        |
+      +-------------------------------+----------------------------------+
+      | Điểm bài (score)              | 0 .. 100                         |
+      +-------------------------------+----------------------------------+
+      | date (sự kiện click, studentVle)| -25 .. 269 ngày                |
+      +-------------------------------+----------------------------------+
+      | date_submitted (nộp bài)      | -11 .. 608 ngày                  |
+      +-------------------------------+----------------------------------+
+      | length (độ dài lượt mở môn)   | 234 .. 269 ngày                  |
+      +-------------------------------+----------------------------------+
+
+Điểm nằm gọn trong [0..100] (không có điểm âm hay >100). Các trường ngày có
+thể ÂM một cách hợp lệ — vì mốc 0 là ngày khai giảng, nên sự kiện trước khai
+giảng (đăng ký sớm, truy cập tài liệu sớm) mang giá trị âm. Đây KHÔNG phải lỗi;
+hiểu sai ngày âm = lỗi của 0 (ngoại lai = -50) là một bẫy diễn giải.
+
+[DA] CONSISTENCY — cùng một thứ có được ghi theo một cách duy nhất không? Ta
+CHUẨN HOÁ biến phân loại (categorical): gom các cách viết khác nhau của cùng
+một hạng về một dạng chuẩn, để "0-10%" và "0–10%" (hai dấu gạch khác nhau) hay
+khoảng trắng thừa không bị đếm thành hai hạng riêng. Sau chuẩn hoá, số hạng
+của các biến phân loại là cố định và kiểm được: highest_education 5 hạng,
+region 13 hạng, age_band 3 hạng.
+
+[WHY] Vì sao consistency quan trọng tới mức phải làm trước khi mã hoá? Vì nếu
+một hạng bị tách đôi do cách viết, bước one-hot sẽ tạo ra hai cột cho cùng một
+khái niệm → vừa phình chiều, vừa làm loãng tín hiệu thống kê của hạng đó.
+
+
+---------------------------------------------------------------------------
+17.4 [DA] CHIỀU 4–6 — UNIQUENESS, ACCURACY, TIMELINESS/RELEVANCE
+---------------------------------------------------------------------------
+
+[DA] UNIQUENESS (duy nhất) — một dòng phải ứng với đúng một đơn vị quan sát.
+Khoá định danh một dòng là (code_module, code_presentation, id_student) —
+"môn nào, kỳ nào, sinh viên nào". Trong dựng master ta DROP các dòng trùng
+theo khoá này, để mỗi (sinh viên × lượt mở môn) chỉ còn đúng một dòng. Kết quả
+master_raw có 32.593 dòng — đúng grain "1 sinh viên × 1 lượt mở môn", với
+28.785 sinh viên trên 22 lượt mở môn (một sinh viên có thể học nhiều lượt nên
+số dòng > số sinh viên).
+
+[DA] ACCURACY (chính xác) — giá trị có phản ánh đúng thực tế không? Khác với
+validity (chỉ kiểm "có nằm trong miền không"), accuracy hỏi "có ĐÚNG không".
+Ta không có "sự thật vàng" độc lập để đối chiếu từng ô, nên accuracy được bảo
+đảm GIÁN TIẾP bằng: (a) các phép tổng hợp được kiểm bằng số liệu chéo (ví dụ
+mốc 100% phải giữ TRỌN VẸN dữ liệu, khớp master), và (b) các giá trị cực đoan
+được xác minh là HÀNH VI THẬT chứ không phải lỗi nhập (ví dụ total_clicks max
+24.139 — cực đoan nhưng hợp lệ, không âm, không vô lý).
+
+[DA] TIMELINESS / RELEVANCE (kịp thời / liên quan) — đây là chiều TINH TẾ NHẤT
+với một dự án dự đoán SỚM. Một đặc trưng có thể chính xác tuyệt đối nhưng VÔ
+DỤNG hoặc thậm chí ĐỘC HẠI nếu nó đến từ thời điểm sai. Ví dụ: date_unregistration
+(ngày huỷ) thường xảy ra SAU mốc dự đoán → dùng nó là rò rỉ thời gian. Vì vậy
+chiều này được bảo đảm bằng chính bộ lọc thời gian (date <= cutoff_day) và việc
+loại các cột đến-từ-tương-lai. Nói cách khác, "relevance" ở đây = "chỉ dùng
+thông tin mà ta thực sự có vào thời điểm cần dự đoán".
+
+→ Tổng kết 6 chiều: dự án đạt cả sáu, mỗi chiều có bằng chứng số hoặc kiểm
+chứng cụ thể, không chiều nào dựa vào cảm giác.
+
+
+---------------------------------------------------------------------------
+17.5 [WHY] 3 TẦNG PHÒNG THỦ CHỐNG RÒ RỈ — "RÒ RỈ ĐƯỢC MÁY CANH, KHÔNG PHẢI
+     LỜI HỨA"
+---------------------------------------------------------------------------
+
+Chiều timeliness/relevance ở trên đặt ra kẻ thù lớn nhất của độ tin cậy: RÒ RỈ
+DỮ LIỆU (data leakage). Dự án chống rò rỉ bằng BA TẦNG chồng lên nhau — mỗi
+tầng độc lập, hỏng một tầng vẫn còn hai tầng đỡ.
+
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+TẦNG 1 — QUY TRÌNH: SPLIT-TRƯỚC, FIT-CHỈ-TRÊN-TRAIN
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+[WHY] Tầng này là "quy tắc vàng": TÁCH train/test TRƯỚC, rồi mọi thứ HỌC TỪ DỮ
+LIỆU (median để điền khuyết, ngưỡng winsorize 1%/99%, μ/σ của scaler, bộ mã
+hoá) đều FIT chỉ trên TRAIN, sau đó TRANSFORM lên test. Test đóng vai "tương
+lai chưa thấy"; nếu một thống kê được tính trên cả train+test, thông tin test
+đã ngấm ngược vào pipeline → đánh giá lạc quan giả. Quy trình này chặn cả rò rỉ
+TIỀN XỬ LÝ (preprocessing leakage) lẫn — kết hợp với group split — rò rỉ NHÓM
+và rò rỉ THỜI GIAN.
+
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+TẦNG 2 — BẰNG CHỨNG SỐ: KIỂM ĐƯỢC, TÁI LẬP ĐƯỢC
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+[EVAL] Quy trình tốt phải để lại DẤU VẾT SỐ. Ba con số chốt chặn:
+
+      +------------------------------------+--------------------------+
+      | Bằng chứng                         | Giá trị                  |
+      +------------------------------------+--------------------------+
+      | Sinh viên trùng train ∩ test       | 0 (không một ai)         |
+      +------------------------------------+--------------------------+
+      | Tỉ lệ at-risk train vs test        | 0,53 vs 0,52             |
+      +------------------------------------+--------------------------+
+      | Mốc 100% so với master             | khớp 100% (giữ trọn vẹn) |
+      +------------------------------------+--------------------------+
+
+  - 0 SINH VIÊN TRÙNG → group split (theo id_student) hoạt động tuyệt đối,
+    không có cá nhân nào "bắc cầu" hai tập → không rò rỉ nhóm.
+  - at-risk train 0,53 ≈ test 0,52 → stratify giữ cơ cấu nhãn cân nhau →
+    đánh giá không thiên lệch.
+  - Mốc 100% KHỚP MASTER → mốc tham chiếu "biết hết" không sai lệch, bộ lọc
+    thời gian tại 100% giữ trọn dữ liệu (không mất, không dư).
+
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+TẦNG 3 — KIỂM CHỨNG MÁY: UNIT TEST CANH GÁC LIÊN TỤC
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+[EVAL] File tests/test_leakage.py có 19 test, toàn bộ 19/19 PASS. Ba nhóm:
+
+  1) Thống kê tiền xử lý CHỈ học từ train (median/scaler/encoder không ngấm
+     thông tin test) — canh quy tắc vàng (Tầng 1).
+  2) Danh sách-cho-phép (allow-list) chặn cột rò rỉ — ví dụ date_unregistration
+     không được lọt vào ma trận đặc trưng X.
+  3) Mốc 100% khớp master — canh con số ở Tầng 2.
+
+[WHY] Vì sao unit test đáng tin hơn lời cam kết? Vì con người dễ quên, dễ vô
+tình sửa code làm rò rỉ quay lại. Unit test biến quy tắc chống rò rỉ thành một
+CÁI CHỐT TỰ ĐỘNG: hễ ai để cột rò rỉ lọt vào hay fit thống kê trên cả tập, test
+ĐỎ ngay. Đây là điểm mạnh nhất để nói trước giáo viên: "rò rỉ trong dự án em
+được MÁY canh, không phải chỉ lời hứa".
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 17
+---------------------------------------------------------------------------
+
+★ Hỏi: "date_unregistration thiếu tới 69,1% — chất lượng dữ liệu của em kém à?"
+   Đáp: Không. Đó là "thiếu CÓ NGHĨA" (structural): cột ghi NGÀY huỷ đăng ký,
+   chỉ tồn tại nếu sinh viên đã huỷ. 69,1% trống = 69,1% sinh viên KHÔNG huỷ —
+   ô trống là kết quả ĐÚNG. Đánh giá completeness phải hỏi "thiếu vì sao", chứ
+   không chỉ đếm % NaN. Cột này còn bị LOẠI khỏi đặc trưng vì là thông tin
+   tương lai gắn với nhãn (rò rỉ nhãn), không phải vì con số 69%.
+
+★ Hỏi: "Có sáu chiều chất lượng, dự án em đo chiều nào bằng số cụ thể?"
+   Đáp: Cả sáu. Completeness: 3 cột thiếu (1.111 / 45 / 22.521), sau xử lý 0
+   NaN. Validity: điểm trong [0..100], date trong [-25..269] và [-11..608].
+   Consistency: chuẩn hoá categorical (5/13/3 hạng). Uniqueness: drop trùng
+   theo khoá (code_module, code_presentation, id_student), còn 32.593 dòng.
+   Accuracy: cực đoan là hành vi thật (max click 24.139), mốc 100% khớp master.
+   Timeliness/Relevance: bộ lọc date <= cutoff_day + loại cột từ tương lai.
+
+★ Hỏi: "Làm sao em chắc không rò rỉ?"
+   Đáp: Ba tầng. (1) Quy trình: split trước, fit mọi thống kê chỉ trên train.
+   (2) Bằng chứng số: 0 sinh viên trùng, at-risk 0,53 vs 0,52, mốc 100% khớp
+   master. (3) Máy canh: 19/19 unit test trong tests/test_leakage.py PASS, gồm
+   allow-list chặn cột như date_unregistration. Rò rỉ được máy canh liên tục.
+
+
+===========================================================================
+CHƯƠNG 18 — TỔNG HỢP PHÁT HIỆN → GIẢ THUYẾT CHO MÔ HÌNH
+===========================================================================
+
+
+---------------------------------------------------------------------------
+18.1 [ĐN] VÌ SAO PHẢI BIẾN PHÁT HIỆN EDA THÀNH GIẢ THUYẾT
+---------------------------------------------------------------------------
+
+[ĐN] EDA (phân tích khám phá) không phải đích đến — nó là nguồn sinh GIẢ THUYẾT
+(hypothesis) cho giai đoạn mô hình. Một giả thuyết tốt là một mệnh đề CÓ THỂ
+KIỂM CHỨNG, gắn với một KỲ VỌNG cụ thể, và quan trọng nhất: DỰA TRÊN bằng chứng
+quan sát được, không phải linh cảm.
+
+[WHY] Vì sao nối EDA → modeling theo kiểu giả thuyết, không "cứ đưa hết vào mô
+hình rồi xem"? Vì khi đó, nếu mô hình cho kết quả lạ, ta KHÔNG biết là lỗi mô
+hình hay dữ liệu vốn vậy. Có giả thuyết trước, ta có một "kỳ vọng nền" để đối
+chiếu: kết quả mô hình KHỚP giả thuyết → củng cố niềm tin; LỆCH → có manh mối
+rõ ràng để truy. Năm giả thuyết dưới đây mỗi cái ghi rõ DỰA TRÊN gì.
+
+
+---------------------------------------------------------------------------
+18.2 [DA] GIẢ THUYẾT H1 — idle LÀ TÍN HIỆU MẠNH NHẤT, KỲ VỌNG ĐỨNG ĐẦU
+---------------------------------------------------------------------------
+
+GIẢ THUYẾT H1: days_since_last_activity (số ngày kể từ lần hoạt động cuối —
+"idle") sẽ là một trong những ĐẶC TRƯNG QUAN TRỌNG HÀNG ĐẦU của mô hình.
+
+[DA] DỰA TRÊN: idle có Cohen's d = 2,546 — lớn nhất trong mọi đặc trưng số
+(top-5 d lần lượt: idle 2,546; n_assessments_submitted 2,054; weighted_score
+1,964; n_days_active 1,584; mean_score 1,578). Tương quan idle với nhãn at_risk
+là r = 0,778 — mạnh nhất bảng. Trung bình nhóm cách biệt rõ rệt: nhóm không
+nguy cơ idle 14,2 ngày, nhóm nguy cơ 171,1 ngày.
+
+[EVAL] Cách kiểm ở Task 4: xem idle có nằm trong nhóm đầu của feature importance
+(với cây) hoặc có hệ số lớn (với mô hình tuyến tính). Nếu KHÔNG, đó là cờ đỏ
+cần điều tra (có thể do đa cộng tuyến chia sẻ tín hiệu — xem H4).
+
+
+---------------------------------------------------------------------------
+18.3 [DA] GIẢ THUYẾT H2 — DEMOGRAPHIC ĐÓNG VAI PHỤ; LƯU Ý CÔNG BẰNG
+---------------------------------------------------------------------------
+
+GIẢ THUYẾT H2: nhóm đặc trưng HÀNH VI (engagement) và KẾT QUẢ (performance) sẽ
+chi phối dự đoán; nhóm DEMOGRAPHIC (nhân khẩu học) chỉ đóng vai phụ.
+
+[DA] DỰA TRÊN: mọi biến phân loại demographic có liên kết YẾU với nhãn (Cramér's
+V đều ≤ 0,15): highest_education 0,15; imd_band 0,149; region 0,081; age_band
+0,069; disability 0,059; gender 0,022. Trong khi đó các biến hành vi/kết quả có
+Cohen's d từ 1,5 đến 2,5 — vượt trội.
+
+[WHY/NEXT] Hệ quả KÉP. (a) Về mô hình: kỳ vọng demographic ít ảnh hưởng, nên có
+thể không cần khai thác sâu. (b) Về CÔNG BẰNG (fairness): chính vì demographic
+yếu, ta có thêm lý do để theo dõi mô hình KHÔNG vô tình dựa vào gender / region
+/ disability để phân loại — vì làm vậy vừa kém hiệu quả (V thấp) vừa rủi ro đạo
+đức. Đây là một lưu ý cần mang sang giai đoạn đánh giá mô hình.
+
+
+---------------------------------------------------------------------------
+18.4 [DA] GIẢ THUYẾT H3 — MẤT CÂN BẰNG NHẸ, XỬ LÝ CHỈ TRÊN TRAIN
+---------------------------------------------------------------------------
+
+GIẢ THUYẾT H3: mất cân bằng nhãn ở mức NHẸ, nên cần cân nhắc SMOTE / class_weight
+NHƯNG đó không phải vấn đề lớn, và mọi cân bằng CHỈ áp trên train.
+
+[DA] DỰA TRÊN: tỉ lệ at-risk = 52,8% (17.208 / 32.593), tỉ số mất cân bằng
+(imbalance ratio) = 1,118 — tức lớp đa số chỉ nhỉnh hơn lớp thiểu số ~12%. Nhắc
+lại định nghĩa nhãn: at_risk = 1 nếu final_result ∈ {Fail, Withdrawn}, ngược
+lại = 0. Bảng kết quả gốc: Pass 12.361; Withdrawn 10.156; Fail 7.052;
+Distinction 3.024.
+
+[WHY] Vì sao mất cân bằng nhẹ vẫn nhắc tới SMOTE/class_weight? Vì dù 1,118 là
+rất gần cân bằng (không phải ca 1:100 cực đoan), một số mô hình vẫn hưởng lợi
+nhẹ từ việc cân lớp. Nhưng điểm BẢO VỆ then chốt: nếu dùng SMOTE/oversampling,
+phải áp CHỈ TRÊN TRAIN (trong từng fold CV), TUYỆT ĐỐI không đụng test — nếu
+không sẽ tạo rò rỉ và làm test mất giá trị.
+
+[ALT] Vì sao không "phải" dùng SMOTE? Vì 1,118 gần cân bằng; class_weight (chỉnh
+trọng số lớp trong hàm mất mát) thường đủ và đơn giản hơn, không sinh mẫu giả.
+
+
+---------------------------------------------------------------------------
+18.5 [DA] GIẢ THUYẾT H4 — ĐA CỘNG TUYẾN, MÔ HÌNH TUYẾN TÍNH CẦN ĐIỀU HOÀ
+---------------------------------------------------------------------------
+
+GIẢ THUYẾT H4: có đa cộng tuyến (multicollinearity) giữa vài đặc trưng, nên mô
+hình TUYẾN TÍNH cần regularization hoặc bỏ bớt biến; mô hình cây thì chịu được.
+
+[DA] DỰA TRÊN: hai cặp có |r| >= 0,8 — n_days_active–total_clicks r = 0,837;
+days_since_last_activity–n_assessments_submitted r = -0,828. (Ngưỡng nghi rò rỉ
+>= 0,95 thì KHÔNG có cặp nào → không có cặp "trùng lặp trá hình".)
+
+[WHY] Vì sao đa cộng tuyến gây phiền cho mô hình tuyến tính? Vì khi hai biến đi
+gần như song hành (active nhiều thì click nhiều), mô hình không tách bạch nổi
+"công" của từng biến → hệ số trở nên bất ổn, đổi dấu thất thường, khó diễn giải.
+Đó là lý do regularization (L1/L2) hoặc bỏ bớt một trong hai biến là cần thiết.
+
+[NEXT] Liên hệ H1: vì idle chia sẻ tín hiệu với nhiều biến (idle–submits -0,828,
+idle–mean_score -0,769, idle–weighted_score -0,726), nếu mô hình tuyến tính
+"chia phần" tín hiệu cho các biến cộng tuyến, importance của idle có thể bị làm
+mờ — cần đọc importance một cách thận trọng.
+
+
+---------------------------------------------------------------------------
+18.6 [DA] GIẢ THUYẾT H5 — PHÁT HIỆN SỚM KHẢ THI; KỲ VỌNG ĐƯỜNG CONG TĂNG DẦN
+---------------------------------------------------------------------------
+
+GIẢ THUYẾT H5: phát hiện sớm khả thi ngay từ mốc 10–20%, và đường cong hiệu
+năng-theo-thời-gian sẽ TĂNG DẦN theo mốc (RQ1).
+
+[DA] DỰA TRÊN: sức phân biệt (Cohen's d) của các đặc trưng TĂNG ĐƠN ĐIỆU theo
+mốc — bằng chứng "tín hiệu mạnh lên khi có thêm thời gian":
+
+      +-----------+------+------+------+------+------+------+
+      | Đặc trưng | t10  | t20  | t40  | t60  | t80  | t100 |
+      +-----------+------+------+------+------+------+------+
+      | idle      | 0,906| 1,173| 1,563| 1,923| 2,296| 2,546|
+      | mean_score| 0,798| 1,113| 1,492| 1,559| 1,573| 1,578|
+      | n_assess. | 0,669| 0,919| 1,233| 1,652| 1,879| 2,054|
+      | n_days_act| 0,834| 0,991| 1,165| 1,367| 1,500| 1,584|
+      | total_clk | 0,616| 0,688| 0,780| 0,913| 0,994| 1,064|
+      +-----------+------+------+------+------+------+------+
+
+Mốc SỚM NHẤT đạt d >= 0,8 (ngưỡng "hiệu ứng lớn"): idle tại t=10, n_days_active
+tại t=10, mean_score tại t=20, n_assessments_submitted tại t=20, weighted_score
+tại t=20, total_clicks tại t=60.
+
+[WHY] Đọc bảng: ngay tại t=10% (mới ~1/4 chặng đường), idle đã đạt d = 0,906 —
+đã là hiệu ứng lớn. Tức tín hiệu nguy cơ XUẤT HIỆN RẤT SỚM, can thiệp kịp. Vì d
+tăng dần theo mốc, ta KỲ VỌNG đường cong AUC của mô hình cũng tăng dần — đó
+chính là câu trả lời cho RQ1.
+
+[EVAL] LƯU Ý quan trọng: d tăng dần KHÔNG bảo đảm AUC chắc chắn tăng dần — d chỉ
+đo sức phân biệt của TỪNG biến đơn lẻ, còn AUC là kết quả TỔNG HỢP của mô hình.
+Đây là giả thuyết cần Task 4 kiểm, không phải kết luận đã có.
+
+
+---------------------------------------------------------------------------
+★ Q/A CHƯƠNG 18
+---------------------------------------------------------------------------
+
+★ Hỏi: "Em kỳ vọng biến nào quan trọng nhất, và dựa vào đâu?"
+   Đáp: days_since_last_activity (idle). Dựa trên Cohen's d = 2,546 (lớn nhất)
+   và tương quan với nhãn r = 0,778 (mạnh nhất). Trung bình idle nhóm không
+   nguy cơ 14,2 ngày so với nhóm nguy cơ 171,1 ngày — cách biệt rất rõ.
+
+★ Hỏi: "EDA cho thấy demographic yếu — vậy bỏ luôn được không?"
+   Đáp: Cramér's V của demographic đều <= 0,15 nên kỳ vọng vai trò phụ. Nhưng
+   không vội bỏ: giữ để mô hình tự cân, đồng thời THEO DÕI công bằng để mô hình
+   không dựa vào gender/region/disability — vừa kém hiệu quả vừa rủi ro đạo đức.
+
+★ Hỏi: "Đường cong hiệu năng theo thời gian, em đoán hình dạng thế nào?"
+   Đáp: Tăng dần. Dựa trên Cohen's d của các đặc trưng tăng đơn điệu qua 6 mốc
+   (ví dụ idle: 0,906 → 2,546). Nhưng đây là giả thuyết — d đo từng biến, AUC
+   là tổng hợp, nên phải để Task 4 xác nhận hình dạng thật.
+
+
+===========================================================================
+CHƯƠNG 19 — CẨM NANG PHẢN BIỆN: NGÂN HÀNG CÂU HỎI & CÁCH LẬP LUẬN
+===========================================================================
+
+
+---------------------------------------------------------------------------
+19.1 KHUNG LẬP LUẬN 4 CÂU HỎI — XƯƠNG SỐNG CỦA MỌI CÂU TRẢ LỜI
+---------------------------------------------------------------------------
+
+Trước khi vào ngân hàng câu hỏi, nhớ khung bốn câu của dự án — trả lời được bốn
+câu này cho BẤT KỲ quyết định nào là đã bảo vệ được:
+
+      (1) Làm GÌ?            — mô tả thao tác cụ thể.
+      (2) VÌ SAO?           — lý thuyết nền + bằng chứng số.
+      (3) Cách KHÁC bị loại?— phương án thay thế và lý do không chọn.
+      (4) ĐÁNH GIÁ ra sao?  — đo / kiểm chứng hiệu quả bằng gì.
+
+Mẹo trả lời: luôn KÈM MỘT CON SỐ THẬT. "Em chia theo nhóm sinh viên" yếu hơn
+hẳn "em chia theo nhóm sinh viên, kết quả 0 sinh viên trùng giữa train/test".
+
+
+---------------------------------------------------------------------------
+19.2 NHÓM A — ĐỊNH NGHĨA BÀI TOÁN & NHÃN
+---------------------------------------------------------------------------
+
+★ Hỏi: "Vì sao nhị phân hoá nhãn: {Fail, Withdrawn} = at-risk?"
+   Đáp: Mục tiêu là cảnh báo SỚM để can thiệp. Cả Fail (rớt) và Withdrawn (bỏ
+   học) đều là kết cục cần can thiệp, khác hẳn Pass/Distinction. Gộp hai kết cục
+   xấu thành at_risk = 1 biến bài toán 4 lớp thành bài toán nhị phân đúng với
+   nhu cầu "có cần can thiệp hay không". Kết quả: 17.208 ca at-risk = 52,8%.
+
+★ Hỏi: "Withdrawn (bỏ học) khác Fail (rớt) — sao gộp chung?"
+   Đáp: Về can thiệp, cả hai đều cần hành động sớm. Hơn nữa hành vi của hai
+   nhóm tuy khác nhau (median idle Withdrawn ~232–233 ngày, Fail ~116 ngày;
+   median click Withdrawn 89, Fail 317) nhưng đều LỆCH rõ khỏi nhóm Not-at-risk
+   (idle ~11, click 1.425) — tức cùng nằm về phía "nguy cơ". Việc phân biệt sâu
+   Fail vs Withdrawn là bài toán mở rộng, không phải mục tiêu cảnh báo sớm.
+
+
+---------------------------------------------------------------------------
+19.3 NHÓM B — THỜI GIAN & CHECKPOINT
+---------------------------------------------------------------------------
+
+★ Hỏi: "Vì sao cắt theo PHẦN TRĂM tiến độ, không theo NGÀY cố định?"
+   Đáp: Vì các lượt mở môn dài ngắn khác nhau (234–269 ngày). Cùng "ngày 50"
+   ứng với % tiến độ khác nhau giữa các môn → so sánh không công bằng, ý nghĩa
+   "sớm" bị méo. Cắt theo % chuẩn hoá mọi môn về cùng thước "đã đi bao nhiêu
+   chặng đường": cutoff_day = round(length × t/100), tính sẵn cho từng môn-kỳ.
+
+★ Hỏi: "Vì sao 6 mốc 10/20/40/60/80/100, không phải 1 hay 100 mốc?"
+   Đáp: RQ1 cần một ĐƯỜNG CONG hiệu năng-theo-thời-gian, mà đường cần nhiều
+   điểm — 1 mốc không vẽ được. Dày ở đầu (10, 20) nơi can thiệp sớm có giá trị
+   nhất, thưa về sau (40, 60, 80) nơi ít biến động, 100% là tham chiếu "biết
+   hết". 100 mốc thì tốn gấp bội mà thông tin tăng thêm không đáng.
+
+★ Hỏi: "Rò rỉ thời gian là gì? Chặn thế nào?"
+   Đáp: Là dùng thông tin TƯƠNG LAI (so với mốc dự đoán) để dự đoán hiện tại —
+   thứ lúc triển khai thật không thể có. Ví dụ: dùng điểm cuối kỳ, hay ngày huỷ
+   đăng ký, để dự đoán giữa kỳ. Chặn bằng: tại mỗi mốc chỉ giữ sự kiện có
+   date <= cutoff_day, và LOẠI các cột đến-từ-tương-lai (như date_unregistration).
+
+
+---------------------------------------------------------------------------
+19.4 NHÓM C — CHIA TẬP & RÒ RỈ
+---------------------------------------------------------------------------
+
+★ Hỏi: "Vì sao chia theo NHÓM sinh viên, không chia theo dòng?"
+   Đáp: Một sinh viên có nhiều dòng (học nhiều lượt mở môn). Chia theo dòng
+   khiến cùng một người vào cả train lẫn test → mô hình "quen mặt" → điểm test
+   cao giả (rò rỉ nhóm). Triển khai thật gặp sinh viên hoàn toàn mới, nên phải
+   giữ trọn mọi dòng của một người về một phía. Kết quả: 0 sinh viên trùng.
+
+★ Hỏi: "Vì sao vừa group VỪA stratified?"
+   Đáp: Hai mục đích khác nhau. Group (theo id_student) chặn rò rỉ nhóm.
+   Stratified (theo at_risk) giữ tỉ lệ nhãn train ≈ test (0,53 vs 0,52) để đánh
+   giá không thiên lệch. Bỏ cái nào cũng làm điểm test mất giá trị, nên kết hợp
+   cả hai (StratifiedGroupKFold khi CV).
+
+★ Hỏi: "Vì sao fit scaler/median/encoder CHỈ trên train?"
+   Đáp: "Fit" là HỌC tham số từ dữ liệu. Fit trên cả train+test thì μ/σ (hay
+   median, ngưỡng winsorize) đã ngấm thông tin test → rò rỉ tiền xử lý → điểm
+   test lạc quan giả. Test phải là đề kín: chỉ transform bằng tham số học từ
+   train. Quy tắc này được 19 unit test canh.
+
+★ Hỏi: "Có rò rỉ không? Chứng minh đi."
+   Đáp: Ba tầng bằng chứng. (1) Quy trình split-trước-fit-train. (2) Số: 0 sinh
+   viên trùng, at-risk 0,53 vs 0,52, mốc 100% khớp master. (3) Máy: 19/19 unit
+   test trong tests/test_leakage.py PASS, gồm allow-list chặn cột rò rỉ. Rò rỉ
+   được máy canh liên tục, không phải lời hứa.
+
+
+---------------------------------------------------------------------------
+19.5 NHÓM D — LÀM SẠCH (THIẾU & NGOẠI LAI)
+---------------------------------------------------------------------------
+
+★ Hỏi: "Xử lý dữ liệu thiếu thế nào, và vì sao mỗi cột một kiểu?"
+   Đáp: Vì cơ chế thiếu khác nhau. date_unregistration (22.521; 69,1%) là thiếu
+   cấu trúc + rò rỉ nhãn → LOẠI. imd_band (1.111; 3,41%) là phân loại thiếu
+   thường → thêm hạng "Unknown" (không bịa mức thiệt thòi). date_registration
+   (45; 0,14%) là MCAR → điền median của TRAIN. Một con dao không cắt được mọi
+   thứ; xử lý theo NGHĨA từng cột. Sau xử lý: 0 NaN ở mọi cột đặc trưng.
+
+★ Hỏi: "Vì sao không xoá ngoại lai cho 'sạch'?"
+   Đáp: Vì đó là HÀNH VI THẬT, không phải lỗi (ví dụ total_clicks max 24.139 —
+   cực đoan nhưng hợp lệ). Xoá = mất thông tin nhóm rủi ro, lệch mẫu, thiên lệch
+   chọn mẫu. Ta GIỮ đủ 32.593 dòng và BIẾN ĐỔI thay vì cắt: log1p cho biến đếm
+   lệch nặng (clicks_resource skew 34,71), winsorize 1% cho biến có chặn.
+
+★ Hỏi: "Vì sao log1p chứ không log hay sqrt?"
+   Đáp: log thường chết ở x = 0 (mà click đầy số 0); log1p = log(1+x) nhận
+   được 0. sqrt nén quá nhẹ, không đủ cho skew tới 34,71. log1p vừa nén mạnh,
+   nhận 0, vừa giữ thứ hạng → đúng nhất cho dữ liệu đếm lệch nặng. Ngoài ra
+   log1p không có tham số học từ dữ liệu nên không vướng rò rỉ.
+
+
+---------------------------------------------------------------------------
+19.6 NHÓM E — EDA & CHỌN BIỂU ĐỒ
+---------------------------------------------------------------------------
+
+★ Hỏi: "Vì sao chọn biểu đồ X cho biến này?"
+   Đáp: Chọn theo LOẠI dữ liệu và CÂU HỎI. Biến đếm lệch nặng → histogram +
+   boxplot để lộ đuôi phải và ngoại lai (boxplot trực quan hoá đúng quy tắc
+   1,5×IQR). Biến số vs nhãn nhị phân → boxplot theo nhóm + Cohen's d. Hai biến
+   số → scatter + Pearson/Spearman. Biến phân loại vs nhãn → bảng chéo + Cramér's
+   V. Không có biểu đồ "mặc định"; mỗi biểu đồ trả lời một câu hỏi cụ thể.
+
+★ Hỏi: "Biến nào mạnh nhất, bằng chứng?"
+   Đáp: days_since_last_activity (idle): Cohen's d = 2,546, tương quan với nhãn
+   r = 0,778, trung bình nhóm 14,2 vs 171,1 ngày. Đều là số kiểm chứng được.
+
+★ Hỏi: "Tương quan cao giữa hai biến — có phải rò rỉ không?"
+   Đáp: Không tự động. Cặp mạnh nhất là n_days_active–total_clicks r = 0,837 —
+   đó là đa cộng tuyến (hai biến hành vi đi cùng nhau), không phải rò rỉ. Ngưỡng
+   NGHI rò rỉ là |r| >= 0,95 (biến gần như sao chép nhãn); dự án KHÔNG có cặp
+   nào vượt ngưỡng đó. Đa cộng tuyến chỉ cần regularization, không phải loại bỏ
+   vì rò rỉ.
+
+
+---------------------------------------------------------------------------
+19.7 NHÓM F — MẤT CÂN BẰNG & ĐỘ TIN CẬY SỐ LIỆU
+---------------------------------------------------------------------------
+
+★ Hỏi: "Xử lý mất cân bằng lớp thế nào?"
+   Đáp: Mất cân bằng NHẸ — at-risk 52,8%, tỉ số 1,118 (đa số chỉ hơn ~12%). Có
+   thể dùng class_weight hoặc SMOTE, nhưng CHỈ trên train (trong từng fold CV),
+   tuyệt đối không đụng test. Vì gần cân bằng nên thường class_weight là đủ,
+   không cần sinh mẫu giả.
+
+★ Hỏi: "Vì sao em tin các con số này? Tái lập được không?"
+   Đáp: Mọi con số tính lại được từ CSV gốc + parquet bằng clickhouse-local,
+   ghi trong notebooks/00_data_understanding.ipynb và chốt ở
+   reports/data_understanding/verified_numbers.json (nguồn chân lý). Split cố
+   định seed = 42, danh sách id test commit ở data/splits/test_student_ids.csv.
+   Chống rò rỉ có 19/19 unit test. Ai chạy lại cũng ra đúng số → tái lập được.
+
+★ Hỏi: "Nếu kết quả mô hình sau này không khớp giả thuyết EDA thì sao?"
+   Đáp: Đó là thông tin có giá trị, không phải thất bại. Ví dụ nếu idle KHÔNG
+   đứng đầu importance, manh mối đầu tiên là đa cộng tuyến (idle chia sẻ tín
+   hiệu với submits r = -0,828, mean_score r = -0,769) làm mờ importance trong
+   mô hình tuyến tính. Có giả thuyết nền giúp truy nguyên nhân thay vì đoán mò.
+
+
+---------------------------------------------------------------------------
+19.8 BA CÂU CHỐT MANG THEO PHÒNG THI
+---------------------------------------------------------------------------
+
+  1) "Mỗi quyết định trong Task 3 bắt nguồn từ một BẰNG CHỨNG quan sát được,
+     phục vụ một MỤC TIÊU rõ ràng (phát hiện sớm · giải thích được · không rò
+     rỉ), và được KIỂM CHỨNG bằng số thật + unit test."
+
+  2) "Bốn con số xương sống: 32.593 dòng; at-risk 52,8% (mất cân bằng nhẹ, tỉ
+     số 1,118); idle có Cohen's d = 2,546 — mạnh nhất; tín hiệu sớm có từ mốc
+     10%."
+
+  3) "Rò rỉ được MÁY canh: 19/19 unit test PASS, 0 sinh viên trùng train/test,
+     mốc 100% khớp master."
+
+
+===========================================================================
+TÓM TẮT TẬP 7
+===========================================================================
+
+- CHẤT LƯỢNG DỮ LIỆU (Ch.17): đo qua 6 chiều — completeness (3 cột thiếu
+  1.111/45/22.521, trong đó 69,1% date_unregistration là "thiếu CÓ NGHĨA";
+  sau xử lý 0 NaN), validity (điểm 0..100; date -25..269 và -11..608),
+  consistency (chuẩn hoá categorical 5/13/3 hạng), uniqueness (drop trùng theo
+  khoá, còn 32.593 dòng), accuracy (cực đoan là hành vi thật; mốc 100% khớp
+  master), timeliness/relevance (lọc date <= cutoff + loại cột tương lai). Chống
+  rò rỉ ba tầng: quy trình split-trước-fit-train; bằng chứng số (0 trùng,
+  at-risk 0,53 vs 0,52, 100% khớp master); máy canh (19/19 unit test PASS).
+
+- GIẢ THUYẾT CHO MÔ HÌNH (Ch.18): H1 idle đứng đầu importance (d 2,546, r 0,778);
+  H2 demographic vai trò phụ (Cramér's V <= 0,15) + lưu ý fairness; H3 mất cân
+  bằng nhẹ (52,8%, tỉ số 1,118) → class_weight/SMOTE chỉ trên train; H4 đa cộng
+  tuyến (n_days_active–total_clicks 0,837) → mô hình tuyến tính cần regularization;
+  H5 phát hiện sớm khả thi từ t=10–20% và kỳ vọng đường cong hiệu năng tăng dần
+  (d tăng đơn điệu qua 6 mốc). Mỗi giả thuyết ghi rõ bằng chứng EDA và để Task 4
+  kiểm.
+
+- CẨM NANG PHẢN BIỆN (Ch.19): khung 4 câu hỏi (làm GÌ / VÌ SAO / cách KHÁC bị
+  loại / ĐÁNH GIÁ) + ngân hàng câu hỏi theo 6 nhóm (định nghĩa nhãn, thời gian,
+  chia tập & rò rỉ, làm sạch, EDA & biểu đồ, mất cân bằng & độ tin cậy). Mẹo
+  cốt lõi: mọi câu trả lời KÈM một con số thật, kiểm chứng được.
+
+
+-- HẾT TẬP 7 --

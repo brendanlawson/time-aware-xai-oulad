@@ -1,1 +1,1 @@
-"""Feature layer: cleaning, encoding, scaling (fit on train only)."""
+"""Feature layer: anti-leakage preprocessing (missing/outliers/encoding/scaling)."""
