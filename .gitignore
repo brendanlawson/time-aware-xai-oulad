@@ -4,6 +4,9 @@ data/interim/
 data/checkpoints/
 *.parquet
 *.pkl
+# Trained model bundles are regenerable from src.modeling.train (benchmark) — only
+# a deliberately-packaged final model should be versioned, not the 30 checkpoints.
+*.joblib
 # Large data archive / local ClickHouse binary (too big for git, regenerable)
 data.zip
 clickhouse

@@ -202,7 +202,9 @@ Group 1, DSP391m — FPT University. Supervisor: **Nguyễn Thị Hoàng Yến**
 
 ## 10. Project Status
 
-**Report 2 — Data Tasks (collection, cleaning, EDA): complete.** The full data pipeline (`src/data`, `src/features`, `src/eda`, `src/evaluation`) builds the master table (32,593 × 33), six time-aware checkpoint datasets, and the leakage-safe split harness; `tests/test_leakage.py` passes (19 tests); EDA figures and the bilingual Report 2 draft are in `reports/`. Every work item (STT 1–40) and its artifact are mapped in [`docs/README_EN.md`](docs/README_EN.md) (Vietnamese: `docs/README_VI.md`). Modelling and XAI phases follow per the seven-week work plan.
+**Report 2 — Data Tasks (collection, cleaning, EDA): complete.** The full data pipeline (`src/data`, `src/features`, `src/eda`, `src/evaluation`) builds the master table (32,593 × 33), six time-aware checkpoint datasets, and the leakage-safe split harness; `tests/test_leakage.py` passes (19 tests); EDA figures and the bilingual Report 2 draft are in `reports/`. Every work item (STT 1–40) and its artifact are mapped in [`docs/README_EN.md`](docs/README_EN.md) (Vietnamese: `docs/README_VI.md`).
+
+**Phase 2–3 — Benchmarking + Time-Aware Prediction: complete.** The five candidate algorithms (Logistic Regression, Random Forest, XGBoost, LightGBM, ANN) are benchmarked across all six checkpoints with a leakage-safe held-out test and repeated 5-fold × 5-seed cross-validation at t=100% (`src/modeling/train.py`). XGBoost leads, and at-risk prediction becomes reliable (recall ≥ 0.80, PR-AUC ≥ 0.80) from the **40% checkpoint** — answering RQ1. Results: `reports/tables/{model_metrics,cv_summary,time_aware_best}.csv` and the `time_aware_*` / `model_benchmark` figures. The XAI layer (Phase 5) follows.
 
 ## 11. Citation
 
