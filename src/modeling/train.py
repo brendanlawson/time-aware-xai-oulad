@@ -35,6 +35,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.neural_network import MLPClassifier
 
 from src.config import CHECKPOINTS, MODELS_DIR, RANDOM_SEED, TABLES_DIR
 from src.evaluation.make_split import load_checkpoint_split
@@ -104,6 +105,13 @@ def _make_xgb(seed: int):
     return XGBClassifier(random_state=seed, n_jobs=-1, eval_metric="logloss", tree_method="hist")
 
 
+def _make_lgbm(seed: int):
+    # Lazy import: keep this module importable even where lightgbm is absent.
+    from lightgbm import LGBMClassifier
+
+    return LGBMClassifier(random_state=seed, n_jobs=-1, verbose=-1)
+
+
 # Registry of estimator factories, each seeded with RANDOM_SEED. SMOTE balances
 # the TRAIN fold (see train_at_checkpoint), so estimators keep their default
 # class weights — adding class_weight="balanced" on top would double-correct the
@@ -111,20 +119,26 @@ def _make_xgb(seed: int):
 MODEL_REGISTRY = {
     "logreg": lambda seed: LogisticRegression(max_iter=1000, random_state=seed),
     "rf": lambda seed: RandomForestClassifier(random_state=seed, n_jobs=-1),
-    "gboost": lambda seed: HistGradientBoostingClassifier(random_state=seed),
     "xgb": _make_xgb,
     "xgboost": _make_xgb,
+    "lgbm": _make_lgbm,
+    "ann": lambda seed: MLPClassifier(
+        hidden_layer_sizes=(64, 32), max_iter=500, early_stopping=True, random_state=seed
+    ),
+    "gboost": lambda seed: HistGradientBoostingClassifier(random_state=seed),
 }
+
+# The five candidate algorithms benchmarked in the proposal (Phase 2): Logistic
+# Regression, Random Forest, XGBoost, LightGBM and an ANN (MLP). `gboost`
+# (HistGradientBoosting) stays in the registry as an extra fast-tree baseline.
+DEFAULT_MODELS = ("logreg", "rf", "xgb", "lgbm", "ann")
 
 
 def build_model(name: str, seed: int = RANDOM_SEED):
-    """Return an unfitted estimator for ``name``.
+    """Return an unfitted estimator for ``name`` from :data:`MODEL_REGISTRY`.
 
-    TODO: support at least {"logreg", "rf", "gboost"}:
-      - logreg: LogisticRegression(max_iter=1000, class_weight=..., random_state)
-      - rf    : RandomForestClassifier(random_state=seed, n_jobs=-1)
-      - gboost: HistGradientBoostingClassifier(random_state=seed) or XGBClassifier
-    Keep a small registry dict so the CLI can list valid names.
+    Valid names: logreg, rf, xgb (alias xgboost), lgbm, ann, gboost — each seeded
+    with ``seed`` for reproducibility.
     """
     key = name.lower()
     if key not in MODEL_REGISTRY:
@@ -135,9 +149,9 @@ def build_model(name: str, seed: int = RANDOM_SEED):
 def evaluate(model, X_test, y_test) -> dict:
     """Compute the metric suite on the test set.
 
-    TODO: predict + predict_proba; return dict with roc_auc, pr_auc (average
-    precision), f1, recall, precision, balanced_accuracy, brier. Recall matters
-    most here (catching at-risk students) — note it in the report.
+    Returns roc_auc, pr_auc (average precision), f1, recall, precision,
+    balanced_accuracy and brier. Recall of the at-risk (positive) class is the
+    headline metric — catching students who need support matters most here.
     """
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)[:, 1]
@@ -156,15 +170,9 @@ def evaluate(model, X_test, y_test) -> dict:
 def train_at_checkpoint(t_percent: int, model_name: str, seed: int = RANDOM_SEED) -> dict:
     """Full train+evaluate for one (t, model); persist the fitted pipeline.
 
-    TODO:
-      1. train_df, test_df = load_checkpoint_split(t_percent)
-      2. X_train, y_train = make_X_y(train_df); X_test, y_test = make_X_y(test_df)
-      3. Xtr, Xte, ct, feat_names = preprocess(X_train, X_test)
-      4. SMOTE(random_state=seed).fit_resample(Xtr, y_train)  # train only
-      5. model = build_model(model_name, seed).fit(Xtr_res, y_res)
-      6. metrics = evaluate(model, Xte, y_test)
-      7. Save {model, ct, feat_names} to MODELS_DIR/f"{model_name}_t{t}.joblib".
-      8. Return {"model": model_name, "t_percent": t, **metrics}.
+    Loads checkpoint t's fixed split, fits preprocessing + SMOTE on the train fold
+    only (anti-leakage), fits the model, evaluates on the held-out test, and saves
+    a self-contained {model, ct, feat_names, stats} bundle for inference/XAI.
     """
     train_df, test_df = load_checkpoint_split(t_percent)
     X_train, y_train = make_X_y(train_df)
@@ -188,12 +196,12 @@ def train_at_checkpoint(t_percent: int, model_name: str, seed: int = RANDOM_SEED
     return {"model": model_name, "t_percent": int(t_percent), **metrics}
 
 
-def train_all(models=("logreg", "rf", "gboost"), checkpoints=CHECKPOINTS) -> "pd.DataFrame":
-    """Loop over models x checkpoints; return + save the metrics table.
+def train_all(models=DEFAULT_MODELS, checkpoints=CHECKPOINTS) -> "pd.DataFrame":
+    """Loop over models x checkpoints; return + save the held-out metrics table.
 
-    TODO: collect train_at_checkpoint rows into a DataFrame; write
-    TABLES_DIR/"model_metrics.csv". (Consider resume: skip a combo whose model
-    file already exists.)
+    Collects one ``train_at_checkpoint`` row per (model, t) into the tidy
+    ``model_metrics.csv``. Resumable: a combo whose metrics row AND model bundle
+    both already exist is skipped, and the table is rewritten after every new fit.
     """
     # Resume: seed from any prior table so re-runs continue instead of restarting.
     results = _load_existing(METRICS_PATH)
@@ -216,31 +224,121 @@ def train_all(models=("logreg", "rf", "gboost"), checkpoints=CHECKPOINTS) -> "pd
     return _metrics_frame(results)
 
 
+# --- Repeated cross-validation (proposal Phase 2: 5-fold x 5-seed on TRAIN) -----
+CV_METRICS_PATH = TABLES_DIR / "cv_metrics.csv"  # one row per (model, t, repeat, fold)
+CV_SUMMARY_PATH = TABLES_DIR / "cv_summary.csv"  # mean +/- std per (model, t)
+
+
+def cross_validate(
+    model_name: str,
+    t_percent: int,
+    n_splits: int = 5,
+    n_repeats: int = 5,
+    seed: int = RANDOM_SEED,
+) -> "pd.DataFrame":
+    """Repeated stratified-group CV on checkpoint t's TRAIN side (anti-leakage).
+
+    For each of the n_splits x n_repeats folds, preprocessing + SMOTE are fit on
+    that fold's train part ONLY, then the model is scored on the held-out fold.
+    Each repeat reseeds both the partition and the estimator. Returns one row per
+    fold: (model, t_percent, repeat, fold, <metric suite>).
+    """
+    from src.evaluation.split_harness import iter_cv_folds
+
+    train_df, _ = load_checkpoint_split(t_percent)
+    X_all, y_all = make_X_y(train_df)
+    rows = []
+    for r, fold, tr_idx, va_idx in iter_cv_folds(train_df, n_splits, n_repeats, seed):
+        X_tr, X_va = X_all.iloc[tr_idx], X_all.iloc[va_idx]
+        y_tr, y_va = y_all.iloc[tr_idx], y_all.iloc[va_idx]
+        Xtr, Xva, _ct, _fn, _st = preprocess(X_tr, X_va, scaler_save_path=None, return_stats=True)
+        Xtr_res, y_res = SMOTE(random_state=seed).fit_resample(Xtr, y_tr)
+        model = build_model(model_name, seed + r).fit(Xtr_res, y_res)
+        rows.append(
+            {
+                "model": model_name,
+                "t_percent": int(t_percent),
+                "repeat": r,
+                "fold": fold,
+                **evaluate(model, Xva, y_va),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _cv_summary(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Aggregate per-fold CV rows into mean +/- std per (model, t_percent)."""
+    metric_cols = [c for c in _METRIC_COLS if c in df.columns and c not in ("model", "t_percent")]
+    g = df.groupby(["model", "t_percent"])[metric_cols]
+    out = g.mean().round(4).add_suffix("_mean").join(g.std(ddof=0).round(4).add_suffix("_std"))
+    return out.reset_index().sort_values(["t_percent", "f1_mean"], ascending=[True, False])
+
+
+def cross_validate_all(
+    models=DEFAULT_MODELS, checkpoints=(100,), n_splits: int = 5, n_repeats: int = 5
+) -> "pd.DataFrame":
+    """Run repeated CV for each (model, t); write cv_metrics.csv + cv_summary.csv.
+
+    Resumable at the (model, t) grain: a combo already present in cv_metrics.csv is
+    skipped, and both tables are rewritten after every newly-evaluated combo.
+    """
+    prev = pd.read_csv(CV_METRICS_PATH) if CV_METRICS_PATH.exists() else pd.DataFrame()
+    done = (
+        set()
+        if prev.empty
+        else {(str(m), int(t)) for m, t in prev[["model", "t_percent"]].itertuples(index=False)}
+    )
+    parts = [prev] if not prev.empty else []
+    for model_name in models:
+        for t in checkpoints:
+            if (str(model_name), int(t)) in done:
+                logger.info(f"skip (resumed) CV: {model_name} @ t={t}")
+                continue
+            logger.info(f"CV ({n_splits}x{n_repeats}): {model_name} @ t={t}")
+            parts.append(cross_validate(model_name, t, n_splits, n_repeats))
+            allrows = pd.concat(parts, ignore_index=True)
+            _write_csv_atomic(allrows, CV_METRICS_PATH)
+            _write_csv_atomic(_cv_summary(allrows), CV_SUMMARY_PATH)
+    allrows = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    return _cv_summary(allrows) if not allrows.empty else allrows
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """TODO: --model (optional), --t (optional)."""
+    """CLI: optional --model / --t; --cv switches to repeated cross-validation."""
     p = argparse.ArgumentParser(
-        description="Train at-risk models across the six time checkpoints."
+        description="Train or cross-validate at-risk models across the six checkpoints."
     )
     p.add_argument(
         "--model",
         choices=sorted(MODEL_REGISTRY),
         default=None,
-        help="train only this model (default: logreg, rf, gboost)",
+        help="only this model (default: the five benchmark models LR/RF/XGB/LGBM/ANN)",
     )
     p.add_argument(
         "--t",
         type=int,
         choices=CHECKPOINTS,
         default=None,
-        help="train only at this checkpoint %% (default: all six)",
+        help="only this checkpoint %% (default: all six; with --cv, default 100)",
+    )
+    p.add_argument(
+        "--cv",
+        action="store_true",
+        help="repeated 5-fold x 5-seed CV on the train set instead of a held-out fit",
     )
     return p.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """TODO: parse args; train one combo or train_all(); return 0."""
+    """Parse args; run held-out training (default) or cross-validation (--cv)."""
     args = parse_args(argv)
-    models = (args.model,) if args.model else ("logreg", "rf", "gboost")
+    models = (args.model,) if args.model else DEFAULT_MODELS
+    if args.cv:
+        checkpoints = (args.t,) if args.t is not None else (100,)
+        summary = cross_validate_all(models, checkpoints)
+        if not summary.empty:
+            logger.info("cv_summary.csv:\n" + summary.to_string(index=False))
+        return 0
     checkpoints = (args.t,) if args.t is not None else CHECKPOINTS
     metrics = train_all(models, checkpoints)
     if not metrics.empty:

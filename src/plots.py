@@ -48,6 +48,38 @@ def metric_vs_checkpoint(
     return path
 
 
+def model_comparison_bar(
+    metrics: pd.DataFrame,
+    t_percent: int = 100,
+    metric_cols: tuple[str, ...] = ("recall", "f1", "pr_auc", "roc_auc"),
+    name: str = "model_benchmark",
+) -> Path:
+    """Grouped bars comparing the candidate algorithms at one checkpoint (Phase 2).
+
+    ``metrics`` is the tidy table from :func:`src.modeling.train.train_all`; one
+    group of bars per model, one bar per metric. The proposal's headline
+    benchmark figure at t=100% (which model wins on recall / PR-AUC).
+    """
+    apply_style()
+    sub = metrics[metrics["t_percent"] == t_percent].sort_values("recall", ascending=False)
+    models = sub["model"].tolist()
+    x = range(len(models))
+    width = 0.8 / len(metric_cols)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i, m in enumerate(metric_cols):
+        ax.bar([xi + i * width for xi in x], sub[m], width=width, label=m.replace("_", " "))
+    ax.set_xticks([xi + width * (len(metric_cols) - 1) / 2 for xi in x])
+    ax.set_xticklabels(models)
+    ax.set_ylim(0, 1.05)
+    ax.set_xlabel("Model")
+    ax.set_ylabel("score")
+    ax.set_title(f"Model benchmark at t={t_percent}% of course length (Phase 2)")
+    ax.legend(ncol=len(metric_cols), fontsize=8)
+    path = savefig(fig, name)
+    plt.close(fig)
+    return path
+
+
 def importance_bar(
     importance: pd.DataFrame, top: int = 15, name: str = "feature_importance"
 ) -> Path:
