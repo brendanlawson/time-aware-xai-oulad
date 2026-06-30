@@ -22,6 +22,10 @@ requires-python = "~=3.14.0"
 line-length = 99
 src = ["src"]
 include = ["pyproject.toml", "src/**/*.py"]
+# config.py holds GIVEN project constants and must not be auto-formatted: ruff
+# 0.15.20 `format` strips the required parens from `except (A, B):` there,
+# yielding invalid Python 3. Leave it untouched.
+extend-exclude = ["src/config.py"]
 
 [tool.ruff.lint]
 extend-select = ["I"]  # Add import sorting

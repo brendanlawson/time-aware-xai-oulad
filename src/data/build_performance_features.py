@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.data.io_utils import GROUP_COLS, PRESENTATION_KEY
+
 
 def aggregate_performance(
     submissions: pd.DataFrame,
@@ -35,18 +37,45 @@ def aggregate_performance(
                     is_banked, score).
     assessments   : assessments.csv (id_assessment, PRESENTATION_KEY,
                     assessment_type, date [deadline; NaN for final exam], weight).
-    cutoff_lookup : PRESENTATION_KEY + ``cutoff_day``.
-    roster        : every student to emit a row for (GROUP_COLS) — guarantees
-                    non-submitters still get features (and not_submitted).
-
-    TODO:
-      1. Attach PRESENTATION_KEY + deadline + weight to submissions via id_assessment.
-      2. Merge cutoff_lookup; keep submissions with date_submitted <= cutoff_day.
-      3. Group by GROUP_COLS -> n_assessments_submitted, mean_score_to_date,
-         weighted_score_to_date.
-      4. not_submitted: per presentation, find assessments with deadline <= cutoff
-         ("due to date"); a student is flagged if they submitted fewer than the
-         number due to date. (Build a per-presentation "n_due_to_date" count.)
-      5. Left-join everything onto roster so every student appears. Return frame.
+    cutoff_lookup : PRESENTATION_KEY + ``cutoff_day`` (module length for t=100%,
+                    or the checkpoint day).
+    roster        : every student to emit a row for (GROUP_COLS); guarantees
+                    non-submitters still receive features (and not_submitted).
     """
-    raise NotImplementedError
+    meta = assessments.merge(cutoff_lookup, on=PRESENTATION_KEY, how="left")
+    # An assessment is "due to date" when it has a real deadline on/before cutoff.
+    meta["is_due"] = meta["date"].notna() & (meta["date"] <= meta["cutoff_day"])
+    due_per_pres = meta[meta["is_due"]].groupby(PRESENTATION_KEY).size().rename("n_due_to_date")
+
+    sub = submissions.merge(
+        meta[["id_assessment", *PRESENTATION_KEY, "weight", "cutoff_day", "is_due"]],
+        on="id_assessment",
+        how="left",
+    )
+    # Submissions counted "to date": real (not banked) and submitted by cutoff.
+    submitted = sub[(sub["is_banked"] == 0) & (sub["date_submitted"] <= sub["cutoff_day"])].copy()
+    submitted["weighted"] = submitted["score"] * submitted["weight"] / 100.0
+
+    agg = submitted.groupby(GROUP_COLS).agg(
+        n_assessments_submitted=("id_assessment", "count"),
+        mean_score_to_date=("score", "mean"),
+        weighted_score_to_date=("weighted", "sum"),
+    )
+    # Of those, how many were for assessments whose deadline had passed.
+    submitted_due = (
+        submitted[submitted["is_due"]].groupby(GROUP_COLS).size().rename("n_submitted_due")
+    )
+
+    out = roster[GROUP_COLS].drop_duplicates().copy()
+    out = out.merge(agg, on=GROUP_COLS, how="left")
+    out = out.merge(submitted_due, on=GROUP_COLS, how="left")
+    out = out.merge(due_per_pres, on=PRESENTATION_KEY, how="left")
+
+    out["n_assessments_submitted"] = out["n_assessments_submitted"].fillna(0).astype("int32")
+    out["mean_score_to_date"] = out["mean_score_to_date"].fillna(0.0)
+    out["weighted_score_to_date"] = out["weighted_score_to_date"].fillna(0.0)
+    n_due = out["n_due_to_date"].fillna(0)
+    n_submitted_due = out["n_submitted_due"].fillna(0)
+    out["not_submitted"] = ((n_due - n_submitted_due) > 0).astype("int8")
+
+    return out.drop(columns=["n_submitted_due", "n_due_to_date"])

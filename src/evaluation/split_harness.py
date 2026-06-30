@@ -16,8 +16,9 @@ See guide section "evaluation/split_harness.py".
 
 from __future__ import annotations
 
-import numpy as np  # noqa: F401
+import numpy as np
 import pandas as pd
+from sklearn.model_selection import StratifiedGroupKFold
 
 from src.config import RANDOM_SEED, TEST_SIZE
 
@@ -30,43 +31,72 @@ def make_fixed_test_ids(
 ) -> set:
     """Return the set of id_student in the fixed hold-out test set.
 
-    TODO:
-      1. n_splits = max(2, round(1/test_size)).
-      2. StratifiedGroupKFold(n_splits, shuffle=True, random_state=seed).
-      3. Take the FIRST fold's test indices; return the unique id_student there.
-    Splitting by id_student (not row) is what makes the test set reusable across
-    checkpoints.
+    Splitting by id_student (not by row) is what makes the test set reusable
+    across checkpoints: every checkpoint shares the same roster, so the same ids
+    select the same rows everywhere.
     """
-    raise NotImplementedError
+    n_splits = max(2, round(1 / test_size))
+    sgkf = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    y = roster[TARGET_COL].to_numpy()
+    groups = roster[GROUP_COL].to_numpy()
+    _, test_idx = next(sgkf.split(roster, y, groups))
+    return set(roster.iloc[test_idx][GROUP_COL].unique())
 
 
 def split_by_ids(df: pd.DataFrame, test_ids: set) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Split any (checkpoint) dataset into (train, test) by test_ids membership.
-
-    TODO: mask = df[GROUP_COL].isin(test_ids); return df[~mask], df[mask].
-    """
-    raise NotImplementedError
+    """Split any (checkpoint) dataset into (train, test) by test_ids membership."""
+    is_test = df[GROUP_COL].isin(test_ids)
+    return df[~is_test].reset_index(drop=True), df[is_test].reset_index(drop=True)
 
 
 def group_overlap(train: pd.DataFrame, test: pd.DataFrame) -> int:
-    """Count id_student appearing in BOTH (must be 0). TODO."""
-    raise NotImplementedError
+    """Number of id_student present in both sets (must be 0)."""
+    return len(set(train[GROUP_COL]) & set(test[GROUP_COL]))
 
 
 def class_balance(df: pd.DataFrame) -> dict:
-    """Return {0: n0, 1: n1, 'rate': at_risk_rate}. TODO."""
-    raise NotImplementedError
+    """Row/student counts and the at-risk rate for one split."""
+    return {
+        "n_rows": int(len(df)),
+        "n_students": int(df[GROUP_COL].nunique()),
+        "at_risk_rate": round(float(df[TARGET_COL].mean()), 4),
+    }
 
 
-def build_split_report(train: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
-    """One-row-per-set report: sizes, class balance, overlap. TODO."""
-    raise NotImplementedError
+def build_split_report(
+    master: pd.DataFrame, test_size: float = TEST_SIZE, seed: int = RANDOM_SEED
+) -> pd.DataFrame:
+    """One-row-per-split summary used to verify and document the split.
 
-
-def iter_cv_folds(train: pd.DataFrame, n_splits: int = 5, seed: int = RANDOM_SEED):
-    """Yield (train_idx, val_idx) StratifiedGroupKFold folds over the TRAIN set.
-
-    TODO: yield from StratifiedGroupKFold(...).split(train, y=at_risk,
-    groups=id_student). Use inside model selection so CV is also leakage-safe.
+    Performs the fixed split internally so callers can pass just the roster/master
+    table; returns rows ``train`` / ``test`` / ``overlap_students``.
     """
-    raise NotImplementedError
+    test_ids = make_fixed_test_ids(master, test_size, seed)
+    train, test = split_by_ids(master, test_ids)
+    overlap = group_overlap(train, test)
+    rows = [
+        {"split": "train", **class_balance(train)},
+        {"split": "test", **class_balance(test)},
+        {
+            "split": "overlap_students",
+            "n_rows": overlap,
+            "n_students": overlap,
+            "at_risk_rate": np.nan,
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+def iter_cv_folds(
+    train: pd.DataFrame, n_splits: int = 5, n_repeats: int = 5, seed: int = RANDOM_SEED
+):
+    """Yield ``(repeat, fold, train_idx, val_idx)`` for repeated stratified group
+    k-fold over the TRAIN set — the 5-fold x 5-seed scheme from the proposal. Each
+    repeat uses a different seed so results do not hinge on a single partition.
+    """
+    y = train[TARGET_COL].to_numpy()
+    groups = train[GROUP_COL].to_numpy()
+    for r in range(n_repeats):
+        sgkf = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed + r)
+        for fold_idx, (tr, va) in enumerate(sgkf.split(train, y, groups)):
+            yield r, fold_idx, tr, va

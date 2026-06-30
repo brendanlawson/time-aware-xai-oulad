@@ -1,21 +1,29 @@
-"""Chart presentation standard: one import to make every figure consistent,
-colour-blind safe and print-ready (300 dpi).
+"""Executable embodiment of the chart presentation standard.
 
-The colour/label constants are GIVEN (the chart standard). The three functions
-are yours — see guide section "eda/plot_style.py".
+Importing :func:`apply_style` configures matplotlib/seaborn so every EDA figure is
+visually consistent, colour-blind safe and print-ready (300 dpi). The fixed class
+colours guarantee not-at-risk and at-risk always read the same across every chart.
+
+Design follows current publication-quality guidance: minimal chart-junk (top/right
+spines removed), a light grid drawn *below* the data, restrained typography, and
+de-cluttered numeric axes via :func:`tidy_axis`.
 """
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter, MaxNLocator  # noqa: F401
-import seaborn as sns  # noqa: F401  (you'll use sns.set_theme / palettes)
+from pathlib import Path
 
-# Fixed target-class colours, identical in every chart.
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, MaxNLocator
+import seaborn as sns
+
+from src.config import FIGURES_DIR
+
+# Fixed target-class colours, identical in every chart (Chart Standard section 2).
 CLASS_COLOURS = {0: "#2166AC", 1: "#C0392B"}  # 0 not-at-risk (blue), 1 at-risk (red)
 CLASS_LABELS = {0: "Not-at-risk", 1: "At-risk"}
 
-# Feature-group palette (kept here so eda.py and plots stay in sync).
+# Feature-group palette (re-exported so eda.py and plots stay in sync).
 GROUP_COLOURS = {
     "Demographic": "#7F8C8D",  # muted grey
     "Engagement": "#C0392B",  # red (behavioural)
@@ -24,45 +32,63 @@ GROUP_COLOURS = {
 
 # matplotlib rcParams for the house style (resolution, typography, de-junked axes).
 _RC = {
+    # resolution
     "figure.dpi": 120,
     "savefig.dpi": 300,
     "savefig.bbox": "tight",
     "savefig.facecolor": "white",
     "figure.facecolor": "white",
+    # typography
     "font.family": "DejaVu Sans",
     "font.size": 11,
     "axes.titlesize": 12,
     "axes.titleweight": "bold",
     "axes.titlepad": 8,
     "axes.labelsize": 10.5,
+    "axes.labelcolor": "#222222",
+    "xtick.labelsize": 9.5,
+    "ytick.labelsize": 9.5,
+    "xtick.color": "#444444",
+    "ytick.color": "#444444",
+    "legend.fontsize": 9.5,
+    "legend.frameon": False,
+    "figure.titlesize": 14,
+    "figure.titleweight": "bold",
+    # axes / spines / grid (less chart-junk)
+    "axes.edgecolor": "#888888",
+    "axes.linewidth": 0.8,
     "axes.spines.top": False,
     "axes.spines.right": False,
     "axes.grid": True,
-    "grid.alpha": 0.3,
-    "axes.axisbelow": True,  # grid drawn below the data
+    "axes.axisbelow": True,
+    "grid.color": "#E6E6E6",
+    "grid.linewidth": 0.7,
 }
 
 
 def apply_style() -> None:
-    """Apply _RC to matplotlib (call once at the top of an EDA notebook/run).
+    """Apply the team chart standard to the current matplotlib session."""
+    sns.set_theme(style="whitegrid", context="notebook")
+    plt.rcParams.update(_RC)
 
-    TODO: plt.rcParams.update(_RC); optionally sns.set_theme(style='whitegrid').
-    """
-    raise NotImplementedError
+
+_THOUSANDS = FuncFormatter(lambda x, _pos: f"{x:,.0f}")
 
 
 def tidy_axis(ax: plt.Axes, *, nbins: int = 5, integer: bool = False) -> None:
-    """De-clutter a numeric axis (max nbins ticks; thousands separators).
+    """De-clutter a numeric x-axis: few round ticks + thousands separators + despine.
 
-    TODO: ax.xaxis/yaxis.set_major_locator(MaxNLocator(nbins, integer=integer));
-    apply a FuncFormatter for thousands separators where appropriate.
+    Prevents the overlapping tick labels that plague wide-range count features
+    (e.g. ``total_clicks`` spanning 0-24,000).
     """
-    raise NotImplementedError
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=nbins, integer=integer))
+    ax.xaxis.set_major_formatter(_THOUSANDS)
+    sns.despine(ax=ax)
 
 
-def savefig(fig: plt.Figure, name: str) -> "object":
-    """Save fig to FIGURES_DIR/<name>.png at 300 dpi; return the path.
-
-    TODO: ensure FIGURES_DIR exists, fig.savefig(path), return path.
-    """
-    raise NotImplementedError
+def savefig(fig: plt.Figure, name: str) -> Path:
+    """Save a figure to reports/figures/<name>.png at print resolution (300 dpi)."""
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    path = FIGURES_DIR / f"{name}.png"
+    fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
+    return path
