@@ -138,6 +138,40 @@ def stability_drift(drift: pd.DataFrame, name: str = "stability_drift") -> Path:
     return path
 
 
+def grouped_bar(
+    df: pd.DataFrame,
+    x_col: str,
+    metric_cols: tuple[str, ...],
+    name: str,
+    title: str,
+    xlabel: str,
+) -> Path:
+    """Generic grouped-bar chart: one group of bars per ``df[x_col]`` category.
+
+    Each category (kept in the frame's row order) gets one bar per metric in
+    ``metric_cols``. Used for the imbalance-technique comparison (x = technique,
+    bars = recall/F1/PR-AUC) — the "before vs after" view of resampling.
+    """
+    apply_style()
+    cats = df[x_col].tolist()
+    x = range(len(cats))
+    width = 0.8 / len(metric_cols)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i, m in enumerate(metric_cols):
+        bars = ax.bar([xi + i * width for xi in x], df[m], width=width, label=m.replace("_", " "))
+        ax.bar_label(bars, fmt="%.3f", padding=2, fontsize=7.5, color="#333333")
+    ax.set_xticks([xi + width * (len(metric_cols) - 1) / 2 for xi in x])
+    ax.set_xticklabels(cats)
+    ax.set_ylim(0, 1.08)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("score")
+    ax.set_title(title)
+    ax.legend(ncol=len(metric_cols), fontsize=8)
+    path = savefig(fig, name)
+    plt.close(fig)
+    return path
+
+
 def confusion_matrix_plot(
     y_true, y_pred, name: str = "confusion_matrix", title: str | None = None
 ) -> Path:
