@@ -175,6 +175,18 @@ def main(argv: list[str] | None = None) -> int:
         title=f"At-risk recall by model x imbalance strategy (t={args.t}%)",
         xlabel="Model",
     )
+    # Figure 3: Phase-2 baseline benchmark (no-resample) — the "before imbalance" view.
+    base = (
+        df[df["strategy"] == "none"].sort_values("recall", ascending=False).reset_index(drop=True)
+    )
+    plots.grouped_bar(
+        base,
+        "model",
+        ("recall", "f1", "pr_auc", "roc_auc"),
+        name="model_benchmark_baseline",
+        title=f"Benchmark 5 model @ t={args.t}% (baseline, no-resample)",
+        xlabel="Model",
+    )
 
     logger.info("imbalance_comparison.csv:\n" + df.to_string(index=False))
     return 0
