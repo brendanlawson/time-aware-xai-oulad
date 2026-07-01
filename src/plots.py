@@ -181,6 +181,28 @@ def confusion_matrix_plot(
     return path
 
 
+def local_explanation_bar(
+    weights: pd.DataFrame, name: str = "local_explanation", title: str | None = None
+) -> Path:
+    """Signed local-attribution bar for ONE student (LIME/SHAP explanation).
+
+    ``weights`` has columns ``feature`` and ``weight`` (signed). Red bars push the
+    prediction toward *at-risk*, blue bars pull it toward *not-at-risk* — the "why"
+    behind a single early-warning flag.
+    """
+    apply_style()
+    w = weights.reindex(weights["weight"].abs().sort_values(ascending=True).index)
+    colours = [CLASS_COLOURS[1] if v >= 0 else CLASS_COLOURS[0] for v in w["weight"]]
+    fig, ax = plt.subplots(figsize=(8, max(3.0, 0.4 * len(w) + 1)))
+    ax.barh(w["feature"], w["weight"], color=colours, edgecolor="white", linewidth=0.4)
+    ax.axvline(0, color="#888888", lw=0.8)
+    ax.set_xlabel("Local weight  (red → at-risk, blue → not-at-risk)")
+    ax.set_title(title or "Local explanation for one student")
+    path = savefig(fig, name)
+    plt.close(fig)
+    return path
+
+
 def threshold_curve(
     sweep: pd.DataFrame, chosen: dict | None = None, name: str = "threshold_tuning"
 ) -> Path:
