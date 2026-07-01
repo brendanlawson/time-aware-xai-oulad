@@ -1,10 +1,10 @@
 """Build the current-progress presentation (.pptx) for the DSP391m project.
 
-Generates ``reports/slides/Progress_Report.pptx`` (16:9) — a status deck covering
-the whole pipeline as it stands: data (Phase 1), modeling + imbalance (Phase 2),
-time-aware RQ1 (Phase 3), fine-tuning (Task 4), the supplementary evaluation
-(confusion matrix / threshold tuning / significance tests), and explainability
-(Phase 5: SHAP/LIME + stability RQ2/RQ3) — plus an honest what's-left slide.
+Generates ``reports/slides/Progress_Report.pptx`` (16:9) — a progress deck that
+stops at the modeling block owned by Đức: the data pipeline (Phase 1, Phúc), the
+five-model benchmark (Phase 2), and the class-imbalance strategy comparison
+(Phase 4, RQ3). The remaining phases (3 time-aware RQ1, 5 XAI, 6 dashboard) are
+listed as the next steps, not detailed here.
 
 Reuses the house style of ``build_task3_slides.py`` and embeds the real figures
 from ``reports/figures``. Speaker notes go into each slide.
@@ -142,26 +142,6 @@ def add_title(title, subtitle, meta, presenters):
     rr.text = presenters
     _set(rr, 12.5, WHITE, bold=True)
     pp.space_before = Pt(6)
-
-
-def add_divider(part, title, subtitle, n):
-    s = prs.slides.add_slide(BLANK)
-    _rect(s, 0, 0, SW, SH, NAVY)
-    _rect(s, Inches(0.9), Inches(2.7), Inches(1.6), Inches(0.09), ACCENT)
-    _, tk = _box(s, Inches(0.9), Inches(2.0), Inches(11), Inches(0.7))
-    rk = tk.paragraphs[0].add_run()
-    rk.text = part
-    _set(rk, 15, ACCENT, bold=True)
-    _, tf = _box(s, Inches(0.9), Inches(2.95), Inches(11.3), Inches(2.0))
-    r = tf.paragraphs[0].add_run()
-    r.text = title
-    _set(r, 30, WHITE, bold=True)
-    if subtitle:
-        p2 = tf.add_paragraph()
-        r2 = p2.add_run()
-        r2.text = subtitle
-        _set(r2, 15, RGBColor(0xCF, 0xDC, 0xEC), italic=True)
-        p2.space_before = Pt(8)
 
 
 def _add_heading(s, kicker, title):
@@ -308,280 +288,191 @@ def add_content(
 
 
 # ════════════════════════════════════════════════════════════════════════
-# SLIDES
+# SLIDES  (dừng ở khối huấn luyện mô hình của Đức: Phase 1 → 2 → 4)
 # ════════════════════════════════════════════════════════════════════════
 
 add_title(
     "Time-Aware Explainable ML — phát hiện sớm sinh viên nguy cơ (OULAD)",
-    "Báo cáo tiến độ: dữ liệu → mô hình hoá → giải thích (Phase 1–5)",
+    "Báo cáo tiến độ: Dữ liệu (Phase 1) → Huấn luyện mô hình & Mất cân bằng (Phase 2 & 4)",
     [
         "DSP391m · Đồ án Khoa học Dữ liệu · Nhóm 1 · Đại học FPT",
-        "Cập nhật: 02/07/2026",
+        "GVHD: Nguyễn Thị Hoàng Yến  ·  Cập nhật: 02/07/2026",
     ],
-    "Thành viên: Sơn · Khoa · An · Đức · Phúc · Bình",
+    "Khối thực nghiệm: Phúc (Phase 1) · Đức (Phase 2 & 4)",
 )
 
 add_content(
     2,
     "TỔNG QUAN",
-    "Tiến độ theo pha & người phụ trách",
+    "Phạm vi báo cáo & lộ trình",
     [
-        ("note", "✅ đã có code + kết quả thật   ·   🔄 đang làm   ·   ⏳ chưa bắt đầu"),
+        (
+            "note",
+            "Báo cáo này tập trung khối HUẤN LUYỆN MÔ HÌNH (Đức); các pha sau là bước kế tiếp.",
+        ),
     ],
-    notes="Đây là bức tranh tiến độ tổng thể. Toàn bộ khối dữ liệu và mô hình hoá — Phase 1 đến "
-    "Phase 5 — đã có code và kết quả thật. Còn lại là dashboard của An, phần literature review của "
-    "Sơn, và bản báo cáo/slide cuối đang được tổng hợp.",
+    notes="Báo cáo tiến độ lần này dừng ở khối huấn luyện mô hình do Đức phụ trách — gồm Phase 2 "
+    "benchmark năm thuật toán và Phase 4 xử lý mất cân bằng — đứng trên nền pipeline dữ liệu Phase 1 "
+    "của Phúc. Các pha còn lại (RQ1 theo thời gian, giải thích XAI, dashboard) là nội dung báo cáo "
+    "kế tiếp.",
     table={
         "headers": ["Pha / Nhiệm vụ", "Người", "Trạng thái"],
         "rows": [
             ["Phase 1 — Data pipeline, cắt mốc, harness", "Phúc", "✅ Hoàn thành"],
-            ["Phase 2 — Benchmark 5 model + SMOTE", "Đức", "✅ Có kết quả"],
-            ["Phase 3 — Time-aware RQ1 (6 mốc)", "Khoa", "✅ Có kết quả"],
-            ["Task 4 — Fine-tuning + sensitivity", "Đức/Khoa", "✅ Hoàn thành"],
-            ["Bổ trợ — Confusion / Threshold / Kiểm định", "Nhóm", "✅ Mới bổ sung"],
-            ["Phase 5 — SHAP/LIME + stability (RQ2/RQ3)", "Bình", "✅ Có kết quả"],
-            ["Phase 6a — Dashboard Streamlit", "An", "⏳ Chưa làm"],
-            ["Literature Review / References", "Sơn", "🔄 Tài liệu nền"],
-            ["Báo cáo & slide cuối", "Nhóm", "🔄 Đang tổng hợp"],
+            ["Phase 2 — Benchmark 5 model (LR/RF/XGB/LGBM/ANN)", "Đức", "✅ Hoàn thành"],
+            ["Phase 4 — Xử lý mất cân bằng (RQ3)", "Đức", "✅ Hoàn thành"],
+            ["Phase 3 — Time-aware RQ1 (6 mốc)", "Khoa", "▶ Báo cáo sau"],
+            ["Phase 5 — SHAP/LIME + stability (RQ2)", "Bình", "▶ Báo cáo sau"],
+            ["Phase 6 — Dashboard & Báo cáo cuối", "Sơn/An", "▶ Báo cáo sau"],
         ],
-        "top": 2.05,
+        "top": 2.2,
         "width": 12.2,
-        "col_w": [Inches(7.2), Inches(2.0), Inches(3.0)],
+        "col_w": [Inches(7.4), Inches(1.9), Inches(2.9)],
         "fs": 12.5,
     },
 )
 
 add_content(
     3,
-    "PHASE 1 · DỮ LIỆU",
-    "Pipeline dữ liệu chống rò rỉ (nền tảng)",
+    "PHASE 1 · DỮ LIỆU (PHÚC)",
+    "Pipeline dữ liệu chống rò rỉ + khung thực nghiệm",
     [
         (
             "do",
             "7 bảng OULAD → master (32.593 × 33) → cắt 6 mốc 10–100% → tiền xử lý fit-on-train.",
         ),
-        ("why", "Mọi bước mô hình hoá đứng trên tập test cố định + pipeline chống rò rỉ này."),
-        ("out", "6 bộ dataset_t10…t100 + test 20% cố định; 19/19 kiểm thử rò rỉ ĐẠT."),
-        ("key", "Test cố định dùng lại y hệt qua 6 mốc → 6 điểm hiệu năng SO SÁNH ĐƯỢC."),
+        ("do", "Harness: chia 80/20 (StratifiedGroupKFold theo id_student) + CV 5-fold × 5 seed."),
+        ("why", "Toàn bộ khâu huấn luyện đứng trên tập test cố định + pipeline chống rò rỉ này."),
+        ("key", "6 bộ dataset_t10…t100 · test 20% cố định · 19/19 kiểm thử rò rỉ ĐẠT."),
     ],
     presenter="Phúc",
     notes="Nền tảng là pipeline dữ liệu của Phúc: gộp 7 bảng thành master 32.593 dòng, cắt theo 6 mốc "
-    "tiến độ, tiền xử lý fit-on-train chống rò rỉ, và một tập test cố định. 19 kiểm thử tự động xác "
-    "nhận không rò rỉ. Đây là điều kiện để 6 điểm hiệu năng theo mốc so sánh được.",
+    "tiến độ, tiền xử lý fit-on-train chống rò rỉ, cùng khung thực nghiệm chia 80/20 gom nhóm theo "
+    "sinh viên và cross-validation 5-fold lặp 5 seed. 19 kiểm thử tự động xác nhận không rò rỉ.",
     image=(FIG / "preprocessing_sequence.png"),
     caption="Trình tự pipeline tiền xử lý",
 )
 
 add_content(
     4,
-    "PHASE 2 · MÔ HÌNH",
-    "Benchmark 5 thuật toán + xử lý mất cân bằng",
+    "PHASE 2 · BENCHMARK (ĐỨC)",
+    "Huấn luyện 5 thuật toán ứng viên (mốc 100%)",
     [
         ("do", "LR · RF · XGBoost · LightGBM · ANN; SMOTE cân bằng CHỈ trên train fold."),
-        ("why", "Bỏ sót sinh viên nguy cơ là sai lầm đắt nhất → recall & PR-AUC là chỉ số chính."),
-        ("out", "Bảng model_metrics.csv (30 dòng: 5 model × 6 mốc) + biểu đồ so sánh."),
-        ("key", "Tại t=100%: XGB recall 0,935 · PR-AUC 0,991; các model tree bám sát nhau."),
+        (
+            "why",
+            "Bỏ sót SV nguy cơ là sai lầm đắt nhất → recall & PR-AUC lớp at-risk là chỉ số chính.",
+        ),
+        ("out", "Các model tree bám sát nhau; XGB dẫn đầu recall, LightGBM nhỉnh về PR-AUC."),
+        ("key", "XGB @100: recall 0,935 · F1 0,954 · PR-AUC 0,991."),
     ],
     presenter="Đức",
-    notes="Phase 2 benchmark năm thuật toán với SMOTE cân bằng chỉ trên tập train để tránh rò rỉ. Vì bỏ "
-    "sót sinh viên nguy cơ là tốn kém nhất, chỉ số chính là recall và PR-AUC của lớp at-risk. Tại "
-    "cuối khóa, XGBoost đạt recall 0,935 và PR-AUC 0,991.",
+    notes="Phase 2 benchmark năm thuật toán tại mốc 100% với SMOTE cân bằng chỉ trên train. Vì bỏ sót "
+    "sinh viên nguy cơ là tốn kém nhất, chỉ số chính là recall và PR-AUC của lớp at-risk. XGBoost "
+    "dẫn đầu recall 0,935, LightGBM nhỉnh nhất về PR-AUC.",
     image=(FIG / "model_benchmark.png"),
-    caption="So sánh model tại t=100% (recall/F1/PR-AUC/ROC-AUC)",
+    caption="So sánh 5 model @ t=100%",
 )
 
 add_content(
     5,
-    "PHASE 3 · RQ1",
-    "Hiệu năng theo thời gian — dự đoán được sớm cỡ nào?",
+    "PHASE 2 · KẾT QUẢ",
+    "Bảng hiệu năng 5 model (tập test, mốc 100%)",
     [
-        ("do", "Huấn luyện lại tại 6 mốc; theo dõi recall/PR-AUC theo tiến độ khóa học."),
-        ("why", "RQ1: cần cảnh báo SỚM mới can thiệp kịp, không đợi hết môn."),
-        (
-            "out",
-            "Hiệu năng tăng đều theo mốc; đạt ngưỡng tin cậy (recall≥0,80 & PR-AUC≥0,90) từ t=40%.",
-        ),
-        ("key", "Mốc tin cậy sớm nhất: 40% tiến độ khóa học."),
+        ("do", "Đánh giá trên tập test giữ riêng; sắp xếp theo recall lớp at-risk."),
+        ("note", "Chênh lệch giữa các model nhỏ → chọn theo recall + khả năng giải thích được."),
     ],
-    presenter="Khoa",
-    notes="Phase 3 trả lời RQ1: dự đoán sớm được đến đâu. Huấn luyện lại ở cả 6 mốc, hiệu năng tăng đều "
-    "theo tiến độ. Ngưỡng tin cậy recall trên 0,80 và PR-AUC trên 0,90 đạt được ngay từ mốc 40% "
-    "tiến độ khóa học — nghĩa là có thể cảnh báo hữu ích từ khá sớm.",
-    image=(FIG / "time_aware_recall.png"),
-    caption="Recall theo 6 mốc thời gian (RQ1)",
+    presenter="Đức",
+    notes="Bảng hiệu năng năm model trên tập test tại mốc 100%, sắp theo recall. XGBoost đứng đầu "
+    "recall, LightGBM đứng đầu PR-AUC; khoảng cách nhỏ nên nhóm chọn theo recall và tính giải thích "
+    "được của mô hình.",
+    table={
+        "headers": ["Model", "Recall", "F1", "PR-AUC", "ROC-AUC"],
+        "rows": [
+            ["XGBoost", "0,935", "0,954", "0,991", "0,988"],
+            ["ANN (MLP)", "0,931", "0,948", "0,990", "0,987"],
+            ["LightGBM", "0,928", "0,950", "0,991", "0,989"],
+            ["Random Forest", "0,920", "0,947", "0,989", "0,986"],
+            ["Logistic Reg.", "0,917", "0,946", "0,989", "0,986"],
+        ],
+        "top": 2.9,
+        "width": 11.0,
+        "col_w": [Inches(3.4), Inches(1.9), Inches(1.9), Inches(1.9), Inches(1.9)],
+        "fs": 13,
+    },
 )
 
 add_content(
     6,
-    "BỔ TRỢ · KIỂM ĐỊNH",
-    "Xếp hạng model có ý nghĩa thống kê không?",
+    "PHASE 4 · MẤT CÂN BẰNG (ĐỨC)",
+    "Bối cảnh & 4 chiến lược xử lý (RQ3)",
     [
         (
             "do",
-            "Friedman trên 25 fold CV ghép cặp (mỗi metric) + post-hoc Wilcoxon (hiệu chỉnh Holm).",
+            "So sánh: no-resample · class-weight · SMOTE · ADASYN (tái lấy mẫu CHỈ trên train).",
         ),
-        ("why", "Bảng held-out chỉ có 1 số/model → không phân biệt được thắng thật với may rủi."),
+        ("why", "Dữ liệu mất cân bằng NHẸ: at-risk 52,8% / not-at-risk 47,2% (tỉ số 1,12)."),
         (
             "out",
-            "Mọi metric p < 1e-12 → khác biệt CÓ ý nghĩa; XGB nhất recall, LGBM nhất F1/PR-AUC.",
+            "Đo tác động lên F1/Recall/PR-AUC; tránh double-correct (dùng SMOTE thì bỏ class-weight).",
         ),
-        ("key", "XGB thắng recall có ý nghĩa so với cả 4 model còn lại (Holm p<0,05)."),
+        ("key", "ANN không hỗ trợ class-weight → báo N/A (trung thực)."),
     ],
-    presenter="Nhóm",
-    notes="Phần bổ trợ đầu tiên: kiểm định thống kê. Dùng Friedman trên 25 fold cross-validation ghép "
-    "cặp cho từng metric, rồi post-hoc Wilcoxon hiệu chỉnh Holm. Kết quả mọi metric p rất nhỏ, dưới "
-    "1e-12: khác biệt là thật. XGBoost đứng nhất về recall và thắng có ý nghĩa so với cả bốn model "
-    "còn lại; LightGBM nhất về F1 và PR-AUC.",
-    table={
-        "headers": ["Metric", "Model tốt nhất", "Friedman p"],
-        "rows": [
-            ["recall", "XGBoost", "2,4e-13"],
-            ["F1", "LightGBM", "6,1e-17"],
-            ["PR-AUC", "LightGBM", "3,9e-17"],
-            ["ROC-AUC", "LightGBM", "1,4e-16"],
-        ],
-        "top": 4.7,
-        "width": 6.7,
-        "left": 0.6,
-        "col_w": [Inches(2.2), Inches(2.6), Inches(1.9)],
-        "fs": 12,
-    },
+    presenter="Đức",
+    notes="Phase 4 trả lời RQ3: xử lý mất cân bằng thế nào. Dữ liệu mất cân bằng nhẹ, tỉ số 1,12. Nhóm "
+    "so sánh bốn chiến lược — không tái lấy mẫu, class-weight, SMOTE, ADASYN — và mọi tái lấy mẫu "
+    "chỉ áp trên train để tránh rò rỉ. ANN không hỗ trợ class-weight nên báo N/A một cách trung thực.",
+    image=(FIG / "target_distribution.png"),
+    caption="Phân phối lớp at-risk (mất cân bằng nhẹ)",
 )
 
 add_content(
     7,
-    "BỔ TRỢ · NGƯỠNG",
-    "Tinh chỉnh ngưỡng quyết định (threshold tuning)",
+    "PHASE 4 · KẾT QUẢ",
+    "So sánh kỹ thuật mất cân bằng (trước–sau)",
     [
-        ("do", "Quét ngưỡng; chọn theo max-F1, Youden's J, và chính sách recall≥0,90."),
-        ("why", "Ngưỡng mặc định 0,5 là tuỳ tiện cho bài toán mất cân bằng/cảnh báo sớm."),
+        ("do", "XGB @100 (recall): none 0,933 → SMOTE 0,935 → class-weight 0,929 → ADASYN 0,928."),
         (
             "out",
-            "Chính sách recall≥0,90 → ngưỡng 0,87 nâng precision lên 0,995 mà vẫn giữ recall 0,90.",
+            "Mất cân bằng nhẹ nên các kỹ thuật chênh <1% → SMOTE nhỉnh nhất, giữ trong pipeline.",
         ),
-        ("key", "0,5 → 0,87: precision 0,973 → 0,995 (ít báo động giả hơn nhiều)."),
+        ("key", "SMOTE: recall 0,935 · F1 0,954 · PR-AUC 0,991 (tốt nhất sít sao)."),
+        ("note", "Kết quả tái lập: python -m tools.make_imbalance_comparison"),
     ],
-    presenter="Nhóm",
-    notes="Phần bổ trợ thứ hai: tinh chỉnh ngưỡng. Ngưỡng mặc định 0,5 là tuỳ tiện. Nhóm quét ngưỡng và "
-    "chọn theo ba chính sách. Với chính sách giữ recall tối thiểu 0,90, ngưỡng tối ưu là 0,87, nâng "
-    "precision từ 0,973 lên 0,995 — giảm mạnh báo động giả — mà vẫn bắt được 90% sinh viên nguy cơ.",
-    image=(FIG / "threshold_tuning.png"),
-    caption="Precision/Recall/F1 theo ngưỡng",
+    presenter="Đức",
+    notes="Kết quả so sánh: vì dữ liệu chỉ mất cân bằng nhẹ, bốn kỹ thuật chênh nhau dưới 1%. SMOTE "
+    "nhỉnh nhất một chút nên được giữ trong pipeline; đây là kết luận trung thực chứ không thổi "
+    "phồng lợi ích của resampling. Toàn bộ tái lập bằng một lệnh make_imbalance_comparison.",
+    image=(FIG / "imbalance_comparison.png"),
+    caption="XGB — 4 chiến lược mất cân bằng (F1/Recall/PR-AUC)",
 )
 
-add_content(
+s8 = add_content(
     8,
-    "BỔ TRỢ · CONFUSION",
-    "Ma trận nhầm lẫn tại ngưỡng đã tinh chỉnh",
-    [
-        ("do", "Confusion matrix của XGB @ t=100% ở ngưỡng tuned 0,87."),
-        ("why", "Một con số recall che giấu ‘lỗi nằm ở đâu’ — ma trận cho thấy FN/FP cụ thể."),
-        ("out", "Bỏ sót (FN) 10% sinh viên nguy cơ; báo động giả (FP) chỉ 0,4%."),
-        ("key", "FN 337/3.376 · FP 14/3.113 — cân bằng phù hợp cho cảnh báo sớm."),
-    ],
-    presenter="Nhóm",
-    notes="Ma trận nhầm lẫn cho thấy lỗi nằm ở đâu. Ở ngưỡng tinh chỉnh 0,87, mô hình bỏ sót 10% sinh "
-    "viên nguy cơ và chỉ báo động giả 0,4%. Đây là cân bằng phù hợp khi năng lực can thiệp có hạn.",
-    image=(FIG / "confusion_tuned_t100.png"),
-    caption="XGB @ t=100%, ngưỡng 0,87",
-)
-
-add_content(
-    9,
-    "PHASE 5 · XAI",
-    "Giải thích mô hình — SHAP",
-    [
-        ("do", "SHAP TreeExplainer: tầm quan trọng toàn cục + hướng tác động của từng đặc trưng."),
-        ("why", "Recall 0,93 vô nghĩa nếu giáo viên không biết VÌ SAO sinh viên bị gắn cờ."),
-        (
-            "out",
-            "Top driver: số ngày không hoạt động, điểm tích luỹ (có/không trọng số), số bài đã nộp.",
-        ),
-        ("key", "days_since_last_activity cao → đẩy mạnh về ‘at-risk’ (khớp trực giác sư phạm)."),
-    ],
-    presenter="Bình",
-    notes="Phase 5 mở hộp đen. SHAP cho thấy các yếu tố chi phối dự đoán: số ngày kể từ lần hoạt động "
-    "cuối, điểm tích luỹ, và số bài đã nộp. Biểu đồ beeswarm cho thấy nhiều ngày không hoạt động đẩy "
-    "dự đoán về phía nguy cơ — khớp trực giác sư phạm.",
-    image=(FIG / "shap_summary_xgb_t100.png"),
-    caption="SHAP summary (beeswarm) — XGB @ t=100%",
-)
-
-add_content(
-    10,
-    "PHASE 5 · RQ2/RQ3",
-    "Độ ổn định của giải thích — đóng góp nghiên cứu",
-    [
-        ("do", "LIME giải thích từng sinh viên; đo ổn định theo SEED (RQ2) & theo MỐC (RQ3)."),
-        (
-            "why",
-            "Giải thích chỉ đáng tin nếu không đổi khi seed đổi, và drift có kiểm soát theo thời gian.",
-        ),
-        (
-            "out",
-            "RQ2: rất ổn định (Spearman 0,97 · Jaccard 0,75). RQ3: mốc liền kề bám sát, mốc sớm lệch xa t=100%.",
-        ),
-        ("key", "SHAP vs LIME khớp ở top driver, lệch ở giữa (Jaccard@10 = 0,25)."),
-    ],
-    presenter="Bình",
-    notes="Đóng góp nghiên cứu là đo độ ổn định của giải thích. RQ2 — đổi seed: rất ổn định, Spearman "
-    "0,97. RQ3 — theo mốc thời gian: các mốc liền kề bám sát nhau nhưng mốc sớm lệch xa so với cuối "
-    "khóa, nên khi trình bày cho giáo viên phải ghi rõ mốc. SHAP và LIME khớp ở nhóm driver hàng "
-    "đầu nhưng lệch ở tầm giữa — lý do nhóm báo cáo cả hai và kiểm định ổn định thay vì tin một cái.",
-    image=(FIG / "xai_stability_drift.png"),
-    caption="Drift giải thích theo mốc (RQ3)",
-)
-
-add_content(
-    11,
-    "CÒN LẠI",
-    "Việc chưa làm & kế hoạch",
-    [
-        ("p", "An — Dashboard Streamlit + đóng gói model (Phase 6a): CHƯA bắt đầu."),
-        ("p", "Sơn — Introduction / Literature Review / References: mới có tài liệu nền."),
-        ("p", "Nhóm — Báo cáo cuối + slide toàn dự án: đang tổng hợp (2 notebook 05/06 đã sẵn)."),
-        ("note", "Khối dữ liệu + mô hình hoá + XAI đã xong; phần còn lại là đóng gói & viết."),
-    ],
-    presenter="Nhóm",
-    notes="Về việc còn lại: dashboard của An chưa bắt đầu; phần literature review của Sơn mới có tài liệu "
-    "nền; và bản báo cáo cùng slide cuối đang được tổng hợp, dựa trên hai notebook mô hình hoá và "
-    "giải thích đã hoàn tất. Toàn bộ khối kỹ thuật đã xong, phần còn lại chủ yếu là đóng gói và viết.",
-    table={
-        "headers": ["Hạng mục", "Người", "Kế hoạch"],
-        "rows": [
-            ["Dashboard Streamlit", "An", "Dựng app dự đoán + tải model"],
-            ["Literature Review", "Sơn", "Viết theo template báo cáo"],
-            ["Báo cáo & slide cuối", "Nhóm", "Ghép từ notebook 05/06 + kết quả"],
-        ],
-        "top": 4.6,
-        "width": 12.2,
-        "col_w": [Inches(4.6), Inches(1.6), Inches(6.0)],
-        "fs": 12,
-    },
-)
-
-s12 = add_content(
-    12,
     "KẾT LUẬN",
-    "Tình trạng hiện tại",
+    "Tình trạng khối modeling & bước kế tiếp",
     [
         (
             "out",
-            "Đã có: pipeline dữ liệu chống rò rỉ · benchmark 5 model · RQ1 theo 6 mốc · fine-tuning.",
+            "Đã có: pipeline dữ liệu (P1) · benchmark 5 model (P2) · so sánh 4 kỹ thuật mất cân bằng (P4).",
         ),
         (
             "out",
-            "Bổ sung: confusion matrix · threshold tuning · kiểm định thống kê · SHAP/LIME + stability.",
+            "Tái lập từ src/ + tools/ (train.py · make_imbalance_comparison); 19/19 test đạt.",
         ),
-        ("do", "Tiếp theo: dashboard (An) · literature review (Sơn) · báo cáo/slide cuối (nhóm)."),
-        ("note", "Mọi kết quả tái lập được từ src/ + tools/; 19/19 test đạt."),
+        (
+            "do",
+            "Kế tiếp: Phase 3 time-aware RQ1 (Khoa) · Phase 5 SHAP/LIME + stability (Bình) · Phase 6 (Sơn/An).",
+        ),
+        ("note", "Báo cáo sau sẽ trình bày hiệu năng theo 6 mốc thời gian và lớp giải thích XAI."),
     ],
-    presenter="Nhóm",
-    notes="Tóm lại: khối kỹ thuật đã hoàn chỉnh và tái lập được — pipeline dữ liệu, benchmark, RQ1 theo "
-    "mốc, fine-tuning, cùng các phân tích bổ trợ và toàn bộ lớp giải thích SHAP/LIME với đo ổn định. "
-    "Bước tiếp theo là dashboard, literature review, và báo cáo cuối. Cảm ơn thầy/cô và cả lớp.",
+    presenter="Đức",
+    notes="Tóm lại khối modeling đã hoàn chỉnh và tái lập được: pipeline dữ liệu, benchmark năm model, "
+    "và so sánh bốn kỹ thuật mất cân bằng. Bước kế tiếp là Phase 3 chạy thực nghiệm theo 6 mốc trả "
+    "lời RQ1, Phase 5 giải thích SHAP/LIME với đo độ ổn định, và Phase 6 dashboard cùng báo cáo cuối. "
+    "Cảm ơn thầy/cô và cả lớp.",
 )
-_, tf = _box(s12, Inches(0.6), Inches(6.1), Inches(12.2), Inches(0.8))
+_, tf = _box(s8, Inches(0.6), Inches(6.1), Inches(12.2), Inches(0.8))
 r = tf.paragraphs[0].add_run()
 r.text = "Cảm ơn đã lắng nghe!"
 _set(r, 22, ACCENT, bold=True)
