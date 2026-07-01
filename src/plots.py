@@ -18,8 +18,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.metrics import confusion_matrix
 
-from src.eda.plot_style import CLASS_COLOURS, apply_style, savefig
+from src.eda.plot_style import CLASS_COLOURS, CLASS_LABELS, apply_style, savefig
 
 
 def metric_vs_checkpoint(
@@ -132,6 +133,81 @@ def stability_drift(drift: pd.DataFrame, name: str = "stability_drift") -> Path:
     ax.set_ylabel("Ranking agreement")
     ax.set_title("Explanation stability across checkpoints (RQ2/RQ3)")
     ax.legend()
+    path = savefig(fig, name)
+    plt.close(fig)
+    return path
+
+
+def confusion_matrix_plot(
+    y_true, y_pred, name: str = "confusion_matrix", title: str | None = None
+) -> Path:
+    """Annotated confusion-matrix heatmap for the at-risk classifier.
+
+    Each cell shows the raw count over its row-normalised rate, so both the error
+    volume and the per-class rates read at a glance. Rows are the true class,
+    columns the prediction; the bottom-right cell is correctly-flagged at-risk
+    students (true positives) — the ones the early-warning system exists to catch,
+    and the top-right cell (false negatives) the ones it misses.
+    """
+    apply_style()
+    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+    cm_norm = cm / cm.sum(axis=1, keepdims=True).clip(min=1)
+    labels = [CLASS_LABELS[0], CLASS_LABELS[1]]
+    fig, ax = plt.subplots(figsize=(5.2, 4.6))
+    im = ax.imshow(cm_norm, cmap="Blues", vmin=0, vmax=1)
+    for i in range(2):
+        for j in range(2):
+            ax.text(
+                j,
+                i,
+                f"{cm[i, j]:,}\n{cm_norm[i, j]:.1%}",
+                ha="center",
+                va="center",
+                color="white" if cm_norm[i, j] > 0.5 else "#222222",
+                fontsize=11,
+                fontweight="bold",
+            )
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(labels)
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+    ax.set_title(title or "Confusion matrix")
+    ax.grid(False)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="row-normalised rate")
+    path = savefig(fig, name)
+    plt.close(fig)
+    return path
+
+
+def threshold_curve(
+    sweep: pd.DataFrame, chosen: dict | None = None, name: str = "threshold_tuning"
+) -> Path:
+    """Precision / recall / F1 versus decision threshold, with chosen operating points.
+
+    ``sweep`` is the grid from :func:`src.modeling.threshold.sweep_thresholds`
+    (columns ``threshold``, ``precision``, ``recall``, ``f1``). ``chosen`` maps a
+    policy name -> threshold and draws a dashed marker at each; the dotted line at
+    0.5 is the naive default, so the reader sees why a tuned cut beats it for an
+    imbalanced early-warning task.
+    """
+    apply_style()
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    ax.plot(sweep["threshold"], sweep["precision"], label="precision", color=CLASS_COLOURS[0])
+    ax.plot(sweep["threshold"], sweep["recall"], label="recall", color=CLASS_COLOURS[1])
+    ax.plot(sweep["threshold"], sweep["f1"], label="F1", color="#2E7D32")
+    ax.axvline(0.5, ls=":", lw=1.0, color="#999999", label="default 0.5")
+    if chosen:
+        for i, (policy, thr) in enumerate(chosen.items()):
+            ax.axvline(thr, ls="--", lw=1.1, color="#555555")
+            ax.text(thr, 0.03 + 0.06 * i, f" {policy}={thr:.2f}", fontsize=8, color="#333333")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel("Decision threshold")
+    ax.set_ylabel("score")
+    ax.set_title("Threshold tuning: precision / recall / F1 trade-off")
+    ax.legend(ncol=2, fontsize=8)
     path = savefig(fig, name)
     plt.close(fig)
     return path
