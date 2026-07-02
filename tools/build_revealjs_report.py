@@ -2,8 +2,8 @@
 
 Reads the result CSVs (so every table/number is regenerated from source, not typed
 by hand), writes a Markdown source, and renders it to a self-contained HTML deck
-with pandoc + reveal.js. Scoped to the reported milestone (Phase 1 data + Phase 2
-benchmarking); later phases appear as an "upcoming work" roadmap.
+with pandoc + reveal.js. Scoped to Đức's Phase 2 benchmarking (the data phase was
+already presented in Task 3); later phases appear as an "upcoming work" roadmap.
 
 Outputs:
   reports/slides/progress_report.md     (Markdown source, committed)
@@ -58,30 +58,49 @@ def kpi(value: str, label: str) -> str:
 # ── Read results straight from the CSVs ─────────────────────────────────────
 imb = pd.read_csv(TAB / "imbalance_comparison.csv")
 base = imb[imb["strategy"] == "none"].sort_values("recall", ascending=False).reset_index(drop=True)
-bench = base[["model", "recall", "f1", "pr_auc", "roc_auc"]].copy()
-for c in ("recall", "f1", "pr_auc", "roc_auc"):
+_metric_cols = ["recall", "f1", "pr_auc", "roc_auc", "precision", "balanced_acc", "brier"]
+bench = base[["model", *_metric_cols]].copy()
+for c in _metric_cols:
     bench[c] = bench[c].map(lambda v: f"{v:.3f}")
 bench["model"] = bench["model"].map(NICE)
-bench_md = md_table(bench, ["Model", "Recall", "F1", "PR-AUC", "ROC-AUC"])
+bench_md = md_table(
+    bench, ["Model", "Recall", "F1", "PR-AUC", "ROC-AUC", "Precision", "Bal.Acc", "Brier ↓"]
+)
 top = base.iloc[0]
 
-sp = pd.read_csv(TAB / "split_report.csv")
-srow = sp[sp["dataset"] == "t100"].iloc[0]
-
-roadmap_status = md_table(
-    pd.DataFrame(
-        [
-            ["Phase 1 — Data prep & harness", "Phúc", "✅ Hoàn thành"],
-            ["Phase 2 — Benchmark 5 model @100%", "Đức", "✅ Hoàn thành"],
-            ["Phase 4 — Xử lý mất cân bằng (RQ3)", "Đức", "▶ Sắp tới"],
-            ["Phase 3 — Time-aware 6 mốc (RQ1)", "Khoa", "▶ Sắp tới"],
-            ["Phase 5 — SHAP/LIME + độ ổn định (RQ2)", "Bình", "▶ Sắp tới"],
-            ["Phase 6a/b — Dashboard & Báo cáo", "Sơn / An", "▶ Sắp tới"],
-        ],
-        columns=["a", "b", "c"],
-    ),
-    ["Pha / Nhiệm vụ", "Người", "Trạng thái"],
+# CV 5-fold x 5-seed (mean ± std) — the harness reliability view.
+cvs = pd.read_csv(TAB / "cv_summary.csv").sort_values("recall_mean", ascending=False)
+cv_rows = [
+    [
+        NICE[r.model],
+        f"{r.recall_mean:.4f} ± {r.recall_std:.4f}",
+        f"{r.f1_mean:.4f} ± {r.f1_std:.4f}",
+        f"{r.pr_auc_mean:.4f} ± {r.pr_auc_std:.4f}",
+    ]
+    for r in cvs.itertuples()
+]
+cv_md = md_table(
+    pd.DataFrame(cv_rows, columns=["a", "b", "c", "d"]),
+    ["Model", "Recall (μ ± σ)", "F1 (μ ± σ)", "PR-AUC (μ ± σ)"],
 )
+
+# Friedman + post-hoc Wilcoxon — is the ranking statistically real?
+fried = pd.read_csv(TAB / "model_friedman.csv")
+fr_rows = [
+    [r.metric, NICE[r.best_model], f"{r.friedman_stat:.1f}", f"{r.p_value:.1e}"]
+    for r in fried.itertuples()
+]
+fried_md = md_table(
+    pd.DataFrame(fr_rows, columns=["a", "b", "c", "d"]),
+    ["Chỉ số", "Model tốt nhất (mean rank)", "Friedman χ²", "p-value"],
+)
+pw = pd.read_csv(TAB / "model_pairwise_wilcoxon.csv")
+xgb_recall_sig = pw[
+    (pw.metric == "recall")
+    & ((pw.model_a == "xgb") | (pw.model_b == "xgb"))
+    & pw["significant_0.05"]
+]
+n_xgb_wins = int((xgb_recall_sig["better"] == "xgb").sum())
 
 roadmap_next = md_table(
     pd.DataFrame(
@@ -122,80 +141,77 @@ CSS = """
 
 MD = f"""---
 title: "Time-Aware Explainable ML — Phát hiện sớm sinh viên nguy cơ (OULAD)"
-subtitle: "Báo cáo tiến độ · Phase 1–2 · DSP391m — Nhóm 1"
-author: "Phúc (Phase 1) · Đức (Phase 2)  —  GVHD: Nguyễn Thị Hoàng Yến"
+subtitle: "Báo cáo tiến độ · Phase 2 — Benchmarking mô hình · DSP391m — Nhóm 1"
+author: "Đức (Modeling Lead)  —  GVHD: Nguyễn Thị Hoàng Yến"
 date: "02/07/2026 · Đại học FPT"
 ---
 
-# Tổng quan
+# Phase 2 — Benchmarking  ·  <em class="tag">Đức</em>
 
-## Bài toán & phạm vi báo cáo
+## Lựa chọn mô hình — vì sao 5 thuật toán này?
 
-- **Mục tiêu:** phát hiện *sớm* sinh viên nguy cơ trên OULAD và *giải thích được* dự đoán.
-- **3 câu hỏi:** RQ1 dự đoán sớm · RQ2 ổn định giải thích · RQ3 mất cân bằng.
-- Báo cáo này trình bày đến hết **Phase 2 (so tuyển mô hình)**; phần sau là *việc sắp tới*.
-
-{roadmap_status}
-
-# Phase 1 — Dữ liệu & Khung thực nghiệm  ·  <em class="tag">Phúc</em>
-
-## Pipeline dữ liệu chống rò rỉ
-
-<div class="cols">
-<div>
-
-- 7 bảng OULAD → **master 32.593 × 33**.
-- Cắt **6 mốc** tiến độ khoá học (10 → 100%).
-- Tiền xử lý **fit-on-train** (chống rò rỉ).
-- Harness: **80/20** StratifiedGroupKFold theo `id_student` + CV **5-fold × 5 seed**.
-
-</div>
-<div>
-
-{img("preprocessing_sequence.png", 430)}
-
-</div>
-</div>
-
-## Chia dữ liệu & chống rò rỉ — số liệu thật
-
-{kpi(f"{int(srow.n_train):,}", "mẫu train")} {kpi(f"{int(srow.n_test):,}", "mẫu test")} {kpi(f"{int(srow.n_test_students):,}", "SV test")} {kpi(f"{int(srow.student_overlap)}", "SV trùng train/test")}
-
-| Chỉ số | Train | Test |
+| Model | Họ thuật toán | Lý do chọn |
 |---|---|---|
-| Số mẫu | {int(srow.n_train):,} | {int(srow.n_test):,} |
-| Tỉ lệ at-risk | {srow.train_at_risk_rate:.4f} | {srow.test_at_risk_rate:.4f} |
+| Logistic Regression | Tuyến tính | Baseline chuẩn, hệ số đọc được trực tiếp |
+| Random Forest | Bagging cây | Bền với nhiễu/ngoại lai, ít phải tinh chỉnh |
+| XGBoost | Boosting cây | SOTA dữ liệu bảng, hỗ trợ SHAP TreeExplainer |
+| LightGBM | Boosting cây | Nhanh trên dữ liệu lớn, đối chứng cùng họ XGB |
+| ANN (MLP) | Mạng nơ-ron | Đại diện phi tuyến khác họ cây, đối chứng đa dạng |
 
-- Lệch tỉ lệ at-risk train–test chỉ **{srow.rate_gap:.4f}** → phân tầng đạt.
-- **0** sinh viên trùng giữa train/test · **19/19** kiểm thử rò rỉ ĐẠT.
+- Phủ **3 họ mô hình** khác nhau (tuyến tính · cây · nơ-ron) → kết luận không lệ thuộc một họ.
+- Cả 5 đều được các nghiên cứu nền trên OULAD sử dụng → **so sánh được với văn liệu**.
 
-# Phase 2 — So tuyển mô hình (Benchmarking)  ·  <em class="tag">Đức</em>
+## Kiến trúc & cấu hình huấn luyện
 
-## 5 thuật toán ứng viên @ mốc 100%
+| Model | Cấu hình chính (còn lại giữ mặc định) |
+|---|---|
+| Logistic Regression | `max_iter=1000` |
+| Random Forest | mặc định · `n_jobs=-1` |
+| XGBoost | `tree_method=hist` · `eval_metric=logloss` |
+| LightGBM | mặc định · `verbose=-1` |
+| ANN (MLP) | 2 lớp ẩn **(64, 32)** · `max_iter=500` · early-stopping |
 
-<div class="cols">
-<div>
+- **Cùng seed 42** cho mọi model → công bằng & tái lập.
+- Giai đoạn này *chưa* tinh chỉnh siêu tham số — so tuyển ở cấu hình gốc trước, tinh chỉnh sau khi chọn.
 
-- **LR · RF · XGBoost · LightGBM · ANN** (baseline, chưa resample).
-- Chỉ số chính: **Recall & PR-AUC** lớp at-risk (bỏ sót SV nguy cơ là đắt nhất).
-- Các model cây bám sát nhau; **XGB** dẫn đầu recall.
+## Quy trình huấn luyện (Training Procedure)
 
-</div>
-<div>
+1. Nạp **split cố định** của mốc 100% (đã chốt ở Task 3 — 0 SV trùng train/test, 19/19 kiểm thử rò rỉ ĐẠT).
+2. Tiền xử lý **fit trên train** → transform test (median, winsorize, encoder, scaler đều học từ train).
+3. `model.fit(train)` → dự đoán trên **test giữ riêng**.
+4. Chấm **7 chỉ số**; xếp hạng theo **Recall** lớp at-risk.
 
-{img("model_benchmark_baseline.png", 430)}
+- Đây là kết quả **baseline (no-resample)** — Phase 4 sẽ so sánh trước–sau với 4 kỹ thuật cân bằng lớp.
+- Chỉ số chính: **Recall & PR-AUC** lớp at-risk — bỏ sót SV nguy cơ đắt hơn nhiều một cảnh báo nhầm; accuracy dễ gây ảo tưởng.
 
-</div>
-</div>
+## Kết quả so tuyển @ mốc 100%
 
-## Bảng hiệu năng 5 model — baseline (đọc từ CSV)
+{img("model_benchmark_baseline.png", 520)}
 
-{kpi(f"{top.recall:.3f}", f"{NICE[top.model]} · recall")} {kpi(f"{top.pr_auc:.3f}", "PR-AUC")} {kpi(f"{top.f1:.3f}", "F1")}
+## Bảng hiệu năng đầy đủ — 7 chỉ số (đọc từ CSV)
+
+{kpi(f"{top.recall:.3f}", f"{NICE[top.model]} · recall")} {kpi(f"{top.pr_auc:.3f}", "PR-AUC")} {kpi(f"{top.f1:.3f}", "F1")} {kpi(f"{top.brier:.3f}", "Brier (càng thấp càng tốt)")}
 
 {bench_md}
 
-- Đánh giá trên **tập test giữ riêng**, sắp theo recall lớp at-risk.
-- Khoảng cách giữa các model nhỏ → chọn theo **recall + khả năng giải thích được**.
+- Đánh giá trên **tập test giữ riêng**, sắp theo recall lớp at-risk; Brier đo chất lượng xác suất.
+- Khoảng cách giữa các model **nhỏ** → cần kiểm chứng độ tin cậy trước khi kết luận.
+
+## Độ tin cậy: CV 5-fold × 5 seed trên train
+
+{cv_md}
+
+- 25 lần fit/model (pipeline đầy đủ, tiền xử lý + cân bằng lặp lại **trong từng fold** — không rò rỉ).
+- Độ lệch chuẩn rất nhỏ (σ ≈ 0,005) → kết quả **ổn định**, không ăn may theo cách chia fold.
+- Thứ hạng CV khớp thứ hạng test → baseline đáng tin.
+
+## Xếp hạng có ý nghĩa thống kê không?
+
+{fried_md}
+
+- **Friedman** trên 25 fold ghép cặp: mọi chỉ số đều p ≪ 0,05 → khác biệt giữa các model là **thật**, không phải nhiễu.
+- Post-hoc **Wilcoxon (hiệu chỉnh Holm)** trên recall: XGBoost thắng **{n_xgb_wins}/4** cặp so sánh có ý nghĩa.
+- **XGBoost** dẫn recall · **LightGBM** dẫn F1/PR-AUC/ROC-AUC → chọn theo mục tiêu bài toán (recall-first) + **giải thích được** (TreeExplainer, phục vụ Phase 5).
 
 # Kế hoạch & Kết luận
 
@@ -207,7 +223,7 @@ date: "02/07/2026 · Đại học FPT"
 
 ## Kết luận
 
-- **Đã xong & tái lập:** pipeline dữ liệu (P1) + so tuyển 5 model ứng viên (P2).
+- **Đã xong & tái lập:** so tuyển 5 model ứng viên (Phase 2), trên nền dữ liệu đã chốt ở Task 3.
 - **{NICE[top.model]}** dẫn đầu recall (**{top.recall:.3f}**) ngay ở baseline; các model bám sát.
 - **Kế tiếp:** P4 mất cân bằng → P3 time-aware RQ1 → P5 XAI RQ2 → P6 dashboard & báo cáo.
 - Nền tảng tái lập từ `src/` + `tools/`; **19/19** kiểm thử rò rỉ ĐẠT.
