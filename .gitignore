@@ -1,3 +1,6 @@
+# Scratch query file rewritten on every ClickHouse call (build_data_understanding_nb)
+.ch_query.sql
+
 # ---- XAI intermediate cache (per-seed / per-checkpoint SHAP vectors) ----
 # Resumable checkpoint for tools.make_xai_analysis; the final xai_*.csv are committed.
 reports/tables/_xai_cache/
