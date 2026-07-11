@@ -11,8 +11,8 @@ Run:  pytest tests/test_leakage.py -q
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -56,9 +56,7 @@ def roster() -> pd.DataFrame:
     return add_at_risk_label(pd.read_csv(RAW_DIR / "studentInfo.csv"))
 
 
-def _max_date_exceeds_cutoff(
-    cut: pd.DataFrame, cmap: pd.DataFrame, t: int, date_col: str
-) -> int:
+def _max_date_exceeds_cutoff(cut: pd.DataFrame, cmap: pd.DataFrame, t: int, date_col: str) -> int:
     cutoffs = cmap.loc[cmap["t_percent"] == t, PRESENTATION_KEY + ["cutoff_day"]]
     merged = cut.merge(cutoffs, on=PRESENTATION_KEY, how="left")
     return int((merged[date_col] > merged["cutoff_day"]).sum())
@@ -77,10 +75,7 @@ def test_no_submission_leakage(submissions, checkpoint_map, t):
 
 
 def test_counts_non_decreasing_in_t(clickstream, checkpoint_map):
-    counts = [
-        len(cut_at_checkpoint(clickstream, t, checkpoint_map, "date"))
-        for t in CHECKPOINTS
-    ]
+    counts = [len(cut_at_checkpoint(clickstream, t, checkpoint_map, "date")) for t in CHECKPOINTS]
     assert counts == sorted(counts)
 
 
@@ -110,9 +105,7 @@ def test_preprocessing_uses_train_only_stats():
     train = pd.DataFrame(
         {"date_registration": [0.0, 10.0, 20.0], "studied_credits": [30.0, 60.0, 100.0]}
     )
-    test = pd.DataFrame(
-        {"date_registration": [np.nan, 5.0], "studied_credits": [40.0, 99999.0]}
-    )
+    test = pd.DataFrame({"date_registration": [np.nan, 5.0], "studied_credits": [40.0, 99999.0]})
 
     # Missing: a TEST NaN must be filled with the TRAIN median (10), not test's own (5).
     m_stats: dict = {}
@@ -142,6 +135,50 @@ def test_feature_frame_excludes_leaky_columns():
     assert "date_unregistration" not in X.columns
     assert "final_result" not in X.columns
     assert y is not None and set(pd.unique(y)) <= {0, 1}
+
+
+def test_banked_assessment_covers_its_deadline():
+    """A banked assessment (credit carried over from a previous presentation) must
+    not flag not_submitted=1 — its deadline is covered even though nothing was
+    submitted this presentation. Guards the 2026-07-12 fix (pre-fix impact:
+    78/32,593 rows wrongly flagged at t=100)."""
+    from src.data.build_performance_features import aggregate_performance
+
+    key = {"code_module": "AAA", "code_presentation": "2013J"}
+    assessments = pd.DataFrame(
+        [{**key, "id_assessment": 1, "assessment_type": "TMA", "date": 50.0, "weight": 50.0}]
+    )
+    cutoff = pd.DataFrame([{**key, "cutoff_day": 100}])
+    submissions = pd.DataFrame(
+        [
+            {
+                "id_assessment": 1,
+                "id_student": 10,
+                "is_banked": 1,
+                "date_submitted": 0,
+                "score": 70.0,
+            }
+        ]
+    )
+    roster = pd.DataFrame([{**key, "id_student": 10}, {**key, "id_student": 20}])
+
+    out = aggregate_performance(submissions, assessments, cutoff, roster).set_index("id_student")
+    assert out.loc[10, "not_submitted"] == 0  # banked -> deadline covered
+    assert out.loc[10, "n_assessments_submitted"] == 0  # banked is still not a submission
+    assert out.loc[20, "not_submitted"] == 1  # genuinely missed
+
+
+def test_make_split_reuses_committed_ids(tmp_path, monkeypatch):
+    """make_split must never silently re-derive the frozen test ids: fold assignment
+    drifts across sklearn versions (4,574/5,756 ids change under 1.8), so an
+    existing committed CSV is always reused; re-derivation is opt-in (--rederive)."""
+    from src.evaluation import make_split as ms
+
+    frozen = tmp_path / "test_student_ids.csv"
+    pd.DataFrame({"id_student": [1, 2, 3]}).to_csv(frozen, index=False)
+    monkeypatch.setattr(ms, "TEST_IDS_PATH", frozen)
+    ids = ms.resolve_test_ids(master=None)  # file exists -> loaded, master untouched
+    assert ids == {1, 2, 3}
 
 
 def test_checkpoint_t100_idle_matches_master():

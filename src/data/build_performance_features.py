@@ -7,7 +7,8 @@ Per student-module-presentation:
     mean_score_to_date        - mean score of those submissions
     weighted_score_to_date    - sum(score * weight / 100) of those submissions
     not_submitted             - 1 if >=1 assessment whose deadline already passed
-                                (deadline <= cutoff) was NOT submitted by cutoff.
+                                (deadline <= cutoff) was neither submitted by cutoff
+                                nor covered by a banked (carried-over) result.
 
 `aggregate_performance` MUST be pure and cutoff-driven. `not_submitted`
 distinguishes a genuine miss from "no deadline yet", so filling missing scores
@@ -61,9 +62,19 @@ def aggregate_performance(
         mean_score_to_date=("score", "mean"),
         weighted_score_to_date=("weighted", "sum"),
     )
-    # Of those, how many were for assessments whose deadline had passed.
+    # A due assessment counts as covered by a fresh submission by cutoff OR a
+    # banked result carried over from a previous presentation (credit exists from
+    # day 0). Banked rows stay excluded from the score/count features above; until
+    # 2026-07-12 they also failed to cover their deadline, wrongly flagging
+    # not_submitted=1 for 78/32,593 students at t=100 (0.24%).
     submitted_due = (
-        submitted[submitted["is_due"]].groupby(GROUP_COLS).size().rename("n_submitted_due")
+        sub[
+            sub["is_due"]
+            & ((sub["is_banked"] == 1) | (sub["date_submitted"] <= sub["cutoff_day"]))
+        ]
+        .groupby(GROUP_COLS)
+        .size()
+        .rename("n_submitted_due")
     )
 
     out = roster[GROUP_COLS].drop_duplicates().copy()
