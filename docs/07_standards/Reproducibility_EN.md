@@ -51,7 +51,7 @@ To verify integrity at any later point, re-run `setup_raw_data.py`. The script r
 
 ## 4. Environment
 
-- **Python version:** 3.11 (managed via Conda)
+- **Python version:** 3.13 (managed via Conda; see the verified set in Section 4.1)
 - **Dependency pinning:** `requirements.txt` (pip-installable, exact versions) and `environment.yml` (full Conda environment, including non-Python packages)
 - **Note on plotting:** Matplotlib figure generation requires an environment with a working freetype/font stack. On minimal headless servers, install `libfreetype6-dev` (Debian/Ubuntu) or the equivalent before running the EDA step.
 
@@ -59,7 +59,7 @@ To recreate the environment:
 
 ```bash
 conda env create -f environment.yml
-conda activate dsp391m
+conda activate dsp
 ```
 
 Or with pip only:
@@ -67,6 +67,27 @@ Or with pip only:
 ```bash
 pip install -r requirements.txt
 ```
+
+### 4.1 Verified Environment (2026-07-12)
+
+All committed artifacts (model bundles, tables, figures) were built on Windows with the following package set, which `environment.yml` now pins:
+
+| Package | Version | Package | Version |
+|---|---|---|---|
+| Python | 3.13.9 | matplotlib | 3.10.8 |
+| numpy | 2.3.5 | seaborn | 0.13.2 |
+| pandas | 2.3.3 | joblib | 1.5.2 |
+| scipy | 1.16.3 | shap | 0.52.0 |
+| pyarrow | 21.0.0 | lime | 0.2.0.1 |
+| scikit-learn | 1.8.0 | loguru | 0.7.3 |
+| xgboost | 3.1.3 | imbalanced-learn | 0.14.2 |
+| lightgbm | 4.6.0 | | |
+
+(Plus `python-dotenv`, `pytest`, `jupyter`, `nbformat`; `pandoc` 3.8 for docx/deck generation.)
+
+**Bundle compatibility.** The committed `.joblib` bundles are scikit-learn 1.8 / numpy 2.x pickles. Under the older pins (Python 3.11 / scikit-learn 1.5 / numpy < 2), the ANN bundle (`models/ann_t100.joblib`) fails to load (`MT19937 is not a known BitGenerator`), and the remaining bundles load only with an `InconsistentVersionWarning` (results not guaranteed). Always use the pinned environment above.
+
+**Split guard.** `data/splits/test_student_ids.csv` (5,756 students) is the committed source of truth. `python -m src.evaluation.make_split` is guarded: if the id file exists it only loads it and never re-derives the split. Re-deriving (`--rederive`) under a different scikit-learn version changes 4,574/5,756 ids and invalidates every published number — it is reserved for a whole-team decision.
 
 ---
 
@@ -136,8 +157,8 @@ The following facts were established on the canonical run and must hold after an
 - All left-joins in `build_master_table` preserve exactly **32,593 rows** — no row duplication and no row loss.
 - The master table contains **0 duplicate keys** (verified by `pytest tests/test_leakage.py`).
 - The at-risk rate in the master table is **52.8 %**.
-- The six checkpoint datasets share an identical roster of **32,593 students** — no student appears in one checkpoint but not another.
+- The six checkpoint datasets share an identical roster of **32,593 enrolments (28,785 distinct students)** — no enrolment appears in one checkpoint but not another.
 
 ---
 
-_DSP391m Group 1. Last updated: 2026-06-14._
+_DSP391m Group 1. Last updated: 2026-07-12._

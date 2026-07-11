@@ -17,7 +17,7 @@ Cấu trúc thư mục bám theo năm phân tích yêu cầu của Task 3, mỗi
 | Hỗ trợ — quy chuẩn & tái lập | `07_standards/` | `Chart_Standards`, `Reproducibility` |
 | Hỗ trợ — bản gốc có chữ ký | `08_agreements/` | `Step0_Agreement_Nhom1.pdf`, `Leakage_Rules_Signed_Nhom1.pdf` |
 
-Bản thảo tổng hợp toàn bộ là `reports/Report2_DataTasks_{EN,VI}` (kèm biểu đồ EDA nhúng sẵn); bản thực thi tương ứng là `notebooks/01_build_master_table.ipynb` (dựng/làm sạch) và `notebooks/02_eda.ipynb` (EDA Chương 4).
+Sản phẩm tổng hợp hiện hành là chuỗi notebook `notebooks/00…06` cùng bộ docs này (kèm slide trong `reports/slides/`); với chương này, bản thực thi tương ứng là `notebooks/01_build_master_table.ipynb` (dựng/làm sạch) và `notebooks/02_eda.ipynb` (EDA Chương 4).
 
 ## Mã nguồn, dữ liệu và kết quả (ngoài `docs/`)
 
@@ -26,7 +26,7 @@ Bản thảo tổng hợp toàn bộ là `reports/Report2_DataTasks_{EN,VI}` (k�
 | Pipeline dữ liệu | `src/data/` (tương tác, kết quả, bảng hợp nhất, mốc thời gian), `src/features/preprocessing.py` |
 | Bộ phân chia | `src/evaluation/split_harness.py` |
 | EDA | `src/eda/` → biểu đồ ở `reports/figures/`, bảng thống kê ở `reports/tables/` |
-| Kiểm thử | `tests/test_leakage.py` (19 kiểm thử) |
+| Kiểm thử | `tests/test_leakage.py` (bộ kiểm thử rò rỉ/phân chia tự động) |
 | Bộ sinh | `tools/` (docx, notebook, từ điển dữ liệu, phân loại biến, sơ đồ trình tự) |
 
 ## Dữ liệu train / test
@@ -39,7 +39,7 @@ Phép phân chia được định nghĩa **một lần** ở cấp sinh viên �
 | Báo cáo kiểm chứng phân chia (kích thước, tỉ lệ lớp, 0 trùng) | `reports/tables/split_report.csv` | ✅ có commit |
 | Dữ liệu train/test đã tạo (master + từng mốc) | `data/splits/*_train.parquet`, `*_test.parquet` | git bỏ qua (tái tạo được) |
 
-Sinh bằng `python -m src.evaluation.make_split --materialise`. Ở giai đoạn mô hình, nạp trực tiếp phân chia của một mốc:
+Sinh bằng `python -m src.evaluation.make_split --materialise`. Lệnh này có guard: luôn tái dùng `test_student_ids.csv` đã commit, không bao giờ tự ý tính lại phép chia (cờ `--rederive` chỉ dành cho quyết định của cả nhóm, vì tách lại sẽ đổi 4.574/5.756 id). Ở giai đoạn mô hình, nạp trực tiếp phân chia của một mốc:
 
 ```python
 from src.evaluation.make_split import load_checkpoint_split
@@ -57,7 +57,7 @@ python -m src.data.build_master_table    # master_raw.parquet (+ nhật ký join
 python -m src.data.make_checkpoints      # sáu bộ dữ liệu theo mốc
 python -m src.evaluation.make_split --materialise  # phân chia train/test cố định (+ báo cáo)
 python -m src.eda.eda                    # biểu đồ + bảng + eda_findings.json
-pytest tests/test_leakage.py             # 19 kiểm thử rò rỉ/phân chia
+pytest tests/test_leakage.py             # kiểm thử rò rỉ/phân chia tự động
 ```
 
 > Lưu ý: việc sinh biểu đồ matplotlib cần môi trường có font hoạt động (xem `MEMORY`/tài liệu tái lập). Dữ liệu phái sinh `*.parquet` bị git bỏ qua và được pipeline tái tạo.

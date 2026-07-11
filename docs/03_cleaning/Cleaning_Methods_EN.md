@@ -24,6 +24,14 @@ Raw data assembled by joining seven OULAD tables contains defects that, if left 
 
 **Result.** Post-cleaning verification confirms zero duplicate keys. The count is logged to `data/interim/master_cleaning_log.csv` under the item `duplicate_keys_removed`. The join log separately records row counts at each merge step so that unexpected row inflation is immediately visible.
 
+### 2.1 Exact-duplicate clickstream rows — documented decision
+
+**Observation.** The raw `studentVle.csv` contains 10,655,280 rows, of which 787,170 (7.4%) are exact duplicates of another row across all columns. This is a quirk of the OULAD distribution itself: the table has no unique key, and one row represents a student's interactions with one VLE material on one day, with `sum_click` already aggregated at source. By the schema alone, two identical rows are therefore indistinguishable from a legitimately repeated aggregate record.
+
+**Decision — keep and accumulate.** The pipeline retains these rows; the checkpoint aggregation (`groupby` + `sum` over `sum_click`) accumulates them into the engagement features. Rationale: (i) fidelity to the dataset as published — absent a unique key, deleting one copy would be an unverifiable guess about which record is "real"; (ii) consistency with the baseline literature (Adnan et al. 2021; Tomasevic et al. 2020), which works from the original OULAD tables without clickstream deduplication, keeping our click-derived features comparable.
+
+**Acknowledged limitation.** If some of these duplicates are double-logging artefacts at the source, click totals (`total_clicks`, `clicks_*`) are over-counted for the affected student-days. This is accepted and documented as a limitation of the source data rather than "repaired" by deletion. Note the contrast with the master-table deduplication above, where the composite key makes true duplicates identifiable.
+
 ---
 
 ## 3. Consistency and Standardisation
@@ -72,6 +80,8 @@ Raw data assembled by joining seven OULAD tables contains defects that, if left 
 - `date_unregistration`: Most students complete without withdrawing, so 22,521 missing values are structurally unavoidable. Including this column as a feature would require imputing a fictional unregistration date for the majority of the cohort, which has no justification.
 
 **Verified result.** After `handle_missing`, `df.isnull().sum()` equals zero across every feature column in both the training and test splits, as confirmed by the assertion in the pipeline smoke test.
+
+**Errata (2026-07-12): banked assessments & `not_submitted`.** A defect was found and fixed on 2026-07-12 in `src/data/build_performance_features.py`: assessments carried over from a previous presentation ("banked", `is_banked = 1`) were excluded from the set of submitted assessments, yet the same assessments were still counted as due at the checkpoint — so the `not_submitted` indicator was incorrectly set to 1 for students who had banked them. Measured impact: 78 of 32,593 enrolment records (0.24%) at *t* = 100%. The code now counts a banked assessment as covering its deadline. Result tables committed before this date were computed with the pre-fix code and will be recomputed in full during the final report-freeze run (the renumbering checklist is tracked in the defence handbook).
 
 ---
 

@@ -36,7 +36,7 @@ The OU operates as a fully distance-learning institution, meaning all student–
 | `vle.csv` | Catalogue of VLE activity types | ~465 entries |
 | `courses.csv` | Module duration (in days) per semester | 22 records |
 
-**Key statistics:** 32,593 students • 22 module–semester combinations • 7 CSV tables • 10,655,280 VLE interaction entries
+**Key statistics:** 32,593 enrolments (28,785 distinct students) • 22 module–semester combinations • 7 CSV tables • 10,655,280 VLE interaction entries
 
 ### 1.4. Official Citation
 

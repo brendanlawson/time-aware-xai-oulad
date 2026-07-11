@@ -47,9 +47,21 @@ Tại mốc *t%*, một sinh viên Withdrawn có thể rút môn **trước** ho
 3. Sinh viên Withdrawn rút trước mốc *t* vẫn được **giữ** trong dữ liệu mốc *t* và vẫn **gán nhãn at-risk**. Đặc trưng của họ chỉ phản ánh hoạt động tới ngày rút nên rất thấp — và chính **sự suy giảm hoạt động này là tín hiệu cảnh báo sớm**, không phải lỗi dữ liệu.
 4. Hàm cắt theo thời gian (STT 11) tự động loại mọi sự kiện có ngày vượt mốc, nên **không phát sinh rò rỉ thời gian**.
 
-**Hạn chế cần ghi nhận.** Ở các mốc muộn, sinh viên rút sớm gần như không còn hoạt động nên mô hình dễ phát hiện, có thể khiến recall và PR-AUC lạc quan hơn thực tế. Báo cáo nêu rõ hạn chế này và, nếu tiến độ cho phép, kiểm chứng bằng phân tích độ nhạy theo *Phương án B (kiểm duyệt theo mốc)*.
+**Hạn chế cần ghi nhận.** Ở các mốc muộn, sinh viên rút sớm gần như không còn hoạt động nên mô hình dễ phát hiện, có thể khiến recall và PR-AUC lạc quan hơn thực tế. Báo cáo lượng hoá hạn chế này bằng phân tích độ nhạy trên nhóm còn-đang-học trình bày ở Mục 5 — phiên bản phía-đánh-giá của phương án thay thế *Phương án B (kiểm duyệt theo mốc)*.
 
-## 5. Hệ quả cho các bước phía sau
+## 5. Hai khung đọc của biến mục tiêu (làm rõ estimand)
+
+Nhãn cố định của Phương án A hỗ trợ hai estimand (đối tượng suy luận) khác nhau, và mọi chỉ số công bố phải nêu rõ nó thuộc khung nào.
+
+1. **Phân loại kết quả cuối khoá — khung benchmark chính.** Câu hỏi "lượt ghi danh này sẽ kết thúc bằng Fail hay Withdrawn?" được định nghĩa trên toàn bộ 32.593 bản ghi ghi danh tại mọi mốc. Đây là khung cho phép so sánh kết quả với các nghiên cứu nền (Adnan và cộng sự, 2021; Tomasevic và cộng sự, 2020) — vốn cũng giữ nguyên toàn bộ quần thể — và là khung của các bảng benchmark chính của đề tài.
+
+2. **Cảnh báo sớm để can thiệp — khung còn-đang-học.** Can thiệp chỉ đến được với sinh viên chưa rút môn, nên câu hỏi vận hành "giảng viên cần liên hệ ai tại mốc *t*?" chỉ có nghĩa trên nhóm còn đang học tại ngày mốc. Ngay tại *t* = 10%, đã có 4.833 trên 32.593 lượt ghi danh rút trước ngày mốc (923 trong số đó thuộc tập kiểm tra); với các bản ghi này không còn gì để dự đoán — chỉ còn ghi nhận.
+
+**Hệ quả đo được.** Recall trên lớp at-risk của XGBoost tại *t* = 40/80/100% là 0,81/0,90/0,93 trên toàn quần thể nhưng chỉ 0,678/0,783/0,853 trên nhóm còn-đang-học (`reports/tables/sensitivity_active_xgb.csv`, sinh bởi `tools/sensitivity_active.py`). Theo tiêu chí recall ≥ 0,80 của RQ1, toàn quần thể đạt từ *t* = 40%, trong khi nhóm còn-đang-học chỉ đạt tại *t* = 100%. Nhất quán với điều đó, đặc trưng SHAP mạnh nhất là `days_since_last_activity` (trung bình |SHAP| 3,66): trên toàn quần thể, một phần sức mạnh của mô hình là *phát hiện sinh viên đã rời đi*, chứ không chỉ *dự báo nguy cơ tương lai*. Đây **không phải rò rỉ** — nhãn không hề lọt vào đặc trưng, và mức hoạt động thấp của sinh viên đã rút là hành vi thật — mà là **vấn đề định nghĩa quần thể**.
+
+**Quy tắc báo cáo.** Mọi phát biểu dạng "dự đoán đáng tin cậy từ *t* = 40%" phải nêu rõ quần thể được nói tới. Do đó đề tài báo cáo song song cả hai khung: kết quả toàn quần thể là benchmark chính, kết quả nhóm còn-đang-học là phân tích độ nhạy hướng tới can thiệp.
+
+## 6. Hệ quả cho các bước phía sau
 
 Mọi hạng mục phụ thuộc "Bước 0" đều kế thừa định nghĩa này: quy tắc phòng rò rỉ (STT 12), khảo sát lược đồ và bảng quy đổi mốc (STT 9, 10), thiết kế phân chia (STT 21), và tài liệu nguồn gốc/đạo đức (STT 30). Tên cột mục tiêu là `at_risk`; `final_result` chỉ được giữ lại như nguồn gốc thô của nhãn.
 
