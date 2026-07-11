@@ -3,7 +3,7 @@
 #################################################################################
 
 PROJECT_NAME = time-aware-xai-oulad
-PYTHON_VERSION = 3.14
+PYTHON_VERSION = 3.13
 PYTHON_INTERPRETER = python
 
 #################################################################################
@@ -61,10 +61,12 @@ create_environment:
 #################################################################################
 
 
-## Make dataset
+## Make dataset (master table -> checkpoints -> frozen split)
 .PHONY: data
-data: requirements
-	$(PYTHON_INTERPRETER) src/dataset.py
+data:
+	$(PYTHON_INTERPRETER) -m src.data.build_master_table
+	$(PYTHON_INTERPRETER) -m src.data.make_checkpoints
+	$(PYTHON_INTERPRETER) -m src.evaluation.make_split --materialise
 
 
 #################################################################################

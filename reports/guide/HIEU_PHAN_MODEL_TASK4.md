@@ -19,7 +19,7 @@ Với **mỗi sinh viên**, máy đưa ra 1 trong 2 nhãn:
 
 Đây gọi là **phân loại nhị phân** (binary classification) — giống lọc email *spam / không spam*, hay bác sĩ sàng lọc *cần chú ý / bình thường*.
 
-**Số liệu của mình:** 32.593 sinh viên. **52.8% là "nguy cơ"** (gần một nửa). Trong nhóm nguy cơ đó: **59% là Bỏ học, 41% là Trượt** — nhớ con số này, mục 9 sẽ cần.
+**Số liệu của mình:** 32.593 lượt ghi danh môn–kỳ (28.785 sinh viên duy nhất — một bạn có thể học nhiều môn). **52.8% là "nguy cơ"** (gần một nửa). Trong nhóm nguy cơ đó: **59% là Bỏ học, 41% là Trượt** — nhớ con số này, mục 9 sẽ cần.
 
 > 🎤 *GV hỏi "bài toán loại gì?"* → "Phân loại nhị phân: nguy cơ hay không, dựa trên final_result."
 
@@ -86,9 +86,9 @@ Ba nguyên tắc chống gian lận (**leakage** — máy "xem trước đáp á
 2. **Cắt thời gian nghiêm** → ở mốc 20%, máy *không được* thấy dữ liệu sau mốc đó.
 3. **Mọi xử lý (chuẩn hóa, cân bằng) chỉ học từ train**, không đụng test.
 
-→ Bọn mình có **19 bài kiểm thử tự động** canh đúng các luật này (đều PASS).
+→ Bọn mình có **hơn 20 bài kiểm thử tự động** canh đúng các luật này (đều PASS).
 
-> 🎤 *"Làm sao chắc không bị leakage?"* → "Chia theo id_student, cắt thời gian, mọi thứ fit trên train; có 19 test tự động kiểm tra, pass hết."
+> 🎤 *"Làm sao chắc không bị leakage?"* → "Chia theo id_student, cắt thời gian, mọi thứ fit trên train; có hơn 20 test tự động kiểm tra, pass hết."
 
 ---
 
@@ -129,7 +129,9 @@ Bảng **recall theo thời gian** (XGBoost — đọc từ trái sang phải):
 
 **Đọc ra:** càng học nhiều, máy đoán càng chuẩn (recall tăng đều). Nếu lấy mốc "đáng tin" = recall ≥ 0.80, thì **đạt từ mốc 40%** → đúng với các bài báo nền (Adnan: 40–60%).
 
-> 🎤 **Câu trả lời RQ1:** "XGBoost tốt nhất; dự đoán đạt độ tin cậy chấp nhận được từ khoảng **40% thời lượng khóa học**."
+> 🎤 **Câu trả lời RQ1:** "XGBoost tốt nhất; trên toàn bộ lượt ghi danh, dự đoán đạt ngưỡng tin cậy từ **~40% khoá học**; trên nhóm còn-đang-học — nhóm can thiệp được — ngưỡng đó chỉ đạt ở **cuối khoá**, nên bọn em báo cáo cả hai."
+
+Nhưng con số này là trên **toàn bộ lượt ghi danh** — đọc mục 9 để biết cách nói trung thực.
 
 ---
 
@@ -144,22 +146,27 @@ Nên bọn mình làm thêm 1 phép kiểm: **chỉ tính những SV còn đang 
 | Mốc | Recall (tất cả) | Recall (chỉ SV còn học) |
 |---|---|---|
 | 40% | 0.81 | **0.68** |
+| 60% | 0.87 | **0.75** |
+| 80% | 0.90 | **0.78** |
 | 100% | 0.93 | **0.85** |
 
-**Ý nghĩa:** con số đẹp ban đầu có phần nhờ "bắt người đã nghỉ". Trên nhóm *còn cứu được*, bài toán **khó hơn và thật hơn**.
+**Ý nghĩa:** con số đẹp ban đầu có phần nhờ "bắt người đã nghỉ". Trên nhóm *còn cứu được*, bài toán **khó hơn và thật hơn**. Theo đúng tiêu chí recall ≥ 0,80 của nhóm, nhóm còn-học **chỉ đạt ở mốc 100%** — vì vậy mọi phát biểu "tin cậy từ 40%" phải kèm rõ cohort.
 
 > 🎤 *Đây là vũ khí, không phải điểm yếu.* Nói: "Bọn em phát hiện nhãn nguy cơ bị chi phối bởi nhóm đã bỏ học, nên báo cáo tách riêng nhóm còn học để đánh giá trung thực." → GV sẽ thấy nhóm **nghiêm túc và hiểu sâu**.
 
 ---
 
-## 10. Tủ câu hỏi nhanh (học thuộc 6 câu này là đủ tự tin)
+## 10. Tủ câu hỏi nhanh (học thuộc 9 câu này là đủ tự tin)
 
 1. **Bài toán gì?** → Phân loại nhị phân: SV nguy cơ (Trượt/Bỏ) hay không.
 2. **Dữ liệu gì?** → OULAD, 3 nhóm đặc trưng: nhân khẩu học, tương tác, kết quả.
 3. **Thuật toán nào, sao chọn?** → Thử 5 (LR/RF/XGBoost/LightGBM/ANN); **XGBoost** thắng về recall & PR-AUC.
 4. **Đo bằng gì?** → Recall (chính), PR-AUC, ROC-AUC, F1; recall vì không được bỏ sót SV cần giúp.
-5. **Chống leakage sao?** → Chia theo SV, cắt thời gian, fit trên train; 19 test tự động pass.
+5. **Chống leakage sao?** → Chia theo SV, cắt thời gian, fit trên train; hơn 20 test tự động pass.
 6. **Đoán sớm được không (RQ1)?** → Tin cậy từ ~40% khóa học; và bọn em trung thực tách nhóm SV còn-đang-học.
+7. **SMOTE của nhóm cân bằng lớp nào?** → "Nhãn at-risk của bọn em chiếm 52,8% — là lớp đa số nhẹ, nên SMOTE mặc định thực chất tăng mẫu lớp not-at-risk. Bọn em phát hiện điều này, so cả 4 chiến lược và khác biệt ≤0,005 → kết luận không phụ thuộc; con số chính dùng baseline không resample."
+8. **Threshold chọn trên tập nào?** → "Trên validation out-of-fold của train (5-fold), test chỉ chấm một lần ở ngưỡng đã chốt — tránh lạc quan hoá."
+9. **32.593 là sinh viên à?** → "Là lượt ghi danh môn–kỳ; sinh viên duy nhất là 28.785. Split theo id_student nên một SV không bao giờ nằm cả train lẫn test."
 
 ---
 

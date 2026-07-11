@@ -34,7 +34,7 @@ author: "Người trình bày: Đức"
 ## Ô 0 — Markdown: Tiêu đề
 
 **Nói:** "Đây là notebook EDA trên bộ OULAD. EDA chạy **sau khi làm sạch**, trên bảng
-`master_raw` đã sẵn sàng phân tích — **32.593 sinh viên × 33 cột**. Đây là một mắt xích
+`master_raw` đã sẵn sàng phân tích — **32.593 lượt ghi danh × 33 cột**. Đây là một mắt xích
 trong pipeline: cleaning → **EDA** → feature/leakage → mô hình theo checkpoint."
 
 → **Build model:** đặt mốc — mọi thứ phía dưới là *đầu vào quyết định* cho khâu feature

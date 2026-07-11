@@ -7,17 +7,13 @@ resolved relative to each file's directory.
 Requires pandoc on PATH.  Run:  python tools/build_docx.py
 """
 
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-targets = (
-    sorted(ROOT.glob("docs/**/*_EN.md"))
-    + sorted(ROOT.glob("docs/**/*_VI.md"))
-    + sorted(ROOT.glob("reports/Report2_DataTasks_*.md"))
-)
+targets = sorted(ROOT.glob("docs/**/*_EN.md")) + sorted(ROOT.glob("docs/**/*_VI.md"))
 
 failed = 0
 for md in targets:

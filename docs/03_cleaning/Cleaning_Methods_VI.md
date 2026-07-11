@@ -24,6 +24,14 @@ Dữ liệu thô được tổng hợp từ việc nối bảy bảng OULAD ch�
 
 **Kết quả.** Kiểm tra sau làm sạch xác nhận không còn khóa trùng lặp. Số lượng được ghi vào `data/interim/master_cleaning_log.csv` dưới mục `duplicate_keys_removed`. Nhật ký nối bảng (join log) ghi riêng số lượng hàng ở mỗi bước merge để phát hiện ngay lập tức khi số hàng tăng bất thường.
 
+### 2.1 Dòng clickstream trùng lặp toàn phần — quyết định được văn bản hoá
+
+**Quan sát.** File thô `studentVle.csv` có 10.655.280 dòng, trong đó 787.170 dòng (7,4%) trùng lặp toàn phần (giống hệt trên mọi cột) với một dòng khác. Đây là đặc điểm có sẵn của chính bản phân phối OULAD: bảng này không có khóa duy nhất, và một dòng biểu diễn tương tác của một sinh viên với một tài nguyên VLE trong một ngày, với `sum_click` đã được cộng gộp từ nguồn. Vì vậy, chỉ dựa vào lược đồ, hai dòng giống hệt nhau không thể phân biệt với một bản ghi tổng hợp lặp lại hợp lệ.
+
+**Quyết định — giữ và cộng dồn.** Pipeline giữ nguyên các dòng này; bước tổng hợp theo mốc (`groupby` + `sum` trên `sum_click`) cộng dồn chúng vào các đặc trưng tương tác. Căn cứ: (i) trung thành với bộ dữ liệu như được công bố — khi không có khóa duy nhất, việc xóa một bản sao sẽ là phỏng đoán không kiểm chứng được về việc bản ghi nào là "thật"; (ii) nhất quán với các nghiên cứu nền (Adnan và cộng sự 2021; Tomasevic và cộng sự 2020), vốn làm việc trên các bảng OULAD gốc mà không khử trùng lặp clickstream, nhờ đó các đặc trưng từ click của chúng tôi vẫn so sánh được.
+
+**Giới hạn được ghi nhận.** Nếu một phần các dòng trùng này là lỗi ghi kép từ nguồn, các tổng click (`total_clicks`, `clicks_*`) sẽ bị đếm trội cho những ngày-sinh viên bị ảnh hưởng. Điều này được chấp nhận và văn bản hoá như một giới hạn của dữ liệu nguồn thay vì "sửa" bằng cách xóa. Lưu ý sự tương phản với bước khử trùng lặp bảng master ở trên, nơi khóa tổng hợp cho phép nhận diện chắc chắn bản ghi trùng thực sự.
+
 ---
 
 ## 3. Nhất Quán và Chuẩn Hóa
@@ -72,6 +80,8 @@ Dữ liệu thô được tổng hợp từ việc nối bảy bảng OULAD ch�
 - `date_unregistration`: Đa số sinh viên hoàn thành mà không hủy đăng ký, nên 22.521 giá trị khuyết là không tránh khỏi về mặt cấu trúc. Đưa cột này vào làm đặc trưng sẽ đòi hỏi điền ngày hủy đăng ký giả tưởng cho phần lớn sinh viên, điều này không có cơ sở.
 
 **Kết quả kiểm chứng.** Sau `handle_missing`, `df.isnull().sum()` bằng 0 trên mọi cột đặc trưng ở cả tập train lẫn tập test, được xác nhận bằng phép kiểm tra (assertion) trong smoke test của pipeline.
+
+**Errata (2026-07-12): bài đánh giá được bảo lưu (banked) & `not_submitted`.** Một lỗi được phát hiện và sửa ngày 2026-07-12 trong `src/data/build_performance_features.py`: các bài đánh giá được bảo lưu điểm từ lần học trước ("banked", `is_banked = 1`) bị loại khỏi tập bài "đã nộp", nhưng chính các bài đó vẫn bị tính là "đã đến hạn" tại mốc kiểm tra — khiến chỉ báo `not_submitted` bị gán 1 sai cho những sinh viên đã bảo lưu bài. Ảnh hưởng đo được: 78 trên 32.593 bản ghi ghi danh (0,24%) tại *t* = 100%. Code hiện đã tính bài bảo lưu là đã bao phủ hạn nộp của nó. Các bảng kết quả đã commit trước ngày này được tính bằng code trước khi sửa và sẽ được tính lại toàn bộ trong lần chạy chốt báo cáo cuối (danh mục cập nhật số liệu được theo dõi trong sổ tay bảo vệ).
 
 ---
 

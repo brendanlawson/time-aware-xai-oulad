@@ -65,6 +65,22 @@ def load_test_ids() -> set:
     return set(pd.read_csv(TEST_IDS_PATH)["id_student"])
 
 
+def resolve_test_ids(master: "pd.DataFrame | None", rederive: bool = False) -> set:
+    """Return the frozen test ids; only (re)derive them when explicitly asked.
+
+    The committed CSV is the source of truth: StratifiedGroupKFold fold assignment
+    changes across sklearn versions (re-deriving under 1.8 rewrites 4,574 of the
+    5,756 ids), which would silently invalidate every published number. So an
+    existing file is always reused; ``rederive=True`` (CLI ``--rederive``) is the
+    only path that overwrites it.
+    """
+    if TEST_IDS_PATH.exists() and not rederive:
+        print(f"Reusing committed test ids (frozen split): {TEST_IDS_PATH}")
+        return load_test_ids()
+    print("(Re)deriving test ids from the master roster — this REWRITES the committed split!")
+    return save_definition(master)
+
+
 def load_split(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split any dataset into (train, test) using the committed test ids."""
     return split_by_ids(df, load_test_ids())
@@ -130,10 +146,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--materialise", action="store_true", help="also write train/test parquet files"
     )
+    p.add_argument(
+        "--rederive",
+        action="store_true",
+        help="DANGER: recompute the test ids instead of reusing the committed CSV "
+        "(fold assignment differs across sklearn versions; ~4,574/5,756 ids change)",
+    )
     args = p.parse_args(argv)
 
     master = pd.read_parquet(INTERIM_DATA_DIR / "master_raw.parquet")
-    ids = save_definition(master)
+    ids = resolve_test_ids(master, rederive=args.rederive)
     report = build_report(master, ids)
     print(
         f"Test set: {len(ids)} students (seed={RANDOM_SEED}, test_size={TEST_SIZE}); "

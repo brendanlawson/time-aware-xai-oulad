@@ -1,32 +1,38 @@
+# Verified 2026-07-12 against the committed model bundles (sklearn 1.8 / numpy 2.x
+# pickles) — keep in sync with environment.yml. Older pins (numpy<2, sklearn 1.5)
+# could not load ann_*.joblib and crashed savefig/.fit on Windows.
+
 # Core scientific stack
-numpy>=1.23.0,<2.0.0
-pandas>=2.2.2
-scipy>=1.13.1
-pyarrow>=16.1.0          # parquet I/O
+numpy>=2.3,<3
+pandas>=2.3
+scipy>=1.16
+pyarrow>=21.0            # parquet I/O
 
 # Machine learning
-scikit-learn>=1.5.0
-xgboost>=2.0.3
-lightgbm>=4.3.0
-imbalanced-learn>=0.12.3 # SMOTE, ADASYN
-tensorflow>=2.16.1       # ANN
+scikit-learn==1.8.0      # hard pin: the committed .joblib bundles are 1.8 pickles
+xgboost>=3.1
+lightgbm>=4.6
+imbalanced-learn>=0.14.2 # SMOTE, ADASYN
 
 # Explainable AI
-shap>=0.45.1
+shap>=0.52
 lime>=0.2.0.1
 
 # Visualisation
-matplotlib>=3.9.0
+matplotlib>=3.10
 seaborn>=0.13.2
 missingno>=0.5.2
 
 # Experiment harness & reproducibility
-optuna>=3.6.1
-joblib>=1.4.2
+joblib>=1.5
+loguru>=0.7
+python-dotenv>=1.0
+tqdm>=4.66
 
 # Notebooks & testing
 jupyter>=1.0.0
 nbconvert>=7.0.0
+nbformat>=5.9
 pytest>=8.2.2
 
 # Git workflow tools

@@ -4,6 +4,8 @@
 # ---- XAI intermediate cache (per-seed / per-checkpoint SHAP vectors) ----
 # Resumable checkpoint for tools.make_xai_analysis; the final xai_*.csv are committed.
 reports/tables/_xai_cache/
+# Per-fold OOF cache for tools.make_threshold_validation (final CSV is committed).
+reports/tables/_thr_cache/
 
 # ---- Data (never commit raw or intermediate datasets) ----
 data/raw/

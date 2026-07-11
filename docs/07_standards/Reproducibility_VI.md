@@ -51,7 +51,7 @@ Sau khi tệp kê khai được ghi, `setup_raw_data.py` đặt mỗi tệp CSV 
 
 ## 4. Môi Trường
 
-- **Phiên bản Python:** 3.11 (quản lý qua Conda)
+- **Phiên bản Python:** 3.13 (quản lý qua Conda; xem bộ phiên bản đã kiểm chứng ở Mục 4.1)
 - **Ghim phiên bản phụ thuộc (Dependency pinning):** `requirements.txt` (cài đặt qua pip, phiên bản chính xác) và `environment.yml` (toàn bộ môi trường Conda, bao gồm các gói ngoài Python)
 - **Lưu ý về vẽ biểu đồ:** Việc tạo hình ảnh bằng Matplotlib yêu cầu môi trường có bộ phông chữ/freetype hoạt động được. Trên các máy chủ headless tối giản, hãy cài `libfreetype6-dev` (Debian/Ubuntu) hoặc tương đương trước khi chạy bước EDA.
 
@@ -59,7 +59,7 @@ Sau khi tệp kê khai được ghi, `setup_raw_data.py` đặt mỗi tệp CSV 
 
 ```bash
 conda env create -f environment.yml
-conda activate dsp391m
+conda activate dsp
 ```
 
 Hoặc chỉ dùng pip:
@@ -67,6 +67,27 @@ Hoặc chỉ dùng pip:
 ```bash
 pip install -r requirements.txt
 ```
+
+### 4.1 Môi Trường Đã Kiểm Chứng (2026-07-12)
+
+Toàn bộ sản phẩm đã commit (bundle mô hình, bảng, hình) được build trên Windows với bộ gói sau — `environment.yml` hiện ghim đúng bộ này:
+
+| Gói | Phiên bản | Gói | Phiên bản |
+|---|---|---|---|
+| Python | 3.13.9 | matplotlib | 3.10.8 |
+| numpy | 2.3.5 | seaborn | 0.13.2 |
+| pandas | 2.3.3 | joblib | 1.5.2 |
+| scipy | 1.16.3 | shap | 0.52.0 |
+| pyarrow | 21.0.0 | lime | 0.2.0.1 |
+| scikit-learn | 1.8.0 | loguru | 0.7.3 |
+| xgboost | 3.1.3 | imbalanced-learn | 0.14.2 |
+| lightgbm | 4.6.0 | | |
+
+(Kèm `python-dotenv`, `pytest`, `jupyter`, `nbformat`; `pandoc` 3.8 để sinh docx/deck.)
+
+**Tương thích bundle.** Các bundle `.joblib` đã commit là pickle của scikit-learn 1.8 / numpy 2.x. Với bộ pin cũ (Python 3.11 / scikit-learn 1.5 / numpy < 2), bundle ANN (`models/ann_t100.joblib`) load thất bại (`MT19937 is not a known BitGenerator`), các bundle còn lại chỉ load được kèm `InconsistentVersionWarning` (kết quả không được đảm bảo). Luôn dùng đúng môi trường đã ghim ở trên.
+
+**Guard phân chia dữ liệu.** `data/splits/test_student_ids.csv` (5.756 sinh viên) là nguồn sự thật đã commit. `python -m src.evaluation.make_split` có guard: nếu tệp id đã tồn tại, lệnh chỉ nạp lại chứ không bao giờ tự tính lại phép chia. Tách lại (`--rederive`) bằng phiên bản scikit-learn khác sẽ đổi 4.574/5.756 id và vô hiệu mọi số liệu đã công bố — chỉ dành cho quyết định của cả nhóm.
 
 ---
 
@@ -136,8 +157,8 @@ Các thực tế sau được thiết lập trong lần chạy chuẩn (canonica
 - Tất cả phép kết hợp bảng trái trong `build_master_table` bảo toàn đúng **32.593 hàng** — không có hàng nào bị trùng lặp và không có hàng nào bị mất.
 - Bảng tổng hợp chứa **0 khóa trùng lặp (duplicate keys)** (xác minh bởi `pytest tests/test_leakage.py`).
 - Tỷ lệ có nguy cơ (at-risk rate) trong bảng tổng hợp là **52,8 %**.
-- Sáu tập dữ liệu checkpoint chia sẻ danh sách sinh viên (roster) giống hệt nhau gồm **32.593 sinh viên** — không có sinh viên nào xuất hiện ở một checkpoint mà không có ở checkpoint khác.
+- Sáu tập dữ liệu checkpoint chia sẻ danh sách (roster) giống hệt nhau gồm **32.593 lượt ghi danh (28.785 sinh viên duy nhất)** — không có sinh viên nào xuất hiện ở một checkpoint mà không có ở checkpoint khác.
 
 ---
 
-_Nhóm 1 DSP391m. Cập nhật lần cuối: 2026-06-14._
+_Nhóm 1 DSP391m. Cập nhật lần cuối: 2026-07-12._

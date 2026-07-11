@@ -20,7 +20,7 @@ Chỉ giữ một lần nộp nếu `date_submitted ≤ cutoff_day`. Một bài 
 Chỉ giữ một dòng clickstream nếu `date ≤ cutoff_day`. Mọi đặc trưng tương tác (`total_clicks`, `n_days_active`, `clicks_*`, `max_clicks_single_day`, `mean_clicks_per_active_day`, `days_since_last_activity`) được tổng hợp từ clickstream đã cắt. Cài đặt bởi hàm `cut_at_checkpoint()` trong `src/data/time_utils.py`.
 
 ### Quy tắc 3 — Xử lý Withdrawn-trước-mốc theo Bước 0 (Phương án A)
-Sinh viên rút môn trước mốc *t* vẫn được **giữ** và **gán nhãn at-risk**; đặc trưng của họ chỉ phản ánh hoạt động trước khi rút (Quy tắc 1–2 đã loại sự kiện sau đó). Mức hoạt động thấp này là tín hiệu cảnh báo sớm hợp lệ, không phải rò rỉ. Nhãn lấy từ `final_result` và cố định qua các mốc, nên không bao giờ làm rò rỉ kết quả tương lai vào đặc trưng.
+Sinh viên rút môn trước mốc *t* vẫn được **giữ** và **gán nhãn at-risk**; đặc trưng của họ chỉ phản ánh hoạt động trước khi rút (Quy tắc 1–2 đã loại sự kiện sau đó). Mức hoạt động thấp này là tín hiệu cảnh báo sớm hợp lệ, không phải rò rỉ. Nhãn lấy từ `final_result` và cố định qua các mốc, nên không bao giờ làm rò rỉ kết quả tương lai vào đặc trưng. Tuy vậy, việc giữ lại sinh viên đã rút là một **lựa chọn quần thể có hệ quả đo được**: trên toàn quần thể, một phần hiệu năng đo được đến từ việc nhận diện lại những sinh viên đã rời đi, và recall trên lớp at-risk của nhóm còn-đang-học thấp hơn ở mọi mốc. Điều này không vi phạm quy tắc nào ở trên — không thông tin nhãn nào lọt vào đặc trưng — nhưng nó thay đổi ý nghĩa của các chỉ số công bố. Xem phân tích độ nhạy (`tools/sensitivity_active.py` → `reports/tables/sensitivity_active_xgb.csv`) và mục làm rõ estimand trong *Target_Variable_Definition* về quy ước báo cáo kép của đề tài.
 
 ## 3. Nguyên tắc hỗ trợ — chỉ khớp trên tập huấn luyện
 
@@ -28,7 +28,7 @@ Ngoài trục thời gian, mọi thành phần *học* từ dữ liệu (thống
 
 ## 4. Kiểm thử tự động
 
-`tests/test_leakage.py` khẳng định, cho cả sáu mốc, rằng không bản ghi đã cắt nào có ngày vượt ngày mốc, trên cả clickstream và bài nộp; số bản ghi không giảm theo *t*; và *t = 100%* giữ lại toàn bộ bản ghi có ngày. Đồng thời kiểm tra phân chia không trùng sinh viên và bảo toàn tỉ lệ lớp, và một kiểm thử khẳng định median điền khuyết cùng ngưỡng winsorize **chỉ học trên train** rồi áp cho test, cùng một test allow-list (không cột rò rỉ nào lọt vào X) và một test khẳng định idle ở *t = 100%* khớp master. **Kết quả: 19/19 kiểm thử đạt.**
+`tests/test_leakage.py` khẳng định, cho cả sáu mốc, rằng không bản ghi đã cắt nào có ngày vượt ngày mốc, trên cả clickstream và bài nộp; số bản ghi không giảm theo *t*; và *t = 100%* giữ lại toàn bộ bản ghi có ngày. Đồng thời kiểm tra phân chia không trùng sinh viên và bảo toàn tỉ lệ lớp, và một kiểm thử khẳng định median điền khuyết cùng ngưỡng winsorize **chỉ học trên train** rồi áp cho test, cùng một test allow-list (không cột rò rỉ nào lọt vào X) và một test khẳng định idle ở *t = 100%* khớp master. **Kết quả: toàn bộ kiểm thử rò rỉ tự động đều đạt — xem `tests/test_leakage.py`** (bộ kiểm thử được bổ sung theo thời gian nên không ghi cứng số lượng ở đây).
 
 ## 5. Ví dụ minh hoạ (`AAA / 2013J`, dài 268 ngày)
 

@@ -35,7 +35,7 @@ OU hoạt động theo mô hình đào tạo từ xa hoàn toàn, nghĩa là to�
 | `vle.csv` | Danh mục các loại hoạt động trên VLE | ~465 mục |
 | `courses.csv` | Thời lượng học phần (tính bằng ngày) theo từng học kỳ | 22 bản ghi |
 
-**Thống kê chính:** 32,593 sinh viên • 22 tổ hợp học phần–học kỳ • 7 bảng CSV • 10,655,280 lượt tương tác trên VLE
+**Thống kê chính:** 32.593 lượt ghi danh (28.785 sinh viên duy nhất) • 22 tổ hợp học phần–học kỳ • 7 bảng CSV • 10,655,280 lượt tương tác trên VLE
 
 ### 1.4. Trích dẫn Chính thức
 

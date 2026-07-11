@@ -32,7 +32,7 @@ Xong bước trên là bạn có đầy đủ dữ liệu. Chi tiết từng bư
 
 ## Bước 1 — Cài môi trường
 
-Yêu cầu: **Python 3.11**. Khuyến nghị dùng **conda** (cài sẵn các thư viện nặng như pyarrow, xgboost, lightgbm dạng binary, không cần trình biên dịch).
+Yêu cầu: **Python 3.13** (env đã kiểm chứng — xem `environment.yml`). Khuyến nghị dùng **conda** (cài sẵn các thư viện nặng như pyarrow, xgboost, lightgbm dạng binary, không cần trình biên dịch).
 
 ### Cách A — Conda (khuyến nghị)
 
@@ -51,6 +51,10 @@ pip install -r requirements.txt
 ```
 
 > ⚠️ **Bắt buộc có `pyarrow`** thì mới đọc/ghi được file `.parquet`. Cả hai cách trên đều đã bao gồm. Nếu bạn dùng Python hệ thống mà gặp lỗi `Unable to find a usable engine ... pyarrow`, nghĩa là bạn đang chạy sai môi trường — hãy `conda activate dsp` (hoặc kích hoạt venv) trước.
+
+### Lưu ý tương thích bundle
+
+Các bundle mô hình `.joblib` trong `models/` được build bằng **scikit-learn 1.8 / numpy 2.x** — phải dùng đúng env đã pin trong `environment.yml`. Nếu dùng env cũ (Python 3.11 / sklearn 1.5 / numpy < 2): bundle ANN (`models/ann_t100.joblib`) load **fail** (lỗi `MT19937 is not a known BitGenerator`), các model còn lại load được nhưng kèm `InconsistentVersionWarning` (rủi ro sai lệch kết quả).
 
 ---
 
@@ -126,6 +130,8 @@ python -m src.evaluation.make_split
   - `data/splits/master_train.parquet`, `master_test.parquet`
   - `data/splits/dataset_t{XX}_train.parquet`, `dataset_t{XX}_test.parquet` (12 file)
   - đây là **dữ liệu cuối cùng để huấn luyện mô hình**
+
+> 📌 **Guard an toàn:** nếu `test_student_ids.csv` đã tồn tại, lệnh trên chỉ **nạp lại** danh sách test đã commit chứ không tính lại phép chia — chạy lại bao nhiêu lần cũng an toàn. Muốn tách lại từ đầu phải thêm cờ `--rederive`, nhưng **đừng tự ý làm**: khác phiên bản sklearn sẽ đổi 4.574/5.756 id và vô hiệu mọi số liệu đã công bố (chỉ dùng khi cả nhóm cùng quyết định).
 
 ---
 

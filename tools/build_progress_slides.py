@@ -322,8 +322,8 @@ add_content(
             ["Phase 4 — Xử lý mất cân bằng (RQ3)", "Đức", "▶ Sắp tới"],
             ["Phase 3 — Time-aware 6 mốc (RQ1)", "Khoa", "▶ Sắp tới"],
             ["Phase 5 — SHAP/LIME + độ ổn định (RQ2)", "Bình", "▶ Sắp tới"],
-            ["Phase 6a — Streamlit dashboard", "Sơn", "▶ Sắp tới"],
-            ["Phase 6b — Viết báo cáo & trực quan", "An", "▶ Sắp tới"],
+            ["Phase 6a — Streamlit dashboard", "An", "▶ Sắp tới"],
+            ["Phase 6b — Introduction / Lit review", "Sơn", "▶ Sắp tới"],
         ],
         "top": 2.05,
         "width": 12.2,
@@ -410,13 +410,16 @@ add_content(
     "KẾ HOẠCH",
     "Các việc sắp tới để hoàn thiện bài làm",
     [
-        ("note", "Theo luồng quy trình phân công: Đức → Khoa → Bình → Sơn / An."),
+        (
+            "note",
+            "Theo luồng quy trình phân công: Đức → Khoa → Bình → An (dashboard) / Sơn (lit review).",
+        ),
     ],
     presenter="Nhóm",
     notes="Các việc sắp tới để hoàn thiện, theo đúng luồng phân công: Đức làm Phase 4 xử lý mất cân "
     "bằng (so sánh no-resample/class-weight/SMOTE/ADASYN, RQ3); Khoa chạy thực nghiệm 6 mốc thời gian "
-    "trả lời RQ1; Bình giải thích SHAP/LIME và đo độ ổn định RQ2; Sơn dựng Streamlit dashboard; An "
-    "viết báo cáo cuối và trực quan hoá.",
+    "trả lời RQ1; Bình giải thích SHAP/LIME và đo độ ổn định RQ2; An dựng Streamlit dashboard; Sơn "
+    "viết Introduction/Literature Review; báo cáo cuối do Khoa tổng hợp.",
     table={
         "headers": ["Phase — Công việc", "Người", "Sản phẩm / RQ"],
         "rows": [
@@ -427,8 +430,12 @@ add_content(
             ],
             ["Phase 3 — Chạy thực nghiệm 6 mốc thời gian", "Khoa", "Đường cong hiệu năng · RQ1"],
             ["Phase 5 — SHAP/LIME + độ ổn định giải thích", "Bình", "Giải thích mô hình · RQ2"],
-            ["Phase 6a — Xây dựng Streamlit dashboard", "Sơn", "App dự đoán + đóng gói"],
-            ["Phase 6b — Viết báo cáo & trực quan hoá", "An", "Báo cáo cuối + slide tổng"],
+            ["Phase 6a — Xây dựng Streamlit dashboard", "An", "App dự đoán + đóng gói"],
+            [
+                "Phase 6b — Introduction / Literature Review",
+                "Sơn",
+                "Mở đầu + tổng quan + tài liệu",
+            ],
         ],
         "top": 2.2,
         "width": 12.4,
