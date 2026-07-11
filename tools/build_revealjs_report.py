@@ -108,8 +108,12 @@ roadmap_next = md_table(
             ["Phase 4 — no-resample/class-weight/SMOTE/ADASYN", "Đức", "Biểu đồ so sánh · RQ3"],
             ["Phase 3 — chạy thực nghiệm 6 mốc thời gian", "Khoa", "Đường cong hiệu năng · RQ1"],
             ["Phase 5 — SHAP/LIME + độ ổn định giải thích", "Bình", "Giải thích mô hình · RQ2"],
-            ["Phase 6a — Streamlit dashboard", "Sơn", "App dự đoán + đóng gói"],
-            ["Phase 6b — Viết báo cáo & trực quan hoá", "An", "Báo cáo cuối + slide"],
+            ["Phase 6a — Streamlit dashboard", "An", "App dự đoán + đóng gói"],
+            [
+                "Phase 6b — Introduction / Literature Review",
+                "Sơn",
+                "Mở đầu + tổng quan + tài liệu",
+            ],
         ],
         columns=["a", "b", "c"],
     ),
@@ -219,7 +223,7 @@ date: "02/07/2026 · Đại học FPT"
 
 {roadmap_next}
 
-*Theo luồng quy trình: Đức → Khoa → Bình → Sơn / An.*
+*Theo luồng quy trình: Đức → Khoa → Bình → An (dashboard) / Sơn (lit review); báo cáo cuối do Khoa tổng hợp.*
 
 ## Kết luận
 

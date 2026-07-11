@@ -54,9 +54,41 @@ def _metrics(y, pred, proba) -> dict:
     }
 
 
+def _plot(res: pd.DataFrame, model_name: str) -> None:
+    """Dual-cohort headline figure: full-test vs still-enrolled recall per checkpoint."""
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
+    from src.eda.plot_style import apply_style, savefig
+
+    apply_style()
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    ax.plot(
+        res["t_percent"], res["full_recall"], marker="o", label="Full test cohort (all enrolments)"
+    )
+    ax.plot(
+        res["t_percent"],
+        res["active_recall"],
+        marker="s",
+        label="Still-enrolled at checkpoint (actionable)",
+    )
+    ax.axhline(0.80, ls="--", lw=1, color="#888888", label="Reliability bar (recall = 0.80)")
+    ax.set_xlabel("Course progress t (%)")
+    ax.set_ylabel("At-risk recall")
+    ax.set_title(f"{model_name}: headline vs actionable-cohort recall")
+    ax.set_xticks(list(res["t_percent"]))
+    ax.legend(loc="lower right")
+    path = savefig(fig, f"sensitivity_active_recall_{model_name}")
+    plt.close(fig)
+    print(f"Figure -> {path}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="xgb", help="saved model name (default: xgb)")
+    ap.add_argument("--plot", action="store_true", help="also write the dual-cohort recall figure")
     args = ap.parse_args(argv)
 
     # date_unregistration tells us WHEN a student left; checkpoint_map gives the
@@ -115,6 +147,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Model: {args.model}  (full test vs still-active-at-checkpoint)\n")
     print(view.to_string(index=False))
     print(f"\nSaved -> {out_path}")
+    if args.plot:
+        _plot(res, args.model)
     return 0
 
 
