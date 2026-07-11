@@ -105,16 +105,10 @@ def main():
             print(f"LỖI khi xử lý {file_name}: {e}")
             all_passed = False
 
-    # Ghi xuất tệp Manifest
-    # Nếu file manifest đã tồn tại và là read-only, cần mở quyền ghi trước
+    # Ghi xuất tệp Manifest. Manifest cũ bị khóa read-only từ lần chạy trước,
+    # nên phải mở quyền ghi trước khi ghi đè rồi khóa lại sau khi ghi.
     if os.path.exists(MANIFEST_PATH):
-        try:
-            with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
-                f.write("\n".join(manifest_lines))
-        except PermissionError as e:
-            print(f"LỖI: Không thể ghi manifest tại {MANIFEST_PATH}: {e}")
-            all_passed = False
-        return
+        os.chmod(MANIFEST_PATH, 0o666)
 
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(manifest_lines))
