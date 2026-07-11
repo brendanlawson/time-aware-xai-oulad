@@ -78,7 +78,8 @@ time-aware-xai-oulad/
 │   ├── raw/                       # Seven original OULAD CSVs (git-ignored, read-only)
 │   ├── interim/                   # Master table + intermediate parquet (git-ignored)
 │   ├── checkpoints/               # Six time-sliced datasets, t = 10/20/40/60/80/100% (git-ignored)
-│   └── splits/                    # Frozen train/test split — test_student_ids.csv is committed
+│   ├── splits/                    # Frozen train/test split — test_student_ids.csv is committed
+│   └── oulad_md5_reference.txt    # Committed md5 checksums of the 7 raw files (provenance)
 ├── notebooks/
 │   ├── schema_survey.ipynb
 │   ├── 00_data_understanding.ipynb
@@ -115,13 +116,14 @@ time-aware-xai-oulad/
 │       └── stability.py           # Jaccard top-k, feature-importance std
 ├── tests/
 │   └── test_leakage.py            # asserts no records beyond each checkpoint
-├── tools/                         # ~16 one-shot scripts that generate report artifacts
+├── tools/                         # ~19 one-shot scripts: report artifacts + audit analyses
+│                                  #   (fairness, threshold-on-validation, XAI-by-strategy, …)
 ├── models/                        # Trained model bundles (*.joblib, git-ignored)
 ├── reports/
 │   ├── figures/
-│   ├── tables/                    # model_metrics, imbalance_comparison, xai_*, …
+│   ├── tables/                    # model_metrics, imbalance_comparison, xai_*, fairness_*, …
 │   ├── slides/
-│   ├── guide/
+│   ├── guide/                     # Member guides + SO_TAY_BAO_VE_VI.md (defense handbook)
 │   └── data_understanding/
 ├── docs/                          # 01_data_specification … 08_agreements + bilingual READMEs
 ├── requirements.txt
@@ -188,10 +190,16 @@ md5sum -c data/oulad_md5_reference.txt
 ### Reproduce the pipeline
 
 ```bash
-# Build the master table (Restart & Run All is idempotent)
+# Build everything from the raw CSVs (each step is resumable / idempotent)
+python -m src.data.build_master_table
+python -m src.data.make_checkpoints
+python -m src.evaluation.make_split --materialise   # reuses the committed test ids (guarded)
+python -m src.modeling.train                        # 5 models x 6 checkpoints (resumable)
+
+# Or narrated via the notebooks (Restart & Run All is idempotent)
 jupyter nbconvert --to notebook --execute notebooks/01_build_master_table.ipynb
 
-# Run the leakage tests
+# Run the automated leakage/split test suite
 pytest tests/
 ```
 
@@ -201,9 +209,10 @@ This project is designed so that an external reader can reproduce every result:
 
 - **Deterministic seeds** are fixed throughout (`RANDOM_SEED = 42`).
 - **Data provenance** is pinned by the committed `data/oulad_md5_reference.txt` (md5 per raw file); `setup_raw_data.py` verifies every download against it and records a local manifest.
-- **Environment** is pinned in `requirements.txt` and `environment.yml`.
+- **Frozen split guard.** `data/splits/test_student_ids.csv` is the committed source of truth; `make_split` always reuses it, and re-derivation requires the explicit `--rederive` flag (a whole-team decision — fold assignment drifts across sklearn versions).
+- **Environment** is pinned in `requirements.txt` and `environment.yml` (working set verified 2026-07-12 against the committed model bundles).
 - **Notebooks** execute top-to-bottom without manual intervention (`Restart & Run All`).
-- **Automated tests** (`tests/test_leakage.py`) guard against temporal leakage at all six checkpoints.
+- **Automated tests** (`tests/test_leakage.py`) guard against temporal leakage at all six checkpoints, train-only preprocessing statistics, the feature allow-list and the split guard.
 
 ## 9. Team & Responsibilities
 
@@ -224,7 +233,9 @@ Group 1, DSP391m — FPT University. Supervisor: **Nguyễn Thị Hoàng Yến**
 
 **Phase 2–3 — Benchmarking + Time-Aware Prediction: complete.** The five candidate algorithms (Logistic Regression, Random Forest, XGBoost, LightGBM, ANN) are benchmarked across all six checkpoints with a leakage-safe held-out test and repeated 5-fold × 5-seed cross-validation at t=100% (`src/modeling/train.py`). XGBoost leads; at-risk prediction meets the reliability bar (recall ≥ 0.80) from the **40% checkpoint** on the full enrolment cohort, while on the actionable still-enrolled cohort it reaches the bar only at course end (see `reports/tables/sensitivity_active_xgb.csv`) — both cohorts are reported (RQ1). Results: `reports/tables/{model_metrics,cv_summary,time_aware_best}.csv` and the `time_aware_*` / `model_benchmark` figures.
 
-**Phase 4–5 — Imbalance Handling + XAI: artifacts in place.** Phase 4 compares no-resampling / class-weighting / SMOTE / ADASYN at t=100% (the accuracy half of RQ3): all four strategies differ by ≤ 0.005 on every metric, so the headline benchmark keeps the no-resampling baseline (`reports/tables/imbalance_comparison.csv`). Phase 5 delivers SHAP/LIME explanations and their stability metrics (`reports/tables/xai_*.csv` + figures). Remaining: the instructor dashboard (Phase 6) and the final report.
+**Phase 4–5 — Imbalance Handling + XAI: artifacts in place.** Phase 4 compares no-resampling / class-weighting / SMOTE / ADASYN at t=100%: all four strategies differ by ≤ 0.005 on every accuracy metric (`reports/tables/imbalance_comparison.csv`), and the *explanation* half of RQ3 confirms the same robustness — pairwise SHAP-ranking Spearman ≈ 0.97 for every strategy pair, Jaccard top-10 from 0.54 (SMOTE↔ADASYN) to 1.00 (none↔class-weight) (`reports/tables/xai_stability_strategies.csv`). The headline benchmark therefore keeps the no-resampling baseline. Phase 5 delivers SHAP/LIME explanations and their seed/checkpoint stability metrics (`reports/tables/xai_*.csv` + figures).
+
+**Hardening & audit pass (2026-07-12): complete.** Two independent audits were cross-verified and remediated: the frozen split is guarded in code, decision thresholds are now chosen on out-of-fold validation and applied to the held-out test exactly once (`reports/tables/threshold_validation.csv` — the validation-chosen cuts transfer with almost no change), per-subgroup fairness metrics are published (`reports/tables/fairness_subgroups.csv`; max recall gap 6.2 pp on `imd_band`), a banked-assessment flag bug was fixed with a regression test (78/32,593 rows), and raw-data checksums are pinned. The full narrative, per-member Q&A and the pre-submission renumber checklist live in [`reports/guide/SO_TAY_BAO_VE_VI.md`](reports/guide/SO_TAY_BAO_VE_VI.md) (process log: `reports/guide/_process_log_2026-07-12.md`). Remaining: the instructor dashboard (Phase 6, An), the literature review (Sơn), the final report (Khoa), and the renumber run before submission.
 
 ## 11. Citation
 
