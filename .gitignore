@@ -70,3 +70,5 @@ task/
 /clickhouse
 # MS Office lock temp files
 ~$*
+# LibreOffice lock files
+.~lock.*#
