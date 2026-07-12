@@ -101,6 +101,33 @@ bản chính thức cho thành viên là `SO_TAY_BAO_VE_VI.md` (do "thư ký" t�
 - **build_docx.py → 32/32 docx** tái sinh từ markdown mới (hết docx-drift).
 - **setup_raw_data.py → 7/7 file khớp** `data/oulad_md5_reference.txt`.
 
+## Phiên hoàn thiện 100% (cùng ngày, buổi trưa)
+
+- **Dashboard (An) + Introduction/Lit-Review (Sơn) + bản đồ lắp ráp** — commit bc8ebee.
+- **RENUMBER TOÀN BỘ đã chạy** (`bash tools/renumber.sh`, 36 phút, 20 bước stamp-resume):
+  rebuild data với fix banked → 21/21 test PASS trên dữ liệu mới → train lại 30 bundle →
+  CV 5×5 → Friedman/Wilcoxon → toàn bộ tools → deck + docx. LIME nâng 30→100 dòng.
+- **Số cũ → mới đã đồng bộ vào mọi doc viết tay** (SO_TAY, HIEU_PHAN, Target §5 EN/VI,
+  README, kịch bản nói): xgb@t100 recall 0.9348→0.9298 (SMOTE-pipeline) / 0.9307 (none);
+  active-cohort t100 0.853→0.841 (RQ1 dual-cohort GIỮ NGUYÊN kết luận: full đạt 0.80 từ
+  t=40 — 0.8107; active chỉ ở t=100); SHAP↔LIME Jaccard 0.25 (n=30) → **0.43 (n=100)**;
+  seed-stability 0.69/0.975; strategies Jaccard 0.54–0.82, Spearman ≈0.97; fairness gap
+  6,6pp (imd_band); threshold F1-policy 0.56 (test y hệt default), r90 0.86/precision
+  0.993; Wilcoxon xgb-recall 4/4 giữ nguyên; top SHAP days_since_last_activity 3.57.
+  Sự trôi số = fix banked + khác biệt thư viện giữa các lần chạy cũ — bản mới là bản
+  tái lập được dưới env đã pin (tư thế phòng thủ: "mọi số trong báo cáo sinh từ đúng
+  một lần chạy renumber dưới environment.yml đã kiểm chứng").
+- **Báo cáo cuối**: 7 section (~9.000 từ, Sơn viết mục 1–2, agent viết 3–7) lắp bằng
+  `tools/build_final_report.py` — số/bảng/hình inject từ CSV lúc build (placeholder
+  {{VAL/TBL/FIG}}) → `Final_Report_DSP391m_Group1_EN.md + .docx`.
+- **Slide bảo vệ**: `tools/build_final_slides.py` → `Final_Defense_Slides.pptx`
+  (16 slide, house style của deck cũ, số đọc từ CSV, speaker note tiếng Việt).
+- **Sửa wording SMOTE-headline** cho chính xác (pipeline giữ SMOTE theo proposal;
+  deck Phase-2 trình bày hàng baseline none; Phase 4 chứng minh khác biệt ≤0.007).
+- Dashboard smoke lại trên bundle MỚI: PASS (5.052 active t=40 khớp bảng sensitivity).
+- xlsx phân công (local, gitignored): 40/40 mục Hoàn thành.
+- renumber.sh nối thêm bước 21–22 (final report + slides) cho các lần chạy sau.
+
 ## Kết quả agent (tóm tắt bàn giao)
 
 - **Agent Docs-Root:** LICENSE (MIT, mới) · README.md (minority→majority 52,8%; bảng

@@ -6,6 +6,8 @@
 reports/tables/_xai_cache/
 # Per-fold OOF cache for tools.make_threshold_validation (final CSV is committed).
 reports/tables/_thr_cache/
+# Stamp files for the resumable full renumber run (tools/renumber.sh).
+.renumber_stamps/
 
 # ---- Data (never commit raw or intermediate datasets) ----
 data/raw/

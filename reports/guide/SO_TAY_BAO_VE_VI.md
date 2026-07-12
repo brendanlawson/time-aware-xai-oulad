@@ -34,9 +34,9 @@ Hai con số nền phải thuộc: **32.593 là lượt ghi danh môn–kỳ** (
 
 | RQ | Hỏi gì | Trả lời hiện tại (số thật) |
 |---|---|---|
-| **RQ1** | Model nào tốt nhất, đoán sớm tới đâu thì tin được? | XGBoost dẫn đầu (CV 5-fold × 5-seed + Friedman/Wilcoxon trên train). **Nói theo kiểu kép (dual-cohort):** trên **toàn bộ lượt ghi danh**, recall đạt ngưỡng tin cậy 0,80 **từ mốc 40%** (0.81 → 0.93 tại t=100); trên nhóm **còn-đang-học** — nhóm can thiệp được — chỉ đạt **ở t=100** (0.68 / 0.75 / 0.78 / 0.85 tại 40/60/80/100). Báo cáo cả hai, không chọn một. |
-| **RQ2** | SHAP và LIME có nhất quán, ổn định không? | Ổn định **theo seed cao**: Jaccard top-10 = **0.75**, Spearman = **0.97**. Đồng thuận **SHAP↔LIME thấp**: Jaccard = **0.25** (tính trên n=30 dòng — nêu rõ giới hạn cỡ mẫu). Top-10 dịch chuyển **dần và có trật tự** theo mốc thời gian (Spearman các mốc liền kề 0.86–0.92). |
-| **RQ3** | Xử lý mất cân bằng ảnh hưởng gì tới accuracy VÀ giải thích? | Gần như không: 4 chiến lược (none/class_weight/SMOTE/ADASYN) chênh nhau **≤0,005** trên các chỉ số chính; về giải thích, Spearman importance **≈0,97 ở mọi cặp chiến lược**, Jaccard top-10 none↔class_weight = **1.00**. Twist tự phát hiện: vì at-risk là **đa số 52,8%**, SMOTE mặc định thực chất **tăng mẫu lớp not-at-risk**. |
+| **RQ1** | Model nào tốt nhất, đoán sớm tới đâu thì tin được? | XGBoost dẫn đầu (CV 5-fold × 5-seed + Friedman/Wilcoxon trên train). **Nói theo kiểu kép (dual-cohort):** trên **toàn bộ lượt ghi danh**, recall đạt ngưỡng tin cậy 0,80 **từ mốc 40%** (0.81 → 0.93 tại t=100); trên nhóm **còn-đang-học** — nhóm can thiệp được — chỉ đạt **ở t=100** (0.68 / 0.75 / 0.78 / 0.84 tại 40/60/80/100). Báo cáo cả hai, không chọn một. |
+| **RQ2** | SHAP và LIME có nhất quán, ổn định không? | Ổn định **theo seed cao**: Jaccard top-10 = **0.69**, Spearman = **0.97**. Đồng thuận **SHAP↔LIME một phần**: Jaccard = **0.43** (đo trên n=100 dòng — đã nâng từ 30 ở lần chạy chốt). Top-10 dịch chuyển **dần và có trật tự** theo mốc thời gian (Spearman các mốc liền kề 0.87–0.93). |
+| **RQ3** | Xử lý mất cân bằng ảnh hưởng gì tới accuracy VÀ giải thích? | Gần như không: 4 chiến lược (none/class_weight/SMOTE/ADASYN) chênh nhau **≤0,007** trên các chỉ số chính; về giải thích, Spearman importance **≈0,97 ở mọi cặp chiến lược**, Jaccard top-10 giữa các cặp 0,54–0,82 (chỉ xáo phần đuôi danh sách). Twist tự phát hiện: vì at-risk là **đa số 52,8%**, SMOTE mặc định thực chất **tăng mẫu lớp not-at-risk**. |
 
 🎤 **Câu tổng khi cô bảo "tóm tắt đề tài":** *"Bọn em dự đoán sinh viên nguy cơ Trượt/Bỏ học trên OULAD tại 6 mốc tiến độ khóa, benchmark 5 thuật toán với split cố định theo sinh viên và cross-validation lặp; XGBoost tốt nhất, tin cậy từ mốc 40% trên toàn bộ lượt ghi danh — và bọn em trung thực báo cáo thêm nhóm còn-đang-học, nơi bài toán khó hơn. Mỗi dự đoán đều được giải thích bằng SHAP/LIME và bọn em đo luôn độ ổn định của chính lời giải thích đó."*
 
@@ -80,10 +80,10 @@ Cả 7 chuyện dưới đây đều là **nhóm tự phát hiện, tự đo, t�
 
 | Mốc | Recall toàn bộ | Recall còn-đang-học | Số đã rút trước mốc (test) |
 |---|---|---|---|
-| 40% | 0.8116 | **0.6782** | 1.437 |
-| 60% | 0.8706 | **0.7507** | 1.687 |
-| 80% | 0.8990 | **0.7831** | 1.859 |
-| 100% | 0.9348 | **0.8531** | 1.953 |
+| 40% | 0.8107 | **0.6782** | 1.437 |
+| 60% | 0.8703 | **0.7490** | 1.687 |
+| 80% | 0.8969 | **0.7792** | 1.859 |
+| 100% | 0.9298 | **0.8412** | 1.953 |
 
 LightGBM cho hình dạng y hệt (active t=100 = 0.8363) → kết luận không phụ thuộc một model. Có hình vẽ sẵn: `reports/figures/sensitivity_active_recall_xgb.png` (2 đường + vạch 0,80). Khung lý thuyết: `docs/01_data_specification/Target_Variable_Definition_EN.md` §5 — hai estimand: *phân loại kết cục cuối khóa* (so được với văn liệu, Adnan/Tomasevic cũng giữ full cohort) và *cảnh báo sớm để can thiệp* (chỉ có nghĩa trên nhóm còn học). Đây là **vấn đề định nghĩa quần thể, không phải leakage** — nhãn không hề lọt vào đặc trưng.
 
@@ -93,7 +93,7 @@ LightGBM cho hình dạng y hệt (active t=100 = 0.8363) → kết luận khôn
 
 **Hiện tượng:** với mapping {Fail, Withdrawn} = at-risk, lớp at-risk chiếm **52,8%** — là **đa số nhẹ** (tỷ lệ mất cân bằng chỉ 1,12). Hệ quả ít ai để ý: SMOTE/ADASYN mặc định oversample lớp thiểu số, tức ở đây chúng **tăng mẫu lớp not-at-risk** — ngược với hình dung "SMOTE cứu lớp nguy cơ hiếm" trong slide môn học (con số 68/32 trên slide chỉ là minh họa, không phải OULAD).
 
-**Con số thật** (`imbalance_comparison.csv`, XGBoost @t=100, test): recall none 0.9328 · SMOTE 0.9348 · class_weight 0.9292 · ADASYN 0.9277; F1 từ 0.9487 đến 0.9538 — **mọi chiến lược chênh nhau cỡ ≤0,005**. Kết luận: giữ baseline không resample cho số chính; RQ3 trở thành **câu hỏi robustness có kiểm soát**, và câu trả lời là "robust".
+**Con số thật** (`imbalance_comparison.csv`, XGBoost @t=100, test): recall none 0.9307 · SMOTE 0.9298 · class_weight 0.9295 · ADASYN 0.9292; F1 từ 0.9486 đến 0.9508 — **mọi chiến lược chênh nhau cỡ ≤0,007**. Kết luận: pipeline chuẩn (model_metrics, đường cong RQ1) giữ đúng bước SMOTE của proposal — so sánh Phase 4 chứng minh lựa chọn này không ảnh hưởng gì; deck Phase-2 trình bày hàng baseline không-resample cũng vì thế. RQ3 trở thành **câu hỏi robustness có kiểm soát**, và câu trả lời là "robust".
 
 🎤 *"Nhãn at-risk của bọn em là 52,8% — đa số nhẹ — nên SMOTE mặc định thực chất tăng mẫu lớp not-at-risk. Bọn em phát hiện điều này, vẫn chạy đủ 4 chiến lược: chênh lệch ≤0,005, và câu chuyện giải thích cũng giữ nguyên (Spearman ≈0,97 mọi cặp) — tức kết luận không phụ thuộc cách xử lý mất cân bằng."*
 
@@ -105,22 +105,22 @@ LightGBM cho hình dạng y hệt (active t=100 = 0.8363) → kết luận khôn
 
 | Policy | Ngưỡng chọn trên validation | Test recall | Test precision | Test F1 |
 |---|---|---|---|---|
-| default | 0.50 | 0.9348 | 0.9735 | 0.9538 |
-| max-F1 | **0.49** | 0.9354 | 0.9729 | 0.9538 |
-| Youden | 0.66 | 0.9206 | 0.9835 | 0.9510 |
-| recall ≥ 0,9 | 0.86 | 0.9008 | 0.9941 | 0.9451 |
+| default | 0.50 | 0.9298 | 0.9718 | 0.9503 |
+| max-F1 | **0.56** | 0.9262 | 0.9754 | 0.9502 |
+| Youden | 0.56 | 0.9262 | 0.9754 | 0.9502 |
+| recall ≥ 0,9 | 0.86 | 0.9002 | 0.9931 | 0.9444 |
 
-Điểm ăn tiền: policy F1 chọn ra **0.49 ≈ ngưỡng mặc định 0.5**, và số validation chuyển sang test **gần như không lệch** → chứng minh hồi tố rằng các con số cũ không phải sản phẩm của tune-trên-test.
+Điểm ăn tiền: policy F1 chọn ra **0.56**, cho kết quả test **gần như y hệt ngưỡng mặc định** (F1 0.9502 vs 0.9503), và số validation chuyển sang test **gần như không lệch** → chứng minh hồi tố rằng các con số cũ không phải sản phẩm của tune-trên-test.
 
-🎤 *"Ngưỡng được chọn trên validation out-of-fold của train; test chỉ chấm một lần ở ngưỡng đã chốt. Ngưỡng tối ưu hóa F1 ra 0,49 — gần trùng mặc định — nên kết quả trước đây không hề lạc quan hóa; và nếu trường muốn recall ≥ 0,9 kèm rất ít báo nhầm thì có sẵn ngưỡng 0,86 với precision 0,994."*
+🎤 *"Ngưỡng được chọn trên validation out-of-fold của train; test chỉ chấm một lần ở ngưỡng đã chốt. Ngưỡng tối ưu hóa F1 ra 0,56 — kết quả trên test y hệt ngưỡng mặc định — nên kết quả trước đây không hề lạc quan hóa; và nếu trường muốn recall ≥ 0,9 kèm rất ít báo nhầm thì có sẵn ngưỡng 0,86 với precision 0,993."*
 
 ### Vũ khí 4 — Fairness: đã đo, không chỉ hứa
 
 **Hiện tượng:** tài liệu ethics của nhóm hứa "disaggregated metrics theo nhóm nhân khẩu học" — giờ đã có bảng thật (`tools/make_fairness_report.py`).
 
-**Con số thật** (`fairness_gaps.csv`, XGBoost @t=100, test, ngưỡng 0.5, chỉ tính nhóm n≥50): gap recall lớn nhất theo từng thuộc tính — **imd_band 6,2 điểm** (0.900–0.962, 11 mức) · highest_education 4,6 · region 4,5 · **gender 2,3** (nữ 0.922 / nam 0.945) · disability 1,4 (Y 0.947 còn *cao hơn* N 0.933) · age_band 0,9. Gap FPR mọi thuộc tính ≤5,3 điểm. Chi tiết từng nhóm: `fairness_subgroups.csv`.
+**Con số thật** (`fairness_gaps.csv`, XGBoost @t=100, test, ngưỡng 0.5, chỉ tính nhóm n≥50): gap recall lớn nhất theo từng thuộc tính — **imd_band 6,6 điểm** (0.894–0.960, 11 mức) · region 4,1 · highest_education 3,0 · **gender 2,6** (nữ 0.915 / nam 0.941) · disability 1,7 (Y 0.945 còn *cao hơn* N 0.928) · age_band 1,6. Gap FPR mọi thuộc tính ≤5,3 điểm. Chi tiết từng nhóm: `fairness_subgroups.csv`.
 
-🎤 *"Bọn em đo recall và false-positive-rate tách theo giới tính, vùng, mức nghèo IMD, trình độ, độ tuổi, khuyết tật. Chênh lệch lớn nhất là 6,2 điểm recall giữa các mức IMD — không có nhóm nào bị bỏ rơi nghiêm trọng, và sinh viên khuyết tật thực tế được recall cao hơn trung bình."*
+🎤 *"Bọn em đo recall và false-positive-rate tách theo giới tính, vùng, mức nghèo IMD, trình độ, độ tuổi, khuyết tật. Chênh lệch lớn nhất là 6,6 điểm recall giữa các mức IMD — không có nhóm nào bị bỏ rơi nghiêm trọng, và sinh viên khuyết tật thực tế được recall cao hơn trung bình."*
 
 ### Vũ khí 5 — 787.170 dòng trùng trong studentVle: biết, giữ, và ghi rõ
 
@@ -181,9 +181,9 @@ Mỗi người thuộc phần mình + đọc lướt phần người khác (cô 
 
 ### 4.4 Bình — XAI Lead (SHAP/LIME, stability)
 
-1. **"Đặc trưng nào quan trọng nhất, có hợp lý không?"** → 🎤 *"`days_since_last_activity` — số ngày im lặng — với mean |SHAP| 3.66, bỏ xa mọi đặc trưng khác; thứ hai là `weighted_score_to_date` (2.24). Rất hợp lý sư phạm: im lặng kéo dài và điểm tích lũy thấp chính là hai tín hiệu giáo viên thật cũng nhìn."* (`xai_shap_importance.csv`)
+1. **"Đặc trưng nào quan trọng nhất, có hợp lý không?"** → 🎤 *"`days_since_last_activity` — số ngày im lặng — với mean |SHAP| 3.57, bỏ xa mọi đặc trưng khác; thứ hai là `weighted_score_to_date` (2.08). Rất hợp lý sư phạm: im lặng kéo dài và điểm tích lũy thấp chính là hai tín hiệu giáo viên thật cũng nhìn."* (`xai_shap_importance.csv`)
 2. **"Giải thích có ổn định không hay mỗi lần chạy một kiểu?"** → 🎤 *"Ổn định theo seed: chạy nhiều seed rồi so top-10 SHAP — Jaccard trung bình 0.75, tương quan hạng Spearman 0.97 trên 10 cặp. Câu chuyện toàn cục không đổi theo may rủi."* (`xai_stability_seeds.csv`)
-3. **"SHAP và LIME đồng thuận thấp (Jaccard 0.25) — vậy tin cái nào?"** → 🎤 *"Đây là finding của RQ2 chứ không phải trục trặc: hai phương pháp khác bản chất — SHAP phân bổ đóng góp Shapley trên chính model, LIME fit hồi quy cục bộ trên dữ liệu nhiễu loạn quanh từng điểm. Bọn em nêu rõ hai giới hạn: mới đo trên n=30 dòng nên ước lượng thô, và LIME perturb biến one-hot như biến liên tục nên thêm nhiễu. Kết luận thực hành: dùng SHAP làm trục chính — với model cây nó là TreeExplainer tính chính xác, không phải xấp xỉ lấy mẫu — LIME làm đối chứng cục bộ."* (`xai_shap_vs_lime.csv`)
+3. **"SHAP và LIME đồng thuận một phần (Jaccard 0.43) — vậy tin cái nào?"** → 🎤 *"Đây là finding của RQ2 chứ không phải trục trặc: hai phương pháp khác bản chất — SHAP phân bổ đóng góp Shapley trên chính model, LIME fit hồi quy cục bộ trên dữ liệu nhiễu loạn quanh từng điểm. Bọn em nêu rõ hai giới hạn: đo trên n=100 dòng test, và LIME perturb biến one-hot như biến liên tục nên thêm nhiễu. Kết luận thực hành: dùng SHAP làm trục chính — với model cây nó là TreeExplainer tính chính xác, không phải xấp xỉ lấy mẫu — LIME làm đối chứng cục bộ."* (`xai_shap_vs_lime.csv`)
 4. **"Lời giải thích có đổi theo thời gian không?"** → 🎤 *"Đổi dần và có trật tự: các mốc liền kề tương quan hạng 0.86–0.92; so mốc 10% với 100% thì Jaccard top-10 chỉ 0.18 — tức bộ tín hiệu đầu khóa và cuối khóa khác nhau thật, đúng kỳ vọng của bài toán time-aware, chứ không nhảy loạn."* (`xai_stability_checkpoints.csv`)
 5. **"Cách xử lý mất cân bằng có làm đổi lời giải thích không?"** → 🎤 *"Gần như không — đây là nửa 'giải thích' của RQ3: cùng 1.500 dòng test, Jaccard top-10 giữa none và class_weight là 1.00 tuyệt đối; SMOTE↔ADASYN thấp nhất cũng 0.54; còn tương quan hạng toàn cục thì 0.97 ở mọi cặp. Resampling tổng hợp chỉ xáo nhẹ phần đuôi top-10."* (`xai_stability_strategies.csv`)
 6. **"Jaccard top-k là gì?"** → 🎤 *"Lấy 10 đặc trưng quan trọng nhất của hai lần giải thích, chia kích thước phần giao cho phần hợp — 1.0 là trùng khít, 0 là không chung đặc trưng nào. Bọn em kèm Spearman trên toàn bộ bảng xếp hạng để không phụ thuộc mỗi ngưỡng top-10."*
@@ -223,13 +223,15 @@ Phiên làm việc xuất phát từ **hai bản audit độc lập**; mọi ph�
 | 9 | Ethics doc hứa fairness metrics nhưng chưa có | Tool + bảng mới | `tools/make_fairness_report.py` → `fairness_{subgroups,gaps}.csv` |
 | 10 | RQ3 mới trả lời nửa "accuracy", thiếu nửa "giải thích" | Tool SHAP-per-strategy | `tools/make_xai_by_strategy.py` → `xai_stability_strategies.csv` |
 | 11 | README ghi "Students: 32,593" (thực ra là lượt ghi danh); Step0 PDF trống ngày+chữ ký; xlsx phân công lỗi thời | README sửa thành "Enrolments 32,593 (28,785 students)"; việc ký Step 0 + cập nhật xlsx đưa vào mục 7 | `pypdf`/`pandas` kiểm chứng |
-| 12 | SHAP↔LIME Jaccard 0.25 tính trên n=30 dòng; LIME perturb one-hot như biến liên tục | Ghi rõ giới hạn cỡ mẫu trong guide/docs; đáp án chuẩn ở mục 4.4 câu 3 | `xai_shap_vs_lime.csv` |
+| 12 | SHAP↔LIME đo trên mẫu LIME giới hạn; LIME perturb one-hot như biến liên tục | Nâng LIME 30→100 dòng ở lần chạy chốt (Jaccard 0.25→0.43); giới hạn one-hot ghi rõ trong docs; đáp án chuẩn ở mục 4.4 câu 3 | `xai_shap_vs_lime.csv` |
 | — | Provenance dữ liệu chỉ tự-ghi manifest, chưa có chuẩn đối chiếu | Commit `data/oulad_md5_reference.txt` (7 MD5); `setup_raw_data.py` giờ đối chiếu với reference; đã chạy lại 7/7 khớp | `data/oulad_md5_reference.txt` |
 | — | Suite test 19 → **21** (2 test mới ở #4, #5) | Toàn bộ pass trên env base | `pytest tests/` |
 
 ---
 
 ## 6. Checklist "chạy chốt" (renumber) trước khi nộp báo cáo cuối
+
+> ✅ **Đã thực thi lần đầu 2026-07-12** bằng `bash tools/renumber.sh` (36 phút, 21/21 test PASS, LIME nâng 30→100 dòng). Nếu code/data còn thay đổi thì chạy lại trước khi nộp; xoá `.renumber_stamps/` để chạy lại từ đầu.
 
 **Vì sao phải chạy:** fix banked (#4) nằm trong code nhưng các bảng đã commit tính từ **trước** fix. Chạy chốt một lượt để bảng ↔ code ↔ báo cáo khớp nhau 100%. **Chỉ chạy khi cả nhóm sẵn sàng chốt số** — bước train lại tốn ~1–2 giờ. Mọi bảng/hình/deck/docx đều đọc từ CSV nên sau khi chạy xong, số mới tự lan tới slide và báo cáo khi rebuild.
 

@@ -71,14 +71,14 @@ date: "02/07/2026 · Đại học FPT"
 
 ## Bảng hiệu năng đầy đủ — 7 chỉ số (đọc từ CSV)
 
-<span class="kpi"><b>0.933</b>XGBoost · recall</span> <span class="kpi"><b>0.990</b>PR-AUC</span> <span class="kpi"><b>0.951</b>F1</span> <span class="kpi"><b>0.039</b>Brier (càng thấp càng tốt)</span>
+<span class="kpi"><b>0.931</b>XGBoost · recall</span> <span class="kpi"><b>0.990</b>PR-AUC</span> <span class="kpi"><b>0.951</b>F1</span> <span class="kpi"><b>0.038</b>Brier (càng thấp càng tốt)</span>
 
 | Model | Recall | F1 | PR-AUC | ROC-AUC | Precision | Bal.Acc | Brier ↓ |
 |---|---|---|---|---|---|---|---|
-| XGBoost | 0.933 | 0.951 | 0.990 | 0.987 | 0.969 | 0.950 | 0.039 |
-| LightGBM | 0.931 | 0.952 | 0.991 | 0.989 | 0.973 | 0.952 | 0.037 |
-| ANN (MLP) | 0.923 | 0.947 | 0.990 | 0.987 | 0.972 | 0.947 | 0.040 |
-| Random Forest | 0.921 | 0.949 | 0.990 | 0.987 | 0.978 | 0.949 | 0.040 |
+| XGBoost | 0.931 | 0.951 | 0.990 | 0.987 | 0.972 | 0.951 | 0.038 |
+| LightGBM | 0.930 | 0.952 | 0.991 | 0.989 | 0.974 | 0.952 | 0.037 |
+| Random Forest | 0.922 | 0.949 | 0.989 | 0.987 | 0.977 | 0.949 | 0.041 |
+| ANN (MLP) | 0.920 | 0.946 | 0.990 | 0.987 | 0.973 | 0.946 | 0.041 |
 | Logistic Reg. | 0.918 | 0.946 | 0.989 | 0.986 | 0.976 | 0.947 | 0.041 |
 
 - Đánh giá trên **tập test giữ riêng**, sắp theo recall lớp at-risk; Brier đo chất lượng xác suất.
@@ -88,11 +88,11 @@ date: "02/07/2026 · Đại học FPT"
 
 | Model | Recall (μ ± σ) | F1 (μ ± σ) | PR-AUC (μ ± σ) |
 |---|---|---|---|
-| XGBoost | 0.9307 ± 0.0054 | 0.9506 ± 0.0036 | 0.9901 ± 0.0008 |
-| LightGBM | 0.9294 ± 0.0056 | 0.9515 ± 0.0034 | 0.9907 ± 0.0008 |
-| ANN (MLP) | 0.9238 ± 0.0066 | 0.9460 ± 0.0037 | 0.9891 ± 0.0010 |
-| Random Forest | 0.9199 ± 0.0051 | 0.9486 ± 0.0031 | 0.9887 ± 0.0010 |
-| Logistic Reg. | 0.9184 ± 0.0053 | 0.9453 ± 0.0031 | 0.9888 ± 0.0010 |
+| XGBoost | 0.9309 ± 0.0047 | 0.9507 ± 0.0032 | 0.9901 ± 0.0008 |
+| LightGBM | 0.9295 ± 0.0060 | 0.9516 ± 0.0036 | 0.9907 ± 0.0008 |
+| ANN (MLP) | 0.9245 ± 0.0081 | 0.9463 ± 0.0038 | 0.9891 ± 0.0009 |
+| Random Forest | 0.9202 ± 0.0051 | 0.9489 ± 0.0030 | 0.9889 ± 0.0009 |
+| Logistic Reg. | 0.9180 ± 0.0054 | 0.9452 ± 0.0033 | 0.9887 ± 0.0010 |
 
 - 25 lần fit/model (pipeline đầy đủ, tiền xử lý + cân bằng lặp lại **trong từng fold** — không rò rỉ).
 - Độ lệch chuẩn rất nhỏ (σ ≈ 0,005) → kết quả **ổn định**, không ăn may theo cách chia fold.
@@ -102,10 +102,10 @@ date: "02/07/2026 · Đại học FPT"
 
 | Chỉ số | Model tốt nhất (mean rank) | Friedman χ² | p-value |
 |---|---|---|---|
-| recall | XGBoost | 65.2 | 2.4e-13 |
-| f1 | LightGBM | 82.1 | 6.1e-17 |
-| pr_auc | LightGBM | 83.1 | 3.9e-17 |
-| roc_auc | LightGBM | 80.4 | 1.4e-16 |
+| recall | XGBoost | 73.8 | 3.5e-15 |
+| f1 | LightGBM | 83.8 | 2.7e-17 |
+| pr_auc | LightGBM | 82.6 | 4.9e-17 |
+| roc_auc | LightGBM | 77.7 | 5.4e-16 |
 
 - **Friedman** trên 25 fold ghép cặp: mọi chỉ số đều p ≪ 0,05 → khác biệt giữa các model là **thật**, không phải nhiễu.
 - Post-hoc **Wilcoxon (hiệu chỉnh Holm)** trên recall: XGBoost thắng **4/4** cặp so sánh có ý nghĩa.
@@ -128,7 +128,7 @@ date: "02/07/2026 · Đại học FPT"
 ## Kết luận
 
 - **Đã xong & tái lập:** so tuyển 5 model ứng viên (Phase 2), trên nền dữ liệu đã chốt ở Task 3.
-- **XGBoost** dẫn đầu recall (**0.933**) ngay ở baseline; các model bám sát.
+- **XGBoost** dẫn đầu recall (**0.931**) ngay ở baseline; các model bám sát.
 - **Kế tiếp:** P4 mất cân bằng → P3 time-aware RQ1 → P5 XAI RQ2 → P6 dashboard & báo cáo.
 - Nền tảng tái lập từ `src/` + `tools/`; **19/19** kiểm thử rò rỉ ĐẠT.
 

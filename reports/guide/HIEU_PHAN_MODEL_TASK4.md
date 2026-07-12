@@ -125,7 +125,7 @@ Bảng **recall theo thời gian** (XGBoost — đọc từ trái sang phải):
 
 | Mốc | 10% | 20% | **40%** | 60% | 80% | 100% |
 |---|---|---|---|---|---|---|
-| Recall | 0.71 | 0.76 | **0.81** | 0.87 | 0.90 | 0.93 |
+| Recall | 0.72 | 0.76 | **0.81** | 0.87 | 0.90 | 0.93 |
 
 **Đọc ra:** càng học nhiều, máy đoán càng chuẩn (recall tăng đều). Nếu lấy mốc "đáng tin" = recall ≥ 0.80, thì **đạt từ mốc 40%** → đúng với các bài báo nền (Adnan: 40–60%).
 
@@ -148,7 +148,7 @@ Nên bọn mình làm thêm 1 phép kiểm: **chỉ tính những SV còn đang 
 | 40% | 0.81 | **0.68** |
 | 60% | 0.87 | **0.75** |
 | 80% | 0.90 | **0.78** |
-| 100% | 0.93 | **0.85** |
+| 100% | 0.93 | **0.84** |
 
 **Ý nghĩa:** con số đẹp ban đầu có phần nhờ "bắt người đã nghỉ". Trên nhóm *còn cứu được*, bài toán **khó hơn và thật hơn**. Theo đúng tiêu chí recall ≥ 0,80 của nhóm, nhóm còn-học **chỉ đạt ở mốc 100%** — vì vậy mọi phát biểu "tin cậy từ 40%" phải kèm rõ cohort.
 
@@ -164,7 +164,7 @@ Nên bọn mình làm thêm 1 phép kiểm: **chỉ tính những SV còn đang 
 4. **Đo bằng gì?** → Recall (chính), PR-AUC, ROC-AUC, F1; recall vì không được bỏ sót SV cần giúp.
 5. **Chống leakage sao?** → Chia theo SV, cắt thời gian, fit trên train; hơn 20 test tự động pass.
 6. **Đoán sớm được không (RQ1)?** → Tin cậy từ ~40% khóa học; và bọn em trung thực tách nhóm SV còn-đang-học.
-7. **SMOTE của nhóm cân bằng lớp nào?** → "Nhãn at-risk của bọn em chiếm 52,8% — là lớp đa số nhẹ, nên SMOTE mặc định thực chất tăng mẫu lớp not-at-risk. Bọn em phát hiện điều này, so cả 4 chiến lược và khác biệt ≤0,005 → kết luận không phụ thuộc; con số chính dùng baseline không resample."
+7. **SMOTE của nhóm cân bằng lớp nào?** → "Nhãn at-risk của bọn em chiếm 52,8% — là lớp đa số nhẹ, nên SMOTE mặc định thực chất tăng mẫu lớp not-at-risk. Bọn em phát hiện điều này, so cả 4 chiến lược và khác biệt không đáng kể → kết luận không phụ thuộc lựa chọn; pipeline chuẩn giữ SMOTE theo proposal, còn deck so tuyển trình bày hàng baseline không-resample."
 8. **Threshold chọn trên tập nào?** → "Trên validation out-of-fold của train (5-fold), test chỉ chấm một lần ở ngưỡng đã chốt — tránh lạc quan hoá."
 9. **32.593 là sinh viên à?** → "Là lượt ghi danh môn–kỳ; sinh viên duy nhất là 28.785. Split theo id_student nên một SV không bao giờ nằm cả train lẫn test."
 
