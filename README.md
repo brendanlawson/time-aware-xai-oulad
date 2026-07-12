@@ -116,6 +116,8 @@ time-aware-xai-oulad/
 │       └── stability.py           # Jaccard top-k, feature-importance std
 ├── tests/
 │   └── test_leakage.py            # asserts no records beyond each checkpoint
+├── dashboard/
+│   └── app.py                     # Streamlit early-warning UI (logic stays in src/)
 ├── tools/                         # ~19 one-shot scripts: report artifacts + audit analyses
 │                                  #   (fairness, threshold-on-validation, XAI-by-strategy, …)
 ├── models/                        # Trained model bundles (*.joblib, git-ignored)
@@ -124,6 +126,7 @@ time-aware-xai-oulad/
 │   ├── tables/                    # model_metrics, imbalance_comparison, xai_*, fairness_*, …
 │   ├── slides/
 │   ├── guide/                     # Member guides + SO_TAY_BAO_VE_VI.md (defense handbook)
+│   ├── final_report/              # Assembly map + drafted report sections
 │   └── data_understanding/
 ├── docs/                          # 01_data_specification … 08_agreements + bilingual READMEs
 ├── requirements.txt
@@ -201,6 +204,9 @@ jupyter nbconvert --to notebook --execute notebooks/01_build_master_table.ipynb
 
 # Run the automated leakage/split test suite
 pytest tests/
+
+# Launch the instructor early-warning dashboard (Phase 6a)
+streamlit run dashboard/app.py          # python dashboard/app.py --smoke for a UI-less check
 ```
 
 ## 8. Reproducibility
@@ -235,7 +241,7 @@ Group 1, DSP391m — FPT University. Supervisor: **Nguyễn Thị Hoàng Yến**
 
 **Phase 4–5 — Imbalance Handling + XAI: artifacts in place.** Phase 4 compares no-resampling / class-weighting / SMOTE / ADASYN at t=100%: all four strategies differ by ≤ 0.005 on every accuracy metric (`reports/tables/imbalance_comparison.csv`), and the *explanation* half of RQ3 confirms the same robustness — pairwise SHAP-ranking Spearman ≈ 0.97 for every strategy pair, Jaccard top-10 from 0.54 (SMOTE↔ADASYN) to 1.00 (none↔class-weight) (`reports/tables/xai_stability_strategies.csv`). The headline benchmark therefore keeps the no-resampling baseline. Phase 5 delivers SHAP/LIME explanations and their seed/checkpoint stability metrics (`reports/tables/xai_*.csv` + figures).
 
-**Hardening & audit pass (2026-07-12): complete.** Two independent audits were cross-verified and remediated: the frozen split is guarded in code, decision thresholds are now chosen on out-of-fold validation and applied to the held-out test exactly once (`reports/tables/threshold_validation.csv` — the validation-chosen cuts transfer with almost no change), per-subgroup fairness metrics are published (`reports/tables/fairness_subgroups.csv`; max recall gap 6.2 pp on `imd_band`), a banked-assessment flag bug was fixed with a regression test (78/32,593 rows), and raw-data checksums are pinned. The full narrative, per-member Q&A and the pre-submission renumber checklist live in [`reports/guide/SO_TAY_BAO_VE_VI.md`](reports/guide/SO_TAY_BAO_VE_VI.md) (process log: `reports/guide/_process_log_2026-07-12.md`). Remaining: the instructor dashboard (Phase 6, An), the literature review (Sơn), the final report (Khoa), and the renumber run before submission.
+**Hardening & audit pass (2026-07-12): complete.** Two independent audits were cross-verified and remediated: the frozen split is guarded in code, decision thresholds are now chosen on out-of-fold validation and applied to the held-out test exactly once (`reports/tables/threshold_validation.csv` — the validation-chosen cuts transfer with almost no change), per-subgroup fairness metrics are published (`reports/tables/fairness_subgroups.csv`; max recall gap 6.2 pp on `imd_band`), a banked-assessment flag bug was fixed with a regression test (78/32,593 rows), and raw-data checksums are pinned. The full narrative, per-member Q&A and the pre-submission renumber checklist live in [`reports/guide/SO_TAY_BAO_VE_VI.md`](reports/guide/SO_TAY_BAO_VE_VI.md) (process log: `reports/guide/_process_log_2026-07-12.md`). **Phase 6 — Dashboard + report assembly: in progress.** The Streamlit early-warning dashboard is implemented (`dashboard/app.py`: ranked at-risk list per checkpoint, still-enrolled filter, per-student SHAP explanation labelled with its checkpoint; smoke-tested end-to-end). The Introduction + Literature Review + IEEE references are drafted (`reports/final_report/1_Introduction_and_Literature_Review_EN.md`), and the section-by-section assembly map for the final Word report is at `reports/final_report/00_ASSEMBLY_MAP_VI.md`. Remaining before submission: assemble the final report, sign the Step-0 minutes, and run the renumber checklist.
 
 ## 11. Citation
 

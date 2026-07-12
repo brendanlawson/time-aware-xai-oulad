@@ -281,9 +281,9 @@ python -m tools.build_docx
 
 | Việc | Ai | Ghi chú |
 |---|---|---|
-| **Streamlit dashboard** (Phase 6a): load bundle joblib, chọn mốc, danh sách SV bị cờ + SHAP cục bộ | **An** | Chạy đúng env pin (sklearn 1.8.0); tách `app.py` khỏi module dự đoán như quy ước với Đức |
-| **Introduction + Literature Review + References (IEEE)** | **Sơn** | Concept matrix có sẵn (`references/task/final_exl_4.xlsx` + proposal Appendix A); khung: 27 bài tiêu biểu, 3 dòng nghiên cứu, ô trống tích hợp trên OULAD |
-| **Lắp báo cáo Word cuối** theo Project Template + **slide tổng** | **Khoa** | Chỉ lắp số SAU khi chạy checklist mục 6; mọi số lấy từ `reports/tables/*.csv`, không gõ tay từ trí nhớ |
+| ~~Streamlit dashboard (Phase 6a)~~ **ĐÃ XONG 2026-07-12**: `dashboard/app.py` — danh sách SV bị cờ theo mốc, lọc "còn đang học tại t", SHAP cục bộ gắn nhãn mốc; chạy `streamlit run dashboard/app.py`, kiểm nhanh `python dashboard/app.py --smoke` | **An** (nghiệm thu + tuỳ biến giao diện) | UI mỏng, toàn bộ logic trong `src/` đúng quy ước với Đức; smoke test khớp `active_n`=5.052 tại t=40 |
+| ~~Introduction + Literature Review + References (IEEE)~~ **CÓ BẢN THẢO 2026-07-12**: `reports/final_report/1_Introduction_and_Literature_Review_EN.md` | **Sơn** (rà, chỉnh giọng, bổ sung từ concept matrix nếu muốn) | Mọi trích dẫn bám proposal + Base_Studies_Comparison đã verify; chỗ nào không chắc nguồn đã đánh TODO |
+| **Lắp báo cáo Word cuối** theo Project Template + **slide tổng** | **Khoa** | Bản đồ lắp ráp từng mục → nguồn liệu: `reports/final_report/00_ASSEMBLY_MAP_VI.md`. Chỉ lắp số SAU khi chạy checklist mục 6; mọi số lấy từ `reports/tables/*.csv`, không gõ tay từ trí nhớ |
 | **Chạy checklist renumber (mục 6)** | **Khoa + Phúc** (Phúc phần data/split, Khoa phần train/tools) | ~1–2h máy chạy; commit trọn gói |
 | **KÝ THẬT biên bản Step 0** | **Cả 6 người** | `docs/08_agreements/Step0_Agreement_Nhom1.pdf` hiện **trống ngày + chữ ký** (cả `Leakage_Rules_Signed_Nhom1.pdf` kiểm luôn). In ra, điền ngày, ký, scan đè lại file. Nộp biên bản trống chữ ký là mất điểm miễn phí |
 | **Cập nhật file xlsx phân công** (đang ghi 9/40 việc "Hoàn thành" — lỗi thời) | **Khoa** | Đối chiếu trạng thái thật theo bản đồ STT trong `docs/README_EN.md` |
