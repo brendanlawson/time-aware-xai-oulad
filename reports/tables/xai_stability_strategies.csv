@@ -1,7 +1,7 @@
 strategy_a,strategy_b,jaccard_top10,spearman
-none,class_weight,1.0,0.9776
-none,smote,0.6667,0.9763
-none,adasyn,0.8182,0.9768
-class_weight,smote,0.6667,0.9703
-class_weight,adasyn,0.8182,0.9687
-smote,adasyn,0.5385,0.9706
+none,class_weight,0.5385,0.9739
+none,smote,0.6667,0.9708
+none,adasyn,0.8182,0.9674
+class_weight,smote,0.6667,0.9709
+class_weight,adasyn,0.6667,0.9641
+smote,adasyn,0.8182,0.9744

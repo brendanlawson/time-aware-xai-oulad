@@ -1,50 +1,50 @@
 feature,importance
-num__days_since_last_activity,3.6585696
-num__weighted_score_to_date,2.2380843
-num__mean_score_to_date,0.60888356
-num__n_assessments_submitted,0.36177853
-nominal__code_module_DDD,0.34332165
-num__clicks_oucontent,0.20668209
-num__clicks_url,0.1897632
-num__clicks_subpage,0.17836507
-num__clicks_forumng,0.16535719
-num__total_clicks,0.15867819
-indicator__not_submitted,0.15600273
-num__clicks_homepage,0.15549712
-num__n_days_active,0.13969314
-num__num_of_prev_attempts,0.13440542
-num__clicks_resource,0.13423982
-num__mean_clicks_per_active_day,0.12995668
-nominal__code_module_FFF,0.12969036
-ordinal__imd_band,0.11648414
-nominal__code_module_CCC,0.1137888
-num__clicks_quiz,0.1103314
-num__max_clicks_single_day,0.10849037
-num__date_registration,0.100065574
-ordinal__highest_education,0.09413015
-nominal__code_presentation_2013B,0.07919046
-nominal__code_presentation_2014B,0.073595695
-ordinal__age_band,0.05856209
-num__studied_credits,0.057696935
-nominal__code_module_BBB,0.056199513
-num__clicks_oucollaborate,0.05570595
-binary__gender,0.053195234
-nominal__code_presentation_2013J,0.041141033
-nominal__region_East Anglian Region,0.040312562
-nominal__region_North Western Region,0.034749143
-nominal__region_South West Region,0.031587165
-nominal__region_South Region,0.031078301
-nominal__code_module_GGG,0.0264234
-nominal__region_Yorkshire Region,0.024802018
-nominal__code_presentation_2014J,0.023836743
-nominal__region_West Midlands Region,0.02278119
-nominal__region_London Region,0.02133866
-binary__disability,0.018841758
-nominal__region_South East Region,0.017410832
-nominal__region_Scotland,0.017044462
-nominal__region_East Midlands Region,0.016290378
-nominal__region_Wales,0.015401781
-nominal__region_North Region,0.012667719
-nominal__region_Ireland,0.011291381
-nominal__code_module_EEE,0.0071330694
-nominal__code_module_AAA,0.006345317
+num__days_since_last_activity,3.5664885
+num__weighted_score_to_date,2.082718
+num__mean_score_to_date,0.6881595
+num__n_assessments_submitted,0.37032008
+nominal__code_module_DDD,0.35191777
+num__clicks_oucontent,0.22145498
+nominal__code_module_FFF,0.17505346
+indicator__not_submitted,0.16870427
+num__clicks_homepage,0.16490957
+num__clicks_subpage,0.16152881
+num__n_days_active,0.15303417
+num__total_clicks,0.14991528
+num__clicks_forumng,0.14412099
+num__mean_clicks_per_active_day,0.14279006
+num__clicks_url,0.14113379
+num__max_clicks_single_day,0.12874752
+num__clicks_resource,0.122653686
+num__clicks_quiz,0.12207604
+num__num_of_prev_attempts,0.114278205
+num__date_registration,0.11299442
+ordinal__imd_band,0.109678626
+ordinal__highest_education,0.104196176
+nominal__code_module_CCC,0.102839954
+nominal__code_presentation_2014B,0.09067368
+nominal__code_presentation_2013B,0.08488029
+num__studied_credits,0.07408683
+binary__gender,0.07057368
+ordinal__age_band,0.06908987
+num__clicks_oucollaborate,0.051897593
+nominal__code_module_BBB,0.049389515
+nominal__region_South Region,0.04705219
+nominal__region_East Anglian Region,0.043309607
+nominal__region_South West Region,0.042879492
+nominal__code_presentation_2013J,0.039656825
+nominal__code_module_GGG,0.039578386
+nominal__region_North Western Region,0.025792103
+nominal__region_Yorkshire Region,0.023989543
+nominal__region_London Region,0.021856105
+nominal__region_North Region,0.020113643
+nominal__region_West Midlands Region,0.016842803
+nominal__region_Scotland,0.016074033
+nominal__region_South East Region,0.014909038
+nominal__region_Wales,0.01352575
+binary__disability,0.013261655
+nominal__code_presentation_2014J,0.013207588
+nominal__code_module_EEE,0.0122611085
+nominal__region_Ireland,0.01170754
+nominal__code_module_AAA,0.005503788
+nominal__region_East Midlands Region,0.004858373
