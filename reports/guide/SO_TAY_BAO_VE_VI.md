@@ -60,7 +60,7 @@ Nguyên tắc: **mọi bảng số nằm ở `reports/tables/*.csv`, mọi hình
 | `tools/` | ~19 script sinh bảng/hình/slide/docx một-phát-ăn-ngay | theo mảng (xem mục 6) | `python -m tools.<tên_script>` |
 | `models/` | bundle `{model, ct, feat_names, stats}` dạng `*.joblib` (git-ignored) | An (đóng gói/deploy) | sinh bởi `python -m src.modeling.train` |
 | `reports/tables/`, `reports/figures/` | **nguồn sự thật duy nhất** cho mọi con số/hình | Khoa tổng hợp | từng tool ở mục 6 |
-| `reports/slides/`, `reports/guide/` | deck reveal.js + sổ tay (file này) | Khoa | `python -m tools.build_revealjs_report` |
+| `reports/slides/`, `reports/guide/` | deck PDF (Beamer) + sổ tay (file này) | Khoa | `python -m tools.build_progress_deck` |
 | `docs/` | bộ tài liệu Task 3 song ngữ (01_data_specification … 08_agreements); `docs/README_EN.md` là bản đồ 40 đầu việc STT | cả nhóm | `python -m tools.build_docx` |
 | `notebooks/00…06` | bản notebook chạy được của từng chương | 00–04 Phúc · 05 Đức/Khoa · 06 Bình | Restart & Run All |
 
@@ -269,7 +269,7 @@ python -m tools.sensitivity_active --model lgbm --plot
 python -m tools.make_eval_analysis
 
 # 6) Rebuild deliverables (đọc số từ CSV → tự khớp)
-python -m tools.build_revealjs_report
+python -m tools.build_progress_deck
 python -m tools.build_docx
 ```
 

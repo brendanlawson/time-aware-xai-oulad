@@ -47,7 +47,7 @@ step 15_fairness     "$PY" -m tools.make_fairness_report
 step 16_sens_xgb     "$PY" -m tools.sensitivity_active --model xgb --plot
 step 17_sens_lgbm    "$PY" -m tools.sensitivity_active --model lgbm --plot
 step 18_tuning       "$PY" -m tools.tune_models
-step 19_deck         "$PY" tools/build_revealjs_report.py
+step 19_deck         "$PY" -m tools.build_progress_deck
 step 20_docx         "$PY" tools/build_docx.py
 step 21_final_report "$PY" -m tools.build_final_report
 step 22_final_slides "$PY" -m tools.build_final_slides
