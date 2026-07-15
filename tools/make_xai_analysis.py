@@ -13,8 +13,8 @@ Writes:
            lime_local_example.png, xai_stability_drift.png
 
 CLI:
-    python -m tools.make_xai_analysis                      # xgb, 5 seeds, 30 LIME rows
-    python -m tools.make_xai_analysis --model xgb --seeds 5 --lime-n 30 --sample 1500
+    python -m tools.make_xai_analysis                      # xgb, 5 seeds, 100 LIME rows
+    python -m tools.make_xai_analysis --model xgb --seeds 5 --lime-n 100 --sample 1500
 """
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SHAP + LIME + explanation-stability (Phase 5).")
     p.add_argument("--model", default="xgb", help="model family to explain (default xgb)")
     p.add_argument("--seeds", type=int, default=5, help="#seeds for seed-stability (RQ2)")
-    p.add_argument("--lime-n", type=int, default=30, help="#test rows for SHAP-vs-LIME agreement")
+    p.add_argument("--lime-n", type=int, default=100, help="#test rows for SHAP-vs-LIME agreement")
     p.add_argument("--sample", type=int, default=1500, help="#rows sampled for SHAP")
     return p.parse_args(argv)
 

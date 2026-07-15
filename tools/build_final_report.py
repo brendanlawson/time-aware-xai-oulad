@@ -1,6 +1,6 @@
 """Assemble the final report: stitch the section drafts, inject live numbers.
 
-Prose lives in ``reports/final_report/{1..7}_*_EN.md``. Volatile numbers are
+Prose lives in ``reports/final_report/{1..8}_*_EN.md``. Volatile numbers are
 NEVER hand-typed there — sections use placeholders that this builder resolves
 from the committed result CSVs at build time, so a renumber run automatically
 propagates into the report:
@@ -34,7 +34,7 @@ FIGURES_DIR = ROOT / "reports" / "figures"
 OUT_MD = REPORT_DIR / "Final_Report_DSP391m_Group1_EN.md"
 OUT_DOCX = OUT_MD.with_suffix(".docx")
 
-SECTION_GLOB = sorted(REPORT_DIR.glob("[1-7]_*_EN.md"))
+SECTION_GLOB = sorted(REPORT_DIR.glob("[1-8]_*_EN.md"))
 
 
 def _fmt(x, nd=3):
@@ -156,6 +156,17 @@ def main(argv: list[str] | None = None) -> int:
         "Prediction on OULAD\n% DSP391m — Group 1, FPT University · "
         "Supervisor: Nguyễn Thị Hoàng Yến\n"
     ]
+    parts.append(
+        "## Team Members\n\n"
+        "Group 1, DSP391m - FPT University. Supervisor: Nguyễn Thị Hoàng Yến.\n\n"
+        "| Member | Role | Responsibility |\n|---|---|---|\n"
+        "| Khoa | Methodology Lead & Report Coordinator | Time-aware prediction (RQ1), evaluation, report assembly |\n"
+        "| Đức | Modeling Lead | Model development, class-imbalance handling (RQ3) |\n"
+        "| Bình | XAI Lead | SHAP/LIME explanations, explanation stability (RQ2) |\n"
+        "| Phúc | Implementation Lead | Data pipeline, split harness, leakage tests |\n"
+        "| An | Backend & Dashboard Lead | Model packaging, Streamlit dashboard |\n"
+        "| Sơn | Literature Review Lead | Introduction, literature review, references |\n"
+    )
     for f in SECTION_GLOB:
         print("section:", f.name)
         parts.append(render(f.read_text(encoding="utf-8"), scalars, tables))

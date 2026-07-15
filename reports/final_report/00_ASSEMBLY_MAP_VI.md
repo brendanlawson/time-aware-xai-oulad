@@ -26,4 +26,5 @@
 1. Chạy **renumber** (SO_TAY mục 6) → mọi bảng/hình tự khớp lại → chép số vào Word.
 2. Ký thật `docs/08_agreements/Step0_Agreement_Nhom1.pdf` (đang trống ngày + chữ ký).
 3. Cập nhật xlsx phân công trong `references/task/`.
-4. RQ1 trong mọi mục phải nói kèm cohort (quy tắc ở `docs/01_data_specification/Target_Variable_Definition_EN.md` §5).
+4. Nếu GV yêu cầu notebook CÓ output: chạy `jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb` rồi nộp bản copy NGOÀI git (hook nbstripout sẽ strip khi commit).
+5. RQ1 trong mọi mục phải nói kèm cohort (quy tắc ở `docs/01_data_specification/Target_Variable_Definition_EN.md` §5).
