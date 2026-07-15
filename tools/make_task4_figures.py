@@ -62,6 +62,39 @@ def main() -> int:
         cv = pd.read_csv(cv_path)
         print("\nPhase-2 CV benchmark @ t=100 (mean +/- std across 5x5 folds):")
         print(cv.to_string(index=False))
+
+        # Uncertainty made visible (2026-07 audit gap): mean +/- 1 std error bars
+        # per model, so the report shows variance, not only point estimates.
+        import matplotlib
+
+        matplotlib.use("Agg", force=True)
+        import matplotlib.pyplot as plt
+
+        from src.eda.plot_style import apply_style, savefig
+
+        apply_style()
+        cvs = cv.sort_values("recall_mean", ascending=False).reset_index(drop=True)
+        xs = list(range(len(cvs)))
+        fig, ax = plt.subplots(figsize=(8.5, 4.8))
+        for off, (metric, colour) in enumerate(
+            [("recall", "#C0392B"), ("f1", "#0F4C81"), ("pr_auc", "#2E7D32")]
+        ):
+            ax.errorbar(
+                [x + (off - 1) * 0.22 for x in xs],
+                cvs[f"{metric}_mean"],
+                yerr=cvs[f"{metric}_std"],
+                fmt="o",
+                capsize=4,
+                label=metric.replace("_", "-").upper(),
+                color=colour,
+            )
+        ax.set_xticks(xs)
+        ax.set_xticklabels(cvs["model"])
+        ax.set_ylabel("Score (mean ± 1 std over 25 CV folds)")
+        ax.set_title("Cross-validated performance with uncertainty (5-fold × 5 seeds, t = 100%)")
+        ax.legend()
+        savefig(fig, "cv_uncertainty")
+        plt.close(fig)
     return 0
 
 

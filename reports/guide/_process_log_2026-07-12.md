@@ -128,6 +128,28 @@ bản chính thức cho thành viên là `SO_TAY_BAO_VE_VI.md` (do "thư ký" t�
 - xlsx phân công (local, gitignored): 40/40 mục Hoàn thành.
 - renumber.sh nối thêm bước 21–22 (final report + slides) cho các lần chạy sau.
 
+## Đối soát 8 tài liệu yêu cầu chính thức của môn (buổi chiều)
+
+4 agent đọc trọn bộ guide chương 2–9 (E:\FULearning\..._mat1) và đối chiếu từng
+trang với bằng chứng trong repo. Kết quả: ~95% đầu mục ✅ ngay từ đầu, phần lớn vượt
+yêu cầu. Các gap tìm thấy VÀ ĐÃ VÁ trong cùng phiên:
+- Scatter plot (Ch3/Ch4 nêu đích danh; Chart_Standards của chính nhóm cũng quy định):
+  thêm `bivariate_scatter_pairs.png` (top-4 cặp mạnh nhất, alpha 0.4, tô màu lớp) vào eda.py.
+- Mode cho biến numeric: thêm cột `mode` vào `univariate_numeric.csv`.
+- Hình uncertainty (Ch7): `cv_uncertainty.png` (mean ± std, 25 fold) trong make_task4_figures.
+- Bias–variance tradeoff (Ch6 — gap ❌ duy nhất toàn cuộc): thêm đoạn diễn giải vào §4.4
+  báo cáo, dùng chính số CV std + khoảng cách linear-vs-ensemble.
+- Overfitting/underfitting chưa được gọi tên trong báo cáo: cùng đoạn §4.4.
+- Chưa gọi tên phương pháp tuning: §4.5 giờ nêu RandomizedSearchCV + vì sao chọn thay grid/Bayesian.
+- Template chính thức (Project Template.docx): bổ sung mục **Team Members** (builder),
+  thêm mục **3.8 EDA Key Findings**, tách **References thành mục 7** (trước Appendices 8),
+  xoá 2 ghi chú nháp "Drafted..." sót trong bản nộp.
+- Docx rớt 5 hình Section 4 (pandoc bỏ hình nhúng giữa câu): chuyển 6 hình về đoạn riêng
+  → docx giờ nhúng đủ 16 hình (kiểm bằng đếm word/media + 9 assert nội dung).
+- LIME mặc định 30 → 100 dòng (khớp lần chạy chốt).
+Việc còn lại là của con người: KÝ Step-0 PDF, luyện thuyết trình, nộp LMS, xin feedback GV.
+(Ghi chú trung thực: proposal đã nộp có 3 dòng Appendix A tự đánh dấu "cần thay" chưa thay.)
+
 ## Kết quả agent (tóm tắt bàn giao)
 
 - **Agent Docs-Root:** LICENSE (MIT, mới) · README.md (minority→majority 52,8%; bảng

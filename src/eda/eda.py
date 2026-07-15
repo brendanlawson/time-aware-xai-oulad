@@ -26,6 +26,7 @@ from src.config import (
     CHECKPOINTS,
     CHECKPOINTS_DIR,
     INTERIM_DATA_DIR,
+    RANDOM_SEED,
     REPORTS_DIR,
     TABLES_DIR,
 )
@@ -177,6 +178,7 @@ def univariate(master: pd.DataFrame) -> dict:
     apply_style()
     desc = master[NUMERIC_ALL].describe().T
     desc["median"] = master[NUMERIC_ALL].median()
+    desc["mode"] = master[NUMERIC_ALL].mode().iloc[0]
     desc["skew"] = master[NUMERIC_ALL].skew()
     desc["kurtosis"] = master[NUMERIC_ALL].kurtosis()
     desc = desc.round(3)
@@ -481,6 +483,39 @@ def correlation(master: pd.DataFrame) -> dict:
     ax.set_title("Correlation of numeric features with the target")
     savefig(fig, "corr_with_target")
     plt.close(fig)
+
+    # Scatter views of the strongest numeric-numeric pairs (Chart_Standards:
+    # bivariate numeric vs numeric -> scatter, alpha=0.4), class-coloured on a
+    # fixed-seed 4,000-row sample so the figure stays readable and reproducible.
+    top_pairs = [p for p in strong if "at_risk" not in (p["a"], p["b"])][:4]
+    if top_pairs:
+        rng = np.random.RandomState(RANDOM_SEED)
+        sample = master.iloc[rng.choice(len(master), size=min(4000, len(master)), replace=False)]
+        fig, axes = plt.subplots(2, 2, figsize=(12, 9.5), constrained_layout=True)
+        for ax, p in zip(axes.ravel(), top_pairs):
+            for cls in (0, 1):
+                part = sample[sample["at_risk"] == cls]
+                ax.scatter(
+                    part[p["a"]],
+                    part[p["b"]],
+                    s=8,
+                    alpha=0.4,
+                    color=CLASS_COLOURS[cls],
+                    label=CLASS_LABELS[cls],
+                    linewidths=0,
+                )
+            ax.set_xlabel(p["a"])
+            ax.set_ylabel(p["b"])
+            ax.set_title(f"Pearson r = {p['r']:.2f}", fontsize=10)
+            tidy_axis(ax, nbins=5)
+        handles, labels = axes.ravel()[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="upper right", ncols=2)
+        fig.suptitle(
+            "Strongest numeric-numeric relationships (scatter, 4,000-row sample)",
+            fontweight="bold",
+        )
+        savefig(fig, "bivariate_scatter_pairs")
+        plt.close(fig)
 
     multicollinear = [p for p in strong if abs(p["r"]) >= 0.8]
     leakage = [c for c, v in target_corr.abs().items() if v >= 0.95]

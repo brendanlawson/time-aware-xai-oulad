@@ -4,6 +4,22 @@
 
 ---
 
+## Team Members
+
+Group 1, DSP391m - FPT University. Supervisor: Nguyễn Thị Hoàng Yến.
+
+| Member | Role | Responsibility |
+|---|---|---|
+| Khoa | Methodology Lead & Report Coordinator | Time-aware prediction (RQ1), evaluation, report assembly |
+| Đức | Modeling Lead | Model development, class-imbalance handling (RQ3) |
+| Bình | XAI Lead | SHAP/LIME explanations, explanation stability (RQ2) |
+| Phúc | Implementation Lead | Data pipeline, split harness, leakage tests |
+| An | Backend & Dashboard Lead | Model packaging, Streamlit dashboard |
+| Sơn | Literature Review Lead | Introduction, literature review, references |
+
+
+---
+
 # 1. Introduction and Background
 
 Virtual Learning Environments (VLEs) now mediate a large share of higher-education teaching, and every action a student takes — opening a resource, submitting an assessment, visiting a forum — leaves a digital trace. Failure and drop-out nevertheless remain persistent problems in online and distance education, while the behavioural data captured by learning management systems is still largely under-used for timely intervention. Educational Data Mining and Learning Analytics have responded with a rich body of work on student performance prediction, typically framed as binary at-risk classification, from systematic comparisons of supervised algorithms [1] to prediction at multiple points of course length [2].
@@ -64,30 +80,6 @@ Following Webster and Watson [5], the group surveyed 30 readings (five per membe
 
 Four gaps follow, each mapped to a research question. First, time-aware prediction and XAI have not been integrated: the time-aware studies [1], [2] provide no explanations, while the XAI study [8] considers no multiple time points (RQ1, RQ2). Second, there is no consistent comparison of ANNs and modern ensembles within a single pipeline on the same OULAD data (RQ1, RQ2). Third, explanation stability has not been evaluated quantitatively; assessments remain predominantly qualitative [3], [8] (RQ2). Fourth, the interaction between imbalance handling and explanation quality has not been studied on OULAD (RQ3). No existing work fills all three axes — time-aware prediction, post-hoc explanation, and imbalance handling — simultaneously on OULAD; this project occupies exactly that empty cell, and adds the dual-cohort reporting frame and student-level leakage-safe splitting absent from the base studies.
 
-# References
-
-[1] N. Tomasevic, N. Gvozdenovic, and S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, vol. 143, art. no. 103676, 2020.
-
-[2] M. Adnan et al., "Predicting at-risk students at different percentages of course length for early intervention using machine learning models," *IEEE Access*, vol. 9, pp. 7519–7539, 2021.
-
-[3] H. Alamri and B. Alharbi, "Explainable student performance prediction models: A systematic review," *IEEE Access*, vol. 9, pp. 33132–33143, 2021.
-
-[4] J. Kuzilek, M. Hlosta, and Z. Zdrahal, "Open University Learning Analytics dataset," *Scientific Data*, vol. 4, art. no. 170171, 2017.
-
-[5] J. Webster and R. T. Watson, "Analyzing the past to prepare for the future: Writing a literature review," *MIS Quarterly*, vol. 26, no. 2, pp. xiii–xxiii, 2002.
-
-[6] S. M. Lundberg and S.-I. Lee, "A unified approach to interpreting model predictions," in *Proc. Advances in Neural Information Processing Systems (NeurIPS)*, 2017, pp. 4768–4777.
-
-[7] M. T. Ribeiro, S. Singh, and C. Guestrin, "'Why should I trust you?' Explaining the predictions of any classifier," in *Proc. 22nd ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2016, pp. 1135–1144.
-
-[8] S. Gunasekara and M. Saarela, "Explainable AI in education: Techniques and qualitative assessment," *Applied Sciences*, vol. 15, no. 3, art. no. 1239, 2025.
-
-[9] N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer, "SMOTE: Synthetic minority over-sampling technique," *Journal of Artificial Intelligence Research*, vol. 16, pp. 321–357, 2002.
-
----
-
-Drafted 2026-07-12 for the final report (owner: Sơn); numbers cross-checked against README/docs; format: paste into the Word template.
-
 
 ---
 
@@ -113,7 +105,7 @@ This fixed label, however, supports two distinct estimands. The first is end-of-
 
 Twenty-eight raw features are engineered per enrolment, in three groups. The demographic and context group (11 features) is static: gender, region, highest_education, imd_band, age_band, disability, num_of_prev_attempts, studied_credits, date_registration, and the presentation identifiers code_module and code_presentation. The engagement group (13 features) is aggregated from the clickstream: total_clicks, n_days_active, eight per-activity-type counts (forum, content, resource, homepage, collaboration, quiz, subpage, URL), max_clicks_single_day, mean_clicks_per_active_day, and days_since_last_activity. The performance group (4 features) is aggregated from assessment submissions: mean_score_to_date, weighted_score_to_date, n_assessments_submitted, and the binary indicator not_submitted, which flags enrolments with no submission by the cutoff so that an imputed zero score is never conflated with a genuine zero-score submission.
 
-All time-dependent features are cutoff-driven: at checkpoint *t*, only clickstream and submission records dated on or before the checkpoint day enter the aggregation, so each feature answers "what was known about this student at *t*". One defect in this logic was found and fixed during the audit: assessments banked from a previous presentation were counted as due but not as submitted, incorrectly setting not_submitted for 78 of 32,593 enrolments (0.24%) at *t* = 100%; the fix is covered by a regression test, and all result tables are recomputed in the report-freeze renumber run (Appendix 7.2).
+All time-dependent features are cutoff-driven: at checkpoint *t*, only clickstream and submission records dated on or before the checkpoint day enter the aggregation, so each feature answers "what was known about this student at *t*". One defect in this logic was found and fixed during the audit: assessments banked from a previous presentation were counted as due but not as submitted, incorrectly setting not_submitted for 78 of 32,593 enrolments (0.24%) at *t* = 100%; the fix is covered by a regression test, and all result tables are recomputed in the report-freeze renumber run (Appendix 8.2).
 
 ## 3.4 Time-Aware Checkpointing
 
@@ -143,6 +135,16 @@ Missing values are handled per variable: imd_band gaps become an explicit "Unkno
 
 Resampling, when used, runs strictly inside the training fold after transformation; the test set always reflects the real class distribution. One direction-of-effect caveat is flagged here: because the at-risk class is a slight majority under this label mapping, a default-configured SMOTE oversamples the not-at-risk class rather than the class of interest — a consequence of the label design that the RQ3 experiments in Section 5 make explicit.
 
+## 3.8 Exploratory Data Analysis - Key Findings
+
+Before any modelling, the assembled master table was profiled end to end (notebook `02_eda.ipynb`; all statistics live under `reports/tables/`). Four findings shaped the design decisions above. First, the target is nearly balanced under this label mapping - 52.8% of enrolments are at-risk - which reframes imbalance handling as the controlled robustness question of Section 5 rather than a rare-class problem. Second, every clickstream-derived count is heavily right-skewed with a long tail of highly active students, which motivates the log1p transforms of Section 3.7; the distributions below make this visible directly.
+
+![Univariate distributions of the main numeric features (histogram + kernel density), coloured by feature group; the strong right skew of the engagement counts motivates the log1p treatment.](D:/dsp/reports/figures/univariate_hist_kde.png)
+
+Third, engagement and performance dominate the class signal: the largest group differences (Cohen's d above 1.5 with Benjamini-Hochberg-adjusted p-values near zero) belong to days-since-last-activity, assessment counts and cumulative scores, while demographic attributes show only weak association with the target (Cramer's V <= 0.15) - an early hint of both the predictive ranking of Section 4 and its fairness picture. Fourth, the strongest numeric-numeric relationships are the expected volume couplings (active days versus total clicks), shown below as class-coloured scatter plots; no feature approaches the |r| >= 0.95 leakage alarm threshold against the target, and pairs above |r| >= 0.8 are retained but documented as multicollinear.
+
+![The four strongest numeric-numeric relationships as class-coloured scatter plots (fixed-seed 4,000-row sample; alpha = 0.4 per the project chart standard).](D:/dsp/reports/figures/bivariate_scatter_pairs.png)
+
 
 ---
 
@@ -170,9 +172,13 @@ Table | model   |   roc_auc |   pr_auc |     f1 |   recall |   precision |   bal
 | lgbm    |    0.9889 |   0.9913 | 0.9511 |   0.9295 |      0.9736 |         0.9511 |  0.0368 |
 | logreg  |    0.9857 |   0.9890 | 0.9464 |   0.9171 |      0.9776 |         0.9471 |  0.0414 |
 | rf      |    0.9868 |   0.9896 | 0.9466 |   0.9165 |      0.9788 |         0.9475 |  0.0405 |
-| xgb     |    0.9872 |   0.9902 | 0.9503 |   0.9298 |      0.9718 |         0.9503 |  0.0391 | reports the full seven-metric comparison on the held-out test set at the final checkpoint, and Figure ![Baseline benchmark of the five candidate models at t = 100% on the held-out test set (recall, F1, PR-AUC, ROC-AUC per model; no resampling, shared seed 42).](D:/dsp/reports/figures/model_benchmark_baseline.png) visualises the four principal metrics per model.
+| xgb     |    0.9872 |   0.9902 | 0.9503 |   0.9298 |      0.9718 |         0.9503 |  0.0391 | reports the full seven-metric comparison on the held-out test set at the final checkpoint; the figure below visualises the four principal metrics per model.
 
-The table shows XGBoost at the top of the recall-first ranking, with recall 0.930 and PR-AUC 0.990 on the at-risk class. Two observations matter more than the winner's identity. First, the tree-based models — XGBoost, LightGBM, Random Forest — track each other closely across all seven metrics, with LightGBM marginally ahead on the composite ranking metrics; the boosting family as a whole, not one implementation, dominates the benchmark. Second, Logistic Regression, although last, remains within a few points of the leaders, indicating that the engineered features carry a strong, largely linearly separable signal on which the ensembles add a real but modest increment. Figure ![Confusion matrix of the selected model on the held-out test set at t = 100% at the default decision threshold.](D:/dsp/reports/figures/confusion_default_t100.png) shows the error profile of the leading model at the default threshold.
+![Baseline benchmark of the five candidate models at t = 100% on the held-out test set (recall, F1, PR-AUC, ROC-AUC per model; no resampling, shared seed 42).](D:/dsp/reports/figures/model_benchmark_baseline.png)
+
+The table shows XGBoost at the top of the recall-first ranking, with recall 0.930 and PR-AUC 0.990 on the at-risk class. Two observations matter more than the winner's identity. First, the tree-based models — XGBoost, LightGBM, Random Forest — track each other closely across all seven metrics, with LightGBM marginally ahead on the composite ranking metrics; the boosting family as a whole, not one implementation, dominates the benchmark. Second, Logistic Regression, although last, remains within a few points of the leaders, indicating that the engineered features carry a strong, largely linearly separable signal on which the ensembles add a real but modest increment. The figure below shows the error profile of the leading model at the default threshold.
+
+![Confusion matrix of the selected model on the held-out test set at t = 100% at the default decision threshold.](D:/dsp/reports/figures/confusion_default_t100.png)
 
 Because the gaps between models are small, the honest question is whether this ranking is trustworthy or an accident of one particular data split. The next subsection answers it with two layers of verification.
 
@@ -199,14 +205,18 @@ The second layer is statistical testing on the 25 paired CV folds. Table | metri
 | pr_auc   |          5 |         25 |         82.6154 |    0.0000 | True               | lgbm         |           1.0800 |
 | roc_auc  |          5 |         25 |         77.6761 |    0.0000 | True               | lgbm         |           1.0400 | reports the Friedman test per metric: the null hypothesis of equal performance is rejected far below the 0.05 level for every metric, so the small observed differences are systematic rather than noise. Post-hoc pairwise Wilcoxon signed-rank tests with Holm correction sharpen the picture: XGBoost is significantly better on recall than each of the other four models, while LightGBM leads the composite metrics (F1, PR-AUC, ROC-AUC). The choice follows the objective of the task: given the recall-first framing of early warning and the exact TreeExplainer attributions required by the explanation phase (Section 5), XGBoost is selected as the primary candidate for all subsequent analyses.
 
+In bias-variance terms, the two verification layers also explain *why* the ranking is trustworthy and why neither over- nor under-fitting is driving it. The per-model standard deviations in the cross-validation table are small relative to the between-model gaps - the estimators are low-variance at this sample size - and the figure below visualises those uncertainty bands directly. Overfitting is bounded by construction: every score is computed on data the model never saw (25 held-out folds plus the frozen test set), preprocessing is re-fitted inside each fold, an automated leakage suite guards the pipeline, and the ANN additionally uses early stopping; the close agreement between the cross-validated and held-out rankings confirms that no model is merely memorising its training fold. Underfitting - the bias side of the trade-off - is visible instead as the systematic few-point gap between the linear baseline and the tree ensembles: logistic regression's higher-bias hypothesis class cannot represent the feature interactions that the boosted trees exploit, and that difference is precisely the increment the ensembles add.
+
+![Cross-validated recall, F1 and PR-AUC per model as mean +/- one standard deviation over the 25 folds (5-fold x 5 seeds, t = 100%): between-model gaps exceed within-model variability.](D:/dsp/reports/figures/cv_uncertainty.png)
+
 ## 4.5 Hyperparameter Tuning
 
-With the candidate fixed, a hyperparameter search was run at t = 100%; Table | model   |   t_percent |   cv_best_pr_auc |   default_pr_auc |   tuned_pr_auc |   default_recall |   tuned_recall |   default_f1 |   tuned_f1 |
+With the candidate fixed, a randomised hyperparameter search was run for XGBoost and LightGBM at the t = 40% and t = 100% checkpoints (scikit-learn's `RandomizedSearchCV`: 40 sampled configurations per model, each scored with 5-fold student-grouped cross-validation optimising PR-AUC, with SMOTE applied inside each fold). Random search was preferred over an exhaustive grid, which is combinatorially wasteful in a six-dimensional mixed search space, and over Bayesian optimisation, whose sequential machinery buys little at this budget; a fixed random budget explores the space evenly at identical cost. Table | model   |   t_percent |   cv_best_pr_auc |   default_pr_auc |   tuned_pr_auc |   default_recall |   tuned_recall |   default_f1 |   tuned_f1 |
 |:--------|------------:|-----------------:|-----------------:|---------------:|-----------------:|---------------:|-------------:|-----------:|
 | xgb     |          40 |           0.9485 |           0.9428 |         0.9479 |           0.8107 |         0.8042 |       0.8484 |     0.8519 |
 | xgb     |         100 |           0.9910 |           0.9902 |         0.9914 |           0.9298 |         0.9274 |       0.9503 |     0.9507 |
 | lgbm    |          40 |           0.9476 |           0.9473 |         0.9473 |           0.8095 |         0.8110 |       0.8543 |     0.8534 |
-| lgbm    |         100 |           0.9910 |           0.9913 |         0.9910 |           0.9295 |         0.9301 |       0.9511 |     0.9517 | compares the tuned configuration against the near-default baseline. The honest conclusion is that tuning does not meaningfully improve the model: the table shows a marginal gain on the probability-ranking metric and no improvement — indeed a slight decrease — on recall, the primary metric. The gain does not justify the complexity and reduced reproducibility of a bespoke configuration, so the near-default configuration of Section 4.1 is retained for every result in this report. This is consistent with the benchmark itself: when five differently biased learners sit within a few points of one another, the feature signal, not the estimator configuration, is the binding constraint.
+| lgbm    |         100 |           0.9910 |           0.9913 |         0.9910 |           0.9295 |         0.9301 |       0.9511 |     0.9517 | compares the tuned configurations against the near-default baseline. The honest conclusion is that tuning does not meaningfully improve the model: the table shows a marginal gain on the probability-ranking metric and no improvement — indeed a slight decrease — on recall, the primary metric. The gain does not justify the complexity and reduced reproducibility of a bespoke configuration, so the near-default configuration of Section 4.1 is retained for every result in this report. This is consistent with the benchmark itself: when five differently biased learners sit within a few points of one another, the feature signal, not the estimator configuration, is the binding constraint.
 
 ## 4.6 Time-Aware Performance and RQ1 — Dual-Cohort Answer
 
@@ -217,7 +227,11 @@ The selected protocol was then repeated at all six checkpoints (10/20/40/60/80/1
 |          40 | xgb     |   0.8107 |   0.9428 |    0.9215 | 0.8484 | True       |
 |          60 | xgb     |   0.8703 |   0.9684 |    0.9568 | 0.8964 | True       |
 |          80 | lgbm    |   0.8990 |   0.9827 |    0.9768 | 0.9280 | True       |
-|         100 | xgb     |   0.9298 |   0.9902 |    0.9872 | 0.9503 | True       | lists the best model per checkpoint with its test metrics and a reliability flag, and Figures ![At-risk recall of the best model per checkpoint across the six course-progress checkpoints, full test cohort; the horizontal line marks the recall ≥ 0.80 reliability criterion.](D:/dsp/reports/figures/time_aware_recall.png) and ![PR-AUC of the best model per checkpoint across the six checkpoints, full test cohort.](D:/dsp/reports/figures/time_aware_pr_auc.png) plot the corresponding curves. The table shows LightGBM narrowly ahead at the two earliest checkpoints — both below the reliability criterion — and XGBoost ahead from t = 40% onward. On the full enrolment cohort, recall crosses the 0.80 criterion at t = 40% (reaching 0.811) and rises monotonically to 0.930 at course end, with PR-AUC comfortably above its criterion over the same range. This trajectory is consistent with the 40–60% reliability window reported by Adnan et al. [2] on the same dataset.
+|         100 | xgb     |   0.9298 |   0.9902 |    0.9872 | 0.9503 | True       | lists the best model per checkpoint with its test metrics and a reliability flag, and the two figures below plot the corresponding recall and PR-AUC curves.
+
+![At-risk recall of the best model per checkpoint across the six course-progress checkpoints, full test cohort; the horizontal line marks the recall ≥ 0.80 reliability criterion.](D:/dsp/reports/figures/time_aware_recall.png)
+
+![PR-AUC of the best model per checkpoint across the six checkpoints, full test cohort.](D:/dsp/reports/figures/time_aware_pr_auc.png) The table shows LightGBM narrowly ahead at the two earliest checkpoints — both below the reliability criterion — and XGBoost ahead from t = 40% onward. On the full enrolment cohort, recall crosses the 0.80 criterion at t = 40% (reaching 0.811) and rises monotonically to 0.930 at course end, with PR-AUC comfortably above its criterion over the same range. This trajectory is consistent with the 40–60% reliability window reported by Adnan et al. [2] on the same dataset.
 
 The full cohort is, however, only one of the two estimands defined in Section 3. Because the at-risk label includes withdrawal and the enrolment population is held fixed across checkpoints, the test set at every checkpoint contains students who have already withdrawn before the cutoff — 923 test enrolments have left before the earliest checkpoint at t = 10%, and the count grows at each later cutoff. For these records the model is recording an outcome that has already happened, not forecasting one. Table |   t_percent |   full_recall |   active_recall |   full_pr_auc |   active_pr_auc |   withdrawn_already_gone |
 |------------:|--------------:|----------------:|--------------:|----------------:|-------------------------:|
@@ -226,7 +240,9 @@ The full cohort is, however, only one of the two estimands defined in Section 3.
 |     40.0000 |        0.8107 |          0.6782 |        0.9428 |          0.8462 |                1437.0000 |
 |     60.0000 |        0.8703 |          0.7490 |        0.9684 |          0.8950 |                1687.0000 |
 |     80.0000 |        0.8969 |          0.7792 |        0.9808 |          0.9235 |                1859.0000 |
-|    100.0000 |        0.9298 |          0.8412 |        0.9902 |          0.9559 |                1953.0000 | therefore re-scores the same XGBoost predictions on the still-enrolled subpopulation at each checkpoint, and Figure ![XGBoost at-risk recall per checkpoint on the full test cohort versus the still-enrolled subpopulation, with the recall ≥ 0.80 criterion marked; the gap between the curves quantifies the contribution of already-withdrawn students.](D:/dsp/reports/figures/sensitivity_active_recall_xgb.png) plots the two recall curves side by side. The table shows a substantial, systematic gap: on the still-enrolled cohort, recall is 0.678 at t = 40% and 0.779 at t = 80%, and only reaches 0.841 — crossing the criterion — at t = 100%. The same qualitative shape is reproduced by LightGBM, so the finding is not specific to one model.
+|    100.0000 |        0.9298 |          0.8412 |        0.9902 |          0.9559 |                1953.0000 | therefore re-scores the same XGBoost predictions on the still-enrolled subpopulation at each checkpoint; the figure below plots the two recall curves side by side.
+
+![XGBoost at-risk recall per checkpoint on the full test cohort versus the still-enrolled subpopulation, with the recall ≥ 0.80 criterion marked; the gap between the curves quantifies the contribution of already-withdrawn students.](D:/dsp/reports/figures/sensitivity_active_recall_xgb.png) The table shows a substantial, systematic gap: on the still-enrolled cohort, recall is 0.678 at t = 40% and 0.779 at t = 80%, and only reaches 0.841 — crossing the criterion — at t = 100%. The same qualitative shape is reproduced by LightGBM, so the finding is not specific to one model.
 
 The dual-cohort answer to RQ1 is therefore stated in two parts, always reported together. On the full enrolment cohort — the frame in which the base studies [1], [2] operate — XGBoost is the best model from t = 40% onward and predictions are reliable from t = 40% of course length. On the still-enrolled cohort — the frame in which a tutor can still intervene — the same criterion is met only at course end, and mid-course predictions, while informative, fall short of the reliability bar.
 
@@ -239,7 +255,9 @@ A deployed early-warning system needs a decision threshold, and choosing it on t
 | default(0.5) |      0.5000 |          0.9718 |       0.9301 |   0.9505 |           0.9718 |        0.9298 |    0.9503 |
 | f1           |      0.5600 |          0.9766 |       0.9263 |   0.9508 |           0.9754 |        0.9262 |    0.9502 |
 | youden       |      0.5600 |          0.9766 |       0.9263 |   0.9508 |           0.9754 |        0.9262 |    0.9502 |
-| recall>=0.9  |      0.8600 |          0.9929 |       0.9010 |   0.9447 |           0.9931 |        0.9002 |    0.9444 | reports each policy's validation-chosen threshold with its validation and test metrics, and Figure ![Precision, recall, and F1 on the validation predictions as a function of the decision threshold, with the selected policy thresholds marked.](D:/dsp/reports/figures/threshold_tuning.png) shows the underlying validation trade-off curves.
+| recall>=0.9  |      0.8600 |          0.9929 |       0.9010 |   0.9447 |           0.9931 |        0.9002 |    0.9444 | reports each policy's validation-chosen threshold with its validation and test metrics; the figure below shows the underlying validation trade-off curves.
+
+![Precision, recall, and F1 on the validation predictions as a function of the decision threshold, with the selected policy thresholds marked.](D:/dsp/reports/figures/threshold_tuning.png)
 
 Two results stand out. First, the F1-optimal policy selects a threshold of 0.56, nearly coinciding with the conventional default of 0.5, and the validation metrics transfer to the test set with negligible drift; this retrospectively confirms that the default-threshold results of the preceding subsections were not the product of tuning on the test set. Second, the table includes an institutional policy alternative: if a faculty mandates recall of at least 0.9 on the at-risk class, the validation-chosen threshold of 0.86 delivers that recall on the test set at a precision of 0.993 — an operating point in which flagged students are almost always genuinely at risk.
 
@@ -256,9 +274,6 @@ The project's ethics documentation commits to reporting disaggregated performanc
 
 The table shows that the largest recall gap across all attributes is 6.6 percentage points, observed on imd_band, with the other attributes exhibiting smaller ranges; false-positive-rate gaps are of a similarly modest order. No subgroup is severely under-served: no demographic group falls dramatically below the overall recall level, and the recall for students who declare a disability is not below that of their counterparts. These gaps are reported as observed disparities at a single checkpoint and threshold, not as a certification of fairness; a deployment should monitor the same disaggregated metrics continuously, with per-group detail retained in the repository for audit.
 
----
-
-*Drafted 2026-07-12 (owner: Khoa). All model, threshold, and fairness numbers appear as VAL/TBL/FIG placeholders and are resolved from `reports/tables/*.csv` and `reports/figures/` by the report builder after the renumber checklist (SO_TAY section 6) has been run; only structural constants (5 algorithms, 6 checkpoints, seed 42, 25 CV fits, test 6,489 rows / 5,756 students, reliability criterion recall ≥ 0.80 & PR-AUC ≥ 0.80) are typed literally.*
 
 
 ---
@@ -378,9 +393,32 @@ This project set out to occupy an empty cell in the learning-analytics literatur
 
 ---
 
-# 7. Appendices
+# 7. References
 
-## 7.1 Appendix A — Instructor Dashboard Architecture
+[1] N. Tomasevic, N. Gvozdenovic, and S. Vranes, "An overview and comparison of supervised data mining techniques for student exam performance prediction," *Computers & Education*, vol. 143, art. no. 103676, 2020.
+
+[2] M. Adnan et al., "Predicting at-risk students at different percentages of course length for early intervention using machine learning models," *IEEE Access*, vol. 9, pp. 7519–7539, 2021.
+
+[3] H. Alamri and B. Alharbi, "Explainable student performance prediction models: A systematic review," *IEEE Access*, vol. 9, pp. 33132–33143, 2021.
+
+[4] J. Kuzilek, M. Hlosta, and Z. Zdrahal, "Open University Learning Analytics dataset," *Scientific Data*, vol. 4, art. no. 170171, 2017.
+
+[5] J. Webster and R. T. Watson, "Analyzing the past to prepare for the future: Writing a literature review," *MIS Quarterly*, vol. 26, no. 2, pp. xiii–xxiii, 2002.
+
+[6] S. M. Lundberg and S.-I. Lee, "A unified approach to interpreting model predictions," in *Proc. Advances in Neural Information Processing Systems (NeurIPS)*, 2017, pp. 4768–4777.
+
+[7] M. T. Ribeiro, S. Singh, and C. Guestrin, "'Why should I trust you?' Explaining the predictions of any classifier," in *Proc. 22nd ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2016, pp. 1135–1144.
+
+[8] S. Gunasekara and M. Saarela, "Explainable AI in education: Techniques and qualitative assessment," *Applied Sciences*, vol. 15, no. 3, art. no. 1239, 2025.
+
+[9] N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer, "SMOTE: Synthetic minority over-sampling technique," *Journal of Artificial Intelligence Research*, vol. 16, pp. 321–357, 2002.
+
+
+---
+
+# 8. Appendices
+
+## 8.1 Appendix A — Instructor Dashboard Architecture
 
 The optional instructor dashboard (contribution iv, Section 1) is implemented as a deliberately thin Streamlit interface in `dashboard/app.py`: the UI contains no modelling logic of its own, and every substantive operation — loading a trained checkpoint bundle, applying the anti-leakage transformation, computing SHAP attributions — is delegated to the same `src/` modules used by the experiments, so the dashboard cannot drift from the evaluated pipeline. For inference, each bundle carries the statistics dictionary and fitted ColumnTransformer of Section 3.7; the frozen test cohort is transformed with these stored training-fold statistics only, exactly as during evaluation.
 
@@ -388,12 +426,12 @@ For a selected checkpoint *t* and model, the dashboard shows three things. First
 
 The dashboard is launched with `streamlit run dashboard/app.py`; a headless smoke test, `python dashboard/app.py --smoke`, asserts the full scoring path end-to-end (bundle loading, transformation, prediction, SHAP) without starting the UI.
 
-## 7.2 Appendix B — Reproducibility and the Renumber Protocol
+## 8.2 Appendix B — Reproducibility and the Renumber Protocol
 
 All committed artifacts were built in a verified, pinned environment (Python 3.13.9, scikit-learn 1.8.0, numpy 2.3.5, xgboost 3.1.3, lightgbm 4.6.0, shap 0.52.0; the full set is pinned in `environment.yml` and `requirements.txt`), with a single global seed (42) defined once in `src/config.py` and consumed by every stochastic operation. Data provenance is anchored by an MD5 reference manifest: `setup_raw_data.py` records the hash, size, and download date of each of the seven raw OULAD CSVs, sets the files read-only, and on every subsequent run recomputes and compares the hashes, aborting the pipeline on any mismatch. The frozen split of Section 3.6 is protected by the committed test-student list and a guard that prevents accidental re-derivation.
 
 Because volatile results must never be hand-maintained, the project follows a renumber protocol (documented in the team defence handbook): `tools/renumber.sh` rebuilds every derived artifact — master table, checkpoint datasets, split materialisation, EDA figures, the full test suite, model training, cross-validation, statistical tests, and all analysis tables and figures — from the raw CSVs in a fixed order, with stamp-based resume so an interrupted run continues rather than restarts. This run is mandatory before the final number freeze, since the banked-assessment fix (Section 3.3) postdates some previously committed tables. The report itself closes the loop: `tools/build_final_report.py` stitches the section sources and resolves every volatile number, table, and figure from placeholder references to the committed result CSVs at build time, so no model metric in this document is hand-typed and a renumber run propagates into the report automatically.
 
-## 7.3 Appendix C — Ethics and Fairness Compliance Note
+## 8.3 Appendix C — Ethics and Fairness Compliance Note
 
 OULAD is secondary data, anonymised at source by The Open University and released under CC-BY 4.0; the project's obligations — correct citation, no re-identification attempts, no linkage with external data, and licence acknowledgement — are documented in full in the project's data-source, licence, and ethics statement, and no additional institutional ethics approval is required for this coursework use of a publicly released, anonymised dataset. Beyond compliance, the project audits its own model behaviour for disparate performance: Section 4 reports the fairness table of subgroup metrics and gaps across gender, disability, age band, IMD deprivation band, highest education, and region on the held-out test set. Consistent with the intervention framing, predictions are positioned as decision support for instructors — a ranked list with explanations — rather than as automated decisions about students.
