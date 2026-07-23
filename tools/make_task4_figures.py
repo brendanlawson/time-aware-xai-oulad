@@ -29,9 +29,15 @@ RELIABLE_PRAUC = 0.80
 def main() -> int:
     metrics = pd.read_csv(TABLES_DIR / "model_metrics.csv")
 
-    # RQ1: performance-vs-progress curves, one line per model.
+    # RQ1: performance-vs-progress curves, one line per model. The recall curve
+    # carries the reliability bar its report caption refers to.
     for m in ("recall", "pr_auc", "roc_auc", "f1"):
-        plots.metric_vs_checkpoint(metrics, metric=m, name=f"time_aware_{m}")
+        plots.metric_vs_checkpoint(
+            metrics,
+            metric=m,
+            name=f"time_aware_{m}",
+            criterion=RELIABLE_RECALL if m == "recall" else None,
+        )
     # Phase-2 benchmark: compare the algorithms at the full-course checkpoint.
     plots.model_comparison_bar(metrics, t_percent=100, name="model_benchmark")
 

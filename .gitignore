@@ -72,3 +72,5 @@ task/
 ~$*
 # LibreOffice lock files
 .~lock.*#
+# Bootstrap cache for tools.make_paper_extras (final CSVs are committed).
+reports/tables/_paper_cache/

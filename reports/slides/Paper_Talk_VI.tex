@@ -1,0 +1,268 @@
+% =========================================================================
+% Paper_Talk_VI.tex --- Slide thuyết trình (15 phút, ~14 slide + backup).
+% Build:  tectonic Paper_Talk_VI.tex   (XeTeX, font Segoe UI)
+% =========================================================================
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{default}
+\setbeamertemplate{navigation symbols}{}
+\usepackage{fontspec}
+\setmainfont{Segoe UI}
+\setsansfont{Segoe UI}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\graphicspath{{../figures/}}
+
+\definecolor{themecol}{HTML}{0F4C81}
+\definecolor{accent}{HTML}{C0392B}
+\setbeamercolor{structure}{fg=themecol}
+\setbeamercolor{frametitle}{fg=white,bg=themecol}
+\setbeamercolor{title}{fg=themecol}
+\setbeamerfont{frametitle}{series=\bfseries,size=\large}
+\setbeamertemplate{itemize item}{\color{themecol}\textbullet}
+\setbeamertemplate{itemize subitem}{\color{accent}\textbullet}
+\setbeamertemplate{footline}{\hfill\scriptsize\color{gray}%
+  DSP391m · Nhóm 1 · \insertframenumber/\inserttotalframenumber\hspace{2mm}\vspace{1mm}}
+
+\newcommand{\keyfig}[2]{\begin{center}\includegraphics[width=\linewidth,height=#2\textheight,keepaspectratio]{#1}\end{center}}
+
+\title{Dự đoán sớm sinh viên có nguy cơ học tập kém theo thời gian trên OULAD}
+\subtitle{Đánh giá kép theo quần thể, độ ổn định của giải thích, và độ bền với mất cân bằng lớp}
+\author{Nhóm 1: T.~B.~Phúc, P.~M.~Đức, P.~V.~Khoa, N.~T.~Bình, N.~V.~An, L.~Q.~T.~Sơn}
+\institute{Đại học FPT, Hà Nội \quad\textbullet\quad GVHD: Nguyễn Thị Hoàng Yến}
+\date{Đồ án tốt nghiệp DSP391m}
+
+\begin{document}
+
+% ---- 1. Title
+\begin{frame}\titlepage\end{frame}
+
+% ---- 2. Problem
+\begin{frame}{Bài toán: trượt và bỏ học trong học trực tuyến}
+\begin{columns}
+\begin{column}{0.56\textwidth}
+\begin{itemize}
+  \item Học trực tuyến mất nhiều sinh viên vì \textbf{trượt} và \textbf{bỏ học}.
+  \item Hỗ trợ muộn không thay đổi kết cục; giáo viên cần biết \textbf{ai} và \textbf{khi nào}, đủ sớm để can thiệp.
+  \item Và \textbf{vì sao} bị gắn cờ, để cảnh báo đáng tin và công bằng.
+\end{itemize}
+\end{column}
+\begin{column}{0.44\textwidth}
+\keyfig{withdrawn_activity_decay}{0.6}
+\footnotesize Sinh viên nguy cơ ngừng hoạt động từ rất sớm trước hạn nộp.
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 3. The catch
+\begin{frame}{Điểm mấu chốt hầu như không ai kiểm}
+\begin{itemize}
+  \item Mô hình theo thời gian được chấm ở giữa khóa trên \textbf{toàn bộ danh sách ghi danh}.
+  \item Danh sách đó vẫn chứa sinh viên \textbf{đã rút}, vốn dễ nhận ra qua sự bất hoạt.
+  \item Nên một phần điểm ``cảnh báo sớm'' thực chất là \textbf{nhận ra một kết cục đã xảy ra rồi}.
+\end{itemize}
+\vspace{0.5em}
+\begin{block}{Câu hỏi trung tâm}
+\centering\color{themecol}\textbf{Chúng ta thật ra đang dự đoán ai, và cách chọn quần thể có thổi phồng kết quả không?}
+\end{block}
+\end{frame}
+
+% ---- 4. Questions & Contributions
+\begin{frame}{Câu hỏi nghiên cứu và đóng góp}
+\textbf{Câu hỏi.}
+\begin{itemize}\small
+  \item[RQ1] Mô hình nào tốt nhất, và \emph{sớm đến mức nào} thì tin cậy (recall và PR-AUC $\geq 0{,}80$)?
+  \item[RQ2] Giải thích (SHAP, LIME) \emph{ổn định} đến đâu?
+  \item[RQ3] Xử lý mất cân bằng có quan trọng không, khi at-risk là \emph{đa số} nhẹ (52,8\%)?
+\end{itemize}
+\vspace{0.3em}
+\textbf{Đóng góp.}
+\begin{itemize}\small
+  \item \textbf{Định lượng mức thổi phồng do chọn quần thể} (CI khoảng cách loại trừ 0 ở mọi mốc).
+  \item Benchmark theo thời gian \textbf{đã kiểm định} (Friedman, Wilcoxon-Holm, 25 CV fit).
+  \item Độ ổn định giải thích so với \textbf{mốc ngẫu nhiên Monte-Carlo}, không đánh giá bằng mắt.
+  \item Một \textbf{quy tắc báo cáo kép} và dashboard cho giáo viên.
+\end{itemize}
+\end{frame}
+
+% ---- 5. Data
+\begin{frame}{Dữ liệu: OULAD}
+\begin{columns}
+\begin{column}{0.58\textwidth}
+\begin{itemize}
+  \item \textbf{32.593} lượt ghi danh, \textbf{28.785} sinh viên, \textbf{22} module-presentation.
+  \item \textbf{7 bảng} từ \textbf{3 hệ thống}: thông tin sinh viên, clickstream VLE ($\sim$10,6 triệu dòng), chấm bài.
+  \item Nhãn = \{Fail, Withdrawn\} = \textbf{52,8\%} (đa số nhẹ, không phải lớp hiếm).
+  \item Snapshot cố định, ẩn danh $\Rightarrow$ tái lập được.
+\end{itemize}
+\end{column}
+\begin{column}{0.42\textwidth}
+\keyfig{target_distribution}{0.55}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 6. Method
+\begin{frame}{Phương pháp: pipeline chống rò rỉ, theo thời gian}
+\begin{center}\small\color{themecol}
+Dữ liệu thô (7 bảng) $\rightarrow$ \textbf{Chia theo sinh viên, đóng băng} $\rightarrow$ 6 mốc (10--100\%)
+$\rightarrow$ Đặc trưng fit trên train $\rightarrow$ 5 mô hình $\rightarrow$ SHAP / LIME
+\end{center}
+\vspace{0.3em}
+\begin{itemize}
+  \item Chia \textbf{theo sinh viên}, đóng băng: không sinh viên nào ở cả train lẫn test.
+  \item Tại mốc $t$, chỉ dùng dữ liệu trước hoặc bằng $t$ (không nhìn trộm tương lai).
+  \item Mọi phép biến đổi, resampler, ngưỡng chỉ \textbf{fit trên train}.
+  \item \textbf{21 test tự động} bảo vệ pipeline.
+\end{itemize}
+\end{frame}
+
+% ---- 7. Two estimands
+\begin{frame}{Ý tưởng chính: hai câu hỏi, hai quần thể}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{Toàn bộ quần thể}\\
+\footnotesize\emph{``Lượt này có kết thúc Fail/Withdrawn?''}
+\begin{itemize}\footnotesize
+  \item Là cách nghiên cứu trước dùng.
+  \item Gồm cả sinh viên đã rút.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Quần thể còn theo học}\\
+\footnotesize\emph{``Giáo viên nên liên hệ ai lúc này?''}
+\begin{itemize}\footnotesize
+  \item Chỉ những sinh viên còn can thiệp được.
+  \item Mới là cảnh báo sớm thật.
+\end{itemize}
+\end{column}
+\end{columns}
+\vspace{0.5em}
+\begin{block}{}\centering\color{themecol} Chấm \textbf{cùng một dự đoán} trên cả hai, và báo cáo cả hai.\end{block}
+\end{frame}
+
+% ---- 8. Benchmark
+\begin{frame}{Kết quả 1: mô hình nào, và thứ hạng có thật không?}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{itemize}
+  \item \textbf{XGBoost} dẫn recall (0,930 cuối khóa); các mô hình cây bám sát nhau.
+  \item Thứ hạng \textbf{đã kiểm định}: Friedman ($p<0{,}05$) + Wilcoxon-Holm, 25 CV fit.
+  \item Logistic chỉ kém vài điểm $\Rightarrow$ \textbf{đặc trưng} mang tín hiệu.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\keyfig{model_benchmark_baseline}{0.72}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 9. Dual-cohort (HEADLINE + takeaway)
+\begin{frame}{Kết quả 2 (chính): hiệu ứng quần thể}
+\begin{columns}
+\begin{column}{0.44\textwidth}
+\begin{itemize}\small
+  \item Toàn bộ quần thể vượt recall $\geq 0{,}80$ từ $t{=}40\%$ \dots
+  \item \dots nhóm \textbf{còn theo học} chỉ vượt ở \textbf{cuối khóa}.
+  \item CI khoảng cách \textbf{loại trừ 0 ở mọi mốc}.
+\end{itemize}
+\footnotesize\color{accent}$t{=}40\%$: 0,811 so với 0,678.\quad $t{=}100\%$: 0,930 so với 0,841.
+\end{column}
+\begin{column}{0.56\textwidth}
+\keyfig{sensitivity_active_recall_xgb}{0.66}
+\end{column}
+\end{columns}
+\begin{block}{Thông điệp}\centering\color{themecol}\small
+Độ tin cậy cảnh báo sớm phụ thuộc \textbf{bạn chấm trên quần thể nào}: 40\% trên giấy, nhưng cuối khóa với nhóm sinh viên thật sự can thiệp được.
+\end{block}
+\end{frame}
+
+% ---- 10. Explanations
+\begin{frame}{Kết quả 3: giải thích --- đặc trưng dẫn đầu và độ ổn định}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{itemize}\small
+  \item Đặc trưng số 1: \textbf{số ngày im lặng VLE}, rồi điểm tích lũy.
+  \item Không có nhân khẩu học ở top $\Rightarrow$ cảnh báo \textbf{dựa trên hành vi}, không phải hoàn cảnh.
+  \item \textbf{Ổn định}: Jaccard top-10 \textbf{0,69} so với mốc ngẫu nhiên \textbf{0,12}.
+  \item SHAP và LIME đồng thuận ở đặc trưng dẫn đầu, khác ở đuôi.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\keyfig{shap_importance_xgb_t100}{0.7}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 11. Robustness + supporting
+\begin{frame}{Độ bền và các phân tích bổ sung}
+\begin{columns}
+\begin{column}{0.52\textwidth}
+\begin{itemize}\small
+  \item \textbf{Mất cân bằng:} qua 4 chiến lược, chênh recall tối đa 0,007, kết luận không đổi.
+  \item \textbf{Luật nền:} luật 2 đặc trưng thắng XGBoost sớm (sinh viên rút quá dễ) nhưng thua cuối khóa $\Rightarrow$ chính sách \textbf{lai}.
+  \item \textbf{Hiệu chỉnh} tốt (ECE 0,018 đến 0,042); \textbf{5 đặc trưng} bằng mô hình đầy đủ; gap train-test thu hẹp (không overfit).
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\keyfig{rule_baseline_comparison}{0.62}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 12. Limitations
+\begin{frame}{Giới hạn (nêu thẳng)}
+\begin{itemize}
+  \item \textbf{Một dataset}; chưa kiểm chứng khả năng chuyển sang trường khác.
+  \item \textbf{Nhãn gộp} Fail (khó) và Withdrawn (dễ, hành vi), tách chúng là bước tiếp theo quan trọng.
+  \item Đặc trưng dẫn đầu một phần là \emph{hệ quả} của việc đã rút, nên điểm toàn quần thể ``đọc'' kết cục nhiều như dự báo; con số còn theo học (0,841) mới là con số trung thực.
+  \item Ranh giới tại $t{=}40\%$; phân tích còn-theo-học chấm lại mô hình huấn luyện trên toàn roster.
+\end{itemize}
+\end{frame}
+
+% ---- 13. Conclusion
+\begin{frame}{Kết luận: một quy tắc báo cáo gần như miễn phí}
+\begin{block}{Thông điệp}
+\begin{itemize}
+  \item Mô hình cây gradient boosting thắng một benchmark \emph{đã kiểm định}; con số cảnh báo sớm trung thực nằm ở nhóm \textbf{còn theo học}.
+  \item Giải thích ổn định và dựa trên hành vi; đặc trưng dẫn đầu \emph{chính là} kênh gây thổi phồng.
+\end{itemize}
+\end{block}
+\centering\color{themecol}\textbf{Mọi tuyên bố cảnh báo sớm nên nêu rõ quần thể, kèm khoảng bất định, và gắn giải thích với mốc thời gian.}
+\end{frame}
+
+% ---- 14. Thanks
+\begin{frame}{}
+\vfill\centering
+{\Large\color{themecol}\textbf{Xin cảm ơn}}\\[0.6em]
+Câu hỏi ạ?\\[1.2em]
+\footnotesize Pipeline tái lập được, 21 test, dashboard và bài báo đều trong repo.\\
+Mọi hình và số truy được về \texttt{reports/tables/*.csv}.
+\vfill
+\end{frame}
+
+% ==== BACKUP ====
+\begin{frame}{Backup: bảng dual-cohort}
+\footnotesize
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{t (\%)} & \textbf{Toàn bộ} & \textbf{Còn theo học} & \textbf{Khoảng cách} \\
+\midrule
+40  & 0,811 [0,798; 0,824] & 0,678 [0,656; 0,698] & 0,133 [0,122; 0,144] \\
+60  & 0,870 [0,859; 0,882] & 0,749 [0,730; 0,770] & 0,121 [0,110; 0,133] \\
+80  & 0,897 [0,887; 0,907] & 0,779 [0,760; 0,800] & 0,118 [0,106; 0,130] \\
+100 & 0,930 [0,921; 0,939] & 0,841 [0,821; 0,861] & 0,089 [0,076; 0,101] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\footnotesize\centering CI bootstrap 95\% (1.000 resample mức sinh viên).
+\end{frame}
+
+\begin{frame}{Backup: hiệu chỉnh và rút gọn đặc trưng}
+\begin{columns}
+\begin{column}{0.5\textwidth}\keyfig{calibration_curve}{0.6}\end{column}
+\begin{column}{0.5\textwidth}\keyfig{ablation_topk}{0.6}\end{column}
+\end{columns}
+\end{frame}
+
+\end{document}

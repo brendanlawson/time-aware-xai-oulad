@@ -12,13 +12,13 @@ Output: reports/Task3_Speaker_Script_Merged.docx   (requires pandoc on PATH)
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_MD = ROOT / "reports" / "Task3_Speaker_Script_Merged.md"
 OUT = ROOT / "reports" / "Task3_Speaker_Script_Merged.docx"
-PANDOC = r"C:\Users\phank\anaconda3\Library\bin\pandoc.exe"
+PANDOC = "pandoc"  # resolved from PATH, like build_docx.py / build_final_report.py
 
 
 def main() -> int:

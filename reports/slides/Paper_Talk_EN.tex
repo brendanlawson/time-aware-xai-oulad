@@ -1,0 +1,278 @@
+% =========================================================================
+% Paper_Talk_EN.tex --- Conference talk (15 min, ~14 slides + backup).
+% Build:  tectonic Paper_Talk_EN.tex
+% Speaker script (Vietnamese): Paper_Talk_Script_VI.md
+% =========================================================================
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{default}
+\setbeamertemplate{navigation symbols}{}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\graphicspath{{../figures/}}
+
+\definecolor{themecol}{HTML}{0F4C81}
+\definecolor{accent}{HTML}{C0392B}
+\setbeamercolor{structure}{fg=themecol}
+\setbeamercolor{frametitle}{fg=white,bg=themecol}
+\setbeamercolor{title}{fg=themecol}
+\setbeamerfont{frametitle}{series=\bfseries,size=\large}
+\setbeamertemplate{itemize item}{\color{themecol}\textbullet}
+\setbeamertemplate{itemize subitem}{\color{accent}\textbullet}
+\setbeamertemplate{footline}{\hfill\scriptsize\color{gray}%
+  DSP391m \textbullet\ Group 1 \textbullet\ \insertframenumber/\inserttotalframenumber\hspace{1.2em}\vspace{0.6em}}
+
+\newcommand{\keyfig}[2]{\begin{center}\includegraphics[width=\linewidth,height=#2\textheight,keepaspectratio]{#1}\end{center}}
+
+\title{Time-Aware At-Risk Student Prediction on OULAD}
+\subtitle{Dual-Cohort Evaluation, Explanation Stability, and Imbalance Robustness}
+\author{Group 1: T.~B.~Phuc, P.~M.~Duc, P.~V.~Khoa, N.~T.~Binh, N.~V.~An, L.~Q.~T.~Son}
+\institute{FPT University, Hanoi \quad\textbullet\quad Supervisor: Nguyen Thi Hoang Yen}
+\date{DSP391m Data Science Capstone Project}
+
+\begin{document}
+
+% ---- 1. Title
+\begin{frame}\titlepage\end{frame}
+
+% ---- 2. Problem
+\begin{frame}{The problem: failure and dropout in online learning}
+\begin{columns}
+\begin{column}{0.56\textwidth}
+\begin{itemize}
+  \item Online courses lose many students to \textbf{failure} and \textbf{withdrawal}.
+  \item Late help does not change the outcome; teachers need to know \textbf{who} and \textbf{when}, early enough to act.
+  \item And \textbf{why} a student is flagged, so the alert is trustworthy and fair.
+\end{itemize}
+\end{column}
+\begin{column}{0.44\textwidth}
+\keyfig{withdrawn_activity_decay}{0.6}
+\footnotesize At-risk students go silent in the VLE well before the deadline.
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 3. The catch (hook)
+\begin{frame}{The catch almost no study checks}
+\begin{itemize}
+  \item Time-aware models are scored at mid-course on the \textbf{full enrolment roster}.
+  \item But that roster still contains students who \textbf{already withdrew} --- trivial to detect from their inactivity.
+  \item So part of the reported ``early-warning'' score is really \textbf{detecting an outcome that already happened}.
+\end{itemize}
+\vspace{0.5em}
+\begin{block}{The question this paper asks}
+\centering\color{themecol}\textbf{Whom are we really predicting, and does the evaluation population inflate the result?}
+\end{block}
+\end{frame}
+
+% ---- 4. Questions & Contributions (merged)
+\begin{frame}{Research questions and contributions}
+\textbf{Questions.}
+\begin{itemize}\small
+  \item[RQ1] Which model is best, and \emph{how early} is a prediction reliable (recall and PR-AUC $\geq 0.80$)?
+  \item[RQ2] How \emph{stable} are the explanations (SHAP, LIME)?
+  \item[RQ3] Does imbalance handling matter, given at-risk is a slight \emph{majority} (52.8\%)?
+\end{itemize}
+\vspace{0.3em}
+\textbf{Contributions.}
+\begin{itemize}\small
+  \item \textbf{Population-definition inflation, quantified} (gap CI excludes zero at every checkpoint).
+  \item A \textbf{verified} time-aware benchmark (Friedman, Wilcoxon--Holm over 25 CV fits).
+  \item Explanation stability judged against a \textbf{Monte-Carlo null}, not by eye.
+  \item A \textbf{dual-reporting rule} plus an instructor dashboard.
+\end{itemize}
+\end{frame}
+
+% ---- 5. Data
+\begin{frame}{Data: OULAD}
+\begin{columns}
+\begin{column}{0.58\textwidth}
+\begin{itemize}
+  \item \textbf{32,593} enrolments, \textbf{28,785} students, \textbf{22} module-presentations.
+  \item \textbf{7 tables} from \textbf{3 systems}: student info, VLE clickstream ($\sim$10.6M rows), assessment.
+  \item Target = \{Fail, Withdrawn\} = \textbf{52.8\%} (a slight majority, not a rare class).
+  \item Fixed anonymised snapshot $\Rightarrow$ fully reproducible.
+\end{itemize}
+\end{column}
+\begin{column}{0.42\textwidth}
+\keyfig{target_distribution}{0.55}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 6. Method
+\begin{frame}{Method: a leakage-safe, time-aware pipeline}
+\begin{center}\small\color{themecol}
+Raw (7 tables) $\rightarrow$ \textbf{Frozen student split} $\rightarrow$ 6 checkpoints (10--100\%)
+$\rightarrow$ Fit-on-train features $\rightarrow$ 5 models $\rightarrow$ SHAP / LIME
+\end{center}
+\vspace{0.3em}
+\begin{itemize}
+  \item Split \textbf{by student}, frozen in git: no student is in both train and test.
+  \item At checkpoint $t$, only data on or before $t$ enters a feature (no peeking ahead).
+  \item Every transformer, resampler and threshold is fit on the \textbf{training fold only}.
+  \item \textbf{21 automated tests} guard the pipeline.
+\end{itemize}
+\end{frame}
+
+% ---- 7. Two estimands (key idea)
+\begin{frame}{The key idea: two questions, two populations}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{Full cohort} (all enrolments)\\
+\footnotesize\emph{``Will this end in Fail/Withdrawn?''}
+\begin{itemize}\footnotesize
+  \item The frame prior work uses.
+  \item Includes students who already left.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Still-enrolled cohort}\\
+\footnotesize\emph{``Whom should a tutor contact now?''}
+\begin{itemize}\footnotesize
+  \item The only students an intervention can reach.
+  \item The real early-warning task.
+\end{itemize}
+\end{column}
+\end{columns}
+\vspace{0.5em}
+\begin{block}{}\centering\color{themecol} We score the \textbf{same predictions} on both, and report both.\end{block}
+\end{frame}
+
+% ---- 8. Benchmark
+\begin{frame}{Result 1: which model, and is the ranking real?}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{itemize}
+  \item \textbf{XGBoost} leads recall (0.930 at course end); the tree ensembles are close.
+  \item Ranking \textbf{verified}: Friedman ($p<0.05$) + Wilcoxon--Holm over 25 CV fits.
+  \item Logistic regression trails by a few points $\Rightarrow$ the \textbf{features} carry the signal.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\keyfig{model_benchmark_baseline}{0.72}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 9. Dual-cohort (HEADLINE + takeaway)
+\begin{frame}{Result 2 (headline): the population effect}
+\begin{columns}
+\begin{column}{0.44\textwidth}
+\begin{itemize}\small
+  \item Full cohort clears recall $\geq 0.80$ at $t{=}40\%$ \dots
+  \item \dots the \textbf{still-enrolled} cohort only at \textbf{course end}.
+  \item Gap 95\% CI \textbf{excludes zero at every checkpoint}.
+\end{itemize}
+\footnotesize\color{accent}$t{=}40\%$: 0.811 vs 0.678.\quad $t{=}100\%$: 0.930 vs 0.841.
+\end{column}
+\begin{column}{0.56\textwidth}
+\keyfig{sensitivity_active_recall_xgb}{0.66}
+\end{column}
+\end{columns}
+\begin{block}{Takeaway}\centering\color{themecol}\small
+Reliable early warning depends on \textbf{which population you score}: 40\% of course length on paper, but course end for the students you can actually help.
+\end{block}
+\end{frame}
+
+% ---- 10. Explanations: drivers + stability (merged)
+\begin{frame}{Result 3: explanations --- drivers and stability}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{itemize}\small
+  \item Top driver: \textbf{days since last VLE activity}, then cumulative score.
+  \item No demographic feature at the top $\Rightarrow$ alerts are \textbf{behaviour-based}, not background-based.
+  \item \textbf{Stable}: across seeds, top-10 Jaccard \textbf{0.69} vs a Monte-Carlo null of \textbf{0.12}.
+  \item SHAP vs LIME agree on the top drivers, diverge in the tail.
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\keyfig{shap_importance_xgb_t100}{0.7}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 11. Robustness + supporting analyses (merged)
+\begin{frame}{Robustness and supporting analyses}
+\begin{columns}
+\begin{column}{0.52\textwidth}
+\begin{itemize}\small
+  \item \textbf{Imbalance:} across 4 strategies, max $\Delta$recall $=$ 0.007 --- conclusions do not depend on it.
+  \item \textbf{Rule baseline:} a 2-feature rule beats XGBoost early (withdrawn are trivial) but loses late $\Rightarrow$ \textbf{hybrid} policy.
+  \item \textbf{Calibrated} (ECE 0.018--0.042); \textbf{5 features} match the full model; train-test gap shrinks (no overfit).
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\keyfig{rule_baseline_comparison}{0.62}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---- 12. Limitations
+\begin{frame}{Limitations (stated openly)}
+\begin{itemize}
+  \item \textbf{Single dataset}; transfer to other institutions is untested.
+  \item \textbf{Label conflates} Fail (hard) and Withdrawn (easy, behavioural) --- decomposing them is the key next step.
+  \item The top feature is partly a \emph{consequence} of withdrawal, so full-cohort scores read outcomes as much as forecast them; the still-enrolled number (0.841) is the honest one.
+  \item Borderline at $t{=}40\%$; still-enrolled analysis re-scores a full-roster model.
+\end{itemize}
+\end{frame}
+
+% ---- 13. Conclusion
+\begin{frame}{Conclusion: a costless reporting discipline}
+\begin{block}{Takeaways}
+\begin{itemize}
+  \item Gradient-boosted trees win a \emph{verified} benchmark; the honest early-warning number is on the \textbf{still-enrolled} cohort.
+  \item Explanations are seed-stable and behaviour-based; the top driver \emph{is} the channel of the inflation.
+\end{itemize}
+\end{block}
+\centering\color{themecol}\textbf{Every early-warning claim should name its cohort, carry its uncertainty, and anchor its explanation to a checkpoint.}
+\end{frame}
+
+% ---- 14. Thanks
+\begin{frame}{}
+\vfill\centering
+{\Large\color{themecol}\textbf{Thank you}}\\[0.6em]
+Questions?\\[1.2em]
+\footnotesize Reproducible pipeline, 21 tests, dashboard, and paper in the repository.\\
+All figures and numbers trace to \texttt{reports/tables/*.csv}.
+\vfill
+\end{frame}
+
+% ==== BACKUP SLIDES ====
+\begin{frame}{Backup: dual-cohort table}
+\footnotesize
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{t (\%)} & \textbf{Full cohort} & \textbf{Still-enrolled} & \textbf{Gap} \\
+\midrule
+40  & 0.811 [0.798, 0.824] & 0.678 [0.656, 0.698] & 0.133 [0.122, 0.144] \\
+60  & 0.870 [0.859, 0.882] & 0.749 [0.730, 0.770] & 0.121 [0.110, 0.133] \\
+80  & 0.897 [0.887, 0.907] & 0.779 [0.760, 0.800] & 0.118 [0.106, 0.130] \\
+100 & 0.930 [0.921, 0.939] & 0.841 [0.821, 0.861] & 0.089 [0.076, 0.101] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\footnotesize\centering 95\% percentile-bootstrap CIs (1,000 student-level resamples).
+\end{frame}
+
+\begin{frame}{Backup: calibration and feature ablation}
+\begin{columns}
+\begin{column}{0.5\textwidth}\keyfig{calibration_curve}{0.6}\end{column}
+\begin{column}{0.5\textwidth}\keyfig{ablation_topk}{0.6}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[allowframebreaks]{Backup: selected references}
+\footnotesize
+\begin{thebibliography}{99}
+\bibitem{kuzilek2017} Kuzilek et al. OULAD. \emph{Scientific Data}, 2017.
+\bibitem{adnan2021} Adnan et al. Predicting at-risk students at percentages of course length. \emph{IEEE Access}, 2021.
+\bibitem{chen2016} Chen \& Guestrin. XGBoost. \emph{KDD}, 2016.
+\bibitem{lundberg2020} Lundberg et al. Explainable AI for trees. \emph{Nature Mach. Intell.}, 2020.
+\bibitem{demsar2006} Dem\v{s}ar. Statistical comparisons of classifiers. \emph{JMLR}, 2006.
+\bibitem{wolff2013} Wolff et al. Predicting at-risk students by clicking behaviour. \emph{LAK}, 2013.
+\end{thebibliography}
+\end{frame}
+
+\end{document}
