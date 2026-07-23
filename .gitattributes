@@ -1,0 +1,15 @@
+# The repo lives on an NTFS mount (/mnt/d) reached from both Windows and WSL.
+# Without this, a Windows-side write flips a file to CRLF and git reports the
+# whole file as rewritten — one such episode showed 137 files / 35k lines of
+# churn with zero content change.  Normalise to LF in the index and on checkout.
+* text=auto eol=lf
+
+# Binary deliverables and data: never touch, never diff as text.
+*.parquet binary
+*.joblib  binary
+*.docx    binary
+*.pptx    binary
+*.pdf     binary
+*.png     binary
+*.jpg     binary
+*.ipynb   -text
