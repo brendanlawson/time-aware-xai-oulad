@@ -200,12 +200,59 @@ def reasons_chart(top: pd.DataFrame) -> plt.Figure:
     return fig
 
 
-def threshold_presets() -> dict:
+@st.cache_data
+def policy_presets() -> dict:
+    """policy -> (threshold, val_precision, val_recall) cho XGBoost, điểm vận hành cuối khóa."""
     p = TABLES_DIR / "threshold_validation.csv"
     if not p.exists():
         return {}
     tv = pd.read_csv(p)
-    return dict(zip(tv["policy"], tv["threshold"]))
+    tv = tv[tv.model == "xgb"]
+    tv = tv[tv.t_percent == tv.t_percent.max()]  # ngưỡng hiệu chỉnh tại t=100
+    return {
+        r.policy: (float(r.threshold), float(r.val_precision), float(r.val_recall))
+        for r in tv.itertuples()
+    }
+
+
+@st.cache_data
+def reliability_row(t: int) -> dict:
+    """recall/pr_auc điểm + 95% CI cho full / still-enrolled(active) / gap tại mốc t (xgb)."""
+    p = TABLES_DIR / "bootstrap_ci.csv"
+    if not p.exists():
+        return {}
+    ci = pd.read_csv(p)
+    ci = ci[(ci.model == "xgb") & (ci.t_percent == t)]
+    out = {}
+    for cohort in ("full", "active", "gap"):
+        for metric in ("recall", "pr_auc"):
+            r = ci[(ci.cohort == cohort) & (ci.metric == metric)]
+            if not r.empty:
+                out[(cohort, metric)] = (
+                    float(r.point.iloc[0]),
+                    float(r.ci_lo.iloc[0]),
+                    float(r.ci_hi.iloc[0]),
+                )
+    return out
+
+
+@st.cache_data
+def calibration_ece(t: int) -> float | None:
+    p = TABLES_DIR / "calibration_metrics.csv"
+    if not p.exists():
+        return None
+    c = pd.read_csv(p)
+    r = c[c.t_percent == t]
+    return float(r.ece.iloc[0]) if not r.empty else None
+
+
+@st.cache_data
+def parsimony5() -> tuple[list[str], float]:
+    """Top-5 đặc trưng (theo ablation) và recall đạt được — câu chuyện gọn-để-vận-hành."""
+    a = pd.read_csv(TABLES_DIR / "ablation_results.csv")
+    r = a[a.k == 5].iloc[0]
+    feats = [f.strip() for f in str(r["top_features"]).split(",")]
+    return feats, float(r["recall"])
 
 
 # --- Giao diện -----------------------------------------------------------------
@@ -215,34 +262,60 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Thiết lập")
-        model_name = st.selectbox("Mô hình", list(MODELS), format_func=MODELS.get, index=0)
+        st.markdown("**Mô hình vận hành: XGBoost** ✅")
+        st.caption(
+            "Đã chọn qua benchmark có kiểm định (Friedman + Wilcoxon-Holm trên 25 fit CV): "
+            "dẫn đầu recall và cho SHAP chính xác trên cây."
+        )
+        model_name = "xgb"
         t = st.select_slider(
             "Tiến độ khóa học đã quan sát",
             options=list(CHECKPOINTS),
             value=40,
             format_func=lambda v: f"{v}%",
         )
-        presets = threshold_presets()
+        pol = policy_presets()
         nice = {
-            "manual": "Tự chỉnh",
+            "manual": "Tự chỉnh ngưỡng",
             "default(0.5)": "Mặc định (0.50)",
             "f1": "Cân bằng nhất (F1)",
             "youden": "Youden",
-            "recall>=0.9": "Vét ≥90% SV nguy cơ",
+            "recall>=0.9": "Vét ≥90% SV nguy cơ (ưu tiên không bỏ sót)",
         }
+        options = list(pol) + ["manual"]
+        default_policy = "f1" if "f1" in pol else options[0]
         preset = st.selectbox(
-            "Chính sách ngưỡng cảnh báo",
-            ["manual"] + list(presets),
+            "Chính sách cảnh báo",
+            options,
+            index=options.index(default_policy),
             format_func=lambda k: nice.get(k, k),
-            index=0,
-            help="Các chính sách được chọn trên tập validation, không đụng test.",
+            help="Ngưỡng được chọn trên tập validation (không đụng test), hiệu chỉnh tại cuối khóa.",
         )
-        threshold = st.slider("Ngưỡng cảnh báo", 0.0, 1.0, float(presets.get(preset, 0.5)), 0.01)
+        if preset == "manual":
+            threshold = st.slider("Ngưỡng thủ công", 0.0, 1.0, 0.5, 0.01)
+        else:
+            threshold, vp, vr = pol[preset]
+            st.caption(
+                f"Ngưỡng **{threshold:.2f}** · trên validation: precision **{vp:.1%}**, "
+                f"recall **{vr:.1%}** (không rò rỉ test)."
+            )
         only_active = st.toggle("Chỉ hiện SV còn đang học (can thiệp được)", value=True)
         st.caption(
             "Tắt để xem cả những em đã rút môn trước mốc này — nhóm chỉ *ghi nhận* "
             "được chứ không *giúp* được nữa."
         )
+        with st.expander("🔬 Chế độ nghiên cứu — đối chứng mô hình"):
+            alt = st.selectbox(
+                "Xem mô hình khác (không phải bản vận hành)",
+                list(MODELS),
+                format_func=MODELS.get,
+                index=0,
+            )
+            if alt != "xgb":
+                model_name = alt
+                st.warning(
+                    f"Đang xem **{MODELS[alt]}** để đối chứng — bản vận hành vẫn là XGBoost."
+                )
 
     scores, X_raw, Xt, feat_names, medians = score_cohort(model_name, t)
     view = scores[scores.still_enrolled] if only_active else scores
@@ -258,6 +331,42 @@ def main() -> None:
         c2.metric("Bị gắn cờ nguy cơ", f"{len(flagged):,}")
         c3.metric("Bắt đúng (backtest)", f"{tp / n_pos:.0%}" if n_pos else "–")
         c4.metric("Cờ chính xác (backtest)", f"{tp / len(flagged):.0%}" if len(flagged) else "–")
+
+        rel = reliability_row(t) if model_name == "xgb" else {}
+        if rel:
+
+            def _mark(v: float) -> str:
+                return "✅" if v >= 0.80 else "⚠️"
+
+            st.markdown(
+                "###### Độ tin cậy tại mốc này — backtest, 95% CI · chuẩn đạt khi recall ≥ 0.80"
+            )
+            k1, k2, k3 = st.columns(3)
+            if ("active", "recall") in rel:
+                p, lo, hi = rel[("active", "recall")]
+                k1.metric(
+                    f"{_mark(p)} Recall · nhóm còn học (số trung thực)",
+                    f"{p:.3f}",
+                    f"CI [{lo:.3f}, {hi:.3f}]",
+                    delta_color="off",
+                )
+            if ("full", "recall") in rel:
+                p, lo, hi = rel[("full", "recall")]
+                k2.metric(
+                    f"{_mark(p)} Recall · toàn bộ ghi danh",
+                    f"{p:.3f}",
+                    f"CI [{lo:.3f}, {hi:.3f}]",
+                    delta_color="off",
+                )
+            if ("gap", "recall") in rel:
+                p, lo, hi = rel[("gap", "recall")]
+                k3.metric(
+                    "Chênh do dân số (gap)",
+                    f"{p:.3f}",
+                    f"CI [{lo:.3f}, {hi:.3f}] · loại trừ 0",
+                    delta_color="off",
+                )
+
         if not only_active:
             gone = int((~scores.still_enrolled).sum())
             st.warning(
@@ -285,6 +394,24 @@ def main() -> None:
                 },
             )
             st.caption(f"Hiển thị tối đa 300 em đầu danh sách · mô hình huấn luyện tại mốc {t}%.")
+            export = flagged.rename(
+                columns={
+                    "id_student": "ma_sv",
+                    "code_module": "mon",
+                    "code_presentation": "ky",
+                    "proba": "xac_suat_nguy_co",
+                }
+            )[["ma_sv", "mon", "ky", "xac_suat_nguy_co"]]
+            st.download_button(
+                "⬇️ Tải danh sách ưu tiên (CSV)",
+                data=export.to_csv(index=False).encode(
+                    "utf-8-sig"
+                ),  # utf-8-sig: Excel đọc tiếng Việt
+                file_name=f"canh_bao_som_xgb_t{t}.csv",
+                mime="text/csv",
+                disabled=flagged.empty,
+                use_container_width=True,
+            )
 
         with right:
             st.subheader("Vì sao em này bị gắn cờ?")
@@ -348,6 +475,9 @@ def main() -> None:
 đúng trực giác sư phạm: im lặng kéo dài + điểm thấp là cặp dấu hiệu giảng viên
 thật cũng nhìn.
 
+**Công bằng theo thiết kế:** không đặc trưng nhân khẩu học nào ở nhóm dẫn đầu
+→ cảnh báo dựa trên **hành vi học tập**, không dựa lý lịch sinh viên.
+
 **Độ tin cậy của giải thích** (đo định lượng trong đề tài):
 - Ổn định khi đổi seed huấn luyện (Spearman ≈ 0.97).
 - Không đổi câu chuyện theo cách xử lý mất cân bằng.
@@ -355,6 +485,19 @@ thật cũng nhìn.
   đều được gắn nhãn mốc t.
                 """
             )
+        feats5, rec5 = parsimony5()
+        ece = calibration_ece(t)
+        names5 = ", ".join(FRIENDLY.get(f, f) for f in feats5)
+        st.info(
+            f"**Gọn để vận hành:** chỉ **5 đặc trưng** ({names5}) đã đạt recall "
+            f"{rec5:.3f} ≈ mô hình đầy đủ 49 cột → pipeline nhẹ, giải thích dễ hiểu."
+        )
+        if ece is not None:
+            st.caption(
+                f"Xác suất đã **hiệu chỉnh** (ECE tại mốc {t}% = {ece:.3f}): đọc được như "
+                "mức rủi ro thực, không chỉ là thứ hạng — nền tảng cho các dải rủi ro 🔴🟠🟢 ở tab bên."
+            )
+
         curve = FIGURES_DIR / "sensitivity_active_recall_xgb.png"
         if curve.exists():
             st.divider()
@@ -369,6 +512,10 @@ thật cũng nhìn.
 
 def smoke() -> None:
     """Kiểm tra end-to-end đường ống chấm điểm + giải thích, không cần UI."""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")  # ponytail: console Windows không vỡ tiếng Việt
+    except Exception:
+        pass
     scores, X_raw, Xt, feat_names, medians = score_cohort("xgb", 40)
     assert len(scores) == len(X_raw) == Xt.shape[0] > 6000
     assert Xt.shape[1] == len(feat_names)
@@ -381,6 +528,14 @@ def smoke() -> None:
     # mọi đặc trưng transformed phải dịch được sang tên thân thiện
     unfriendly = [f for f in feat_names if friendly_name(f) == f]
     assert not unfriendly, f"thiếu tên thân thiện: {unfriendly[:5]}"
+    # các quyết định nghiên cứu đã wire vào UI phải có dữ liệu thật
+    assert policy_presets().get("f1"), "thiếu chính sách ngưỡng validation"
+    assert reliability_row(40).get(("active", "recall")), "thiếu bootstrap CI nhóm còn học"
+    assert reliability_row(40).get(("gap", "recall")), "thiếu CI của gap dân số"
+    ece = calibration_ece(100)
+    assert ece is not None and 0 < ece < 0.1, "ECE hiệu chỉnh bất thường"
+    f5, r5 = parsimony5()
+    assert len(f5) == 5 and r5 > 0.9, "câu chuyện parsimony 5-đặc-trưng hỏng"
     print(
         f"SMOKE OK: {len(scores):,} rows | {int(scores.still_enrolled.sum()):,} còn học | "
         f"lý do mẫu: {sent[:80]}..."
