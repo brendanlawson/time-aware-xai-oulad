@@ -46,8 +46,11 @@ def esc_tex(s: str) -> str:
     return s
 
 
-def _ci(point, lo, hi, nd=3) -> str:
-    return f"{point:.{nd}f} (95\\% CI [{lo:.{nd}f}, {hi:.{nd}f}])"
+def _ci(point, lo, hi, nd=3, pct="\\%") -> str:
+    # pct defaults to a pre-escaped "\%" for raw {{VAL:...}} substitution into prose.
+    # For table cells pass pct="%" so latex_table's esc_tex escapes it exactly once
+    # (otherwise "\%" would be double-escaped to "\\%", a LaTeX line break + comment).
+    return f"{point:.{nd}f} (95{pct} CI [{lo:.{nd}f}, {hi:.{nd}f}])"
 
 
 def paper_scalars() -> dict:
@@ -82,6 +85,26 @@ def paper_scalars() -> dict:
             "JB_P99": f"{jb['p99']:.3f}",
         }
     )
+    # Supplementary analyses: rule baseline, calibration, ablation, bias-variance.
+    rb = pd.read_csv(TAB / "rule_baseline.csv").set_index("t_percent")
+    cal = pd.read_csv(TAB / "calibration_metrics.csv").set_index("t_percent")
+    abl = pd.read_csv(TAB / "ablation_results.csv").set_index("k")
+    bv = pd.read_csv(TAB / "bias_variance_gap.csv").set_index("t_percent")
+    mm = pd.read_csv(TAB / "model_metrics.csv").set_index(["model", "t_percent"])
+    s.update(
+        {
+            "RULE_RECALL_T10": f"{rb.loc[10, 'rule_recall']:.3f}",
+            "RULE_RECALL_T100": f"{rb.loc[100, 'rule_recall']:.3f}",
+            "XGB_RECALL_T10": f"{mm.loc[('xgb', 10), 'recall']:.3f}",
+            "ECE_T100": f"{cal.loc[100, 'ece']:.3f}",
+            "ECE_MAX": f"{cal['ece'].max():.3f}",
+            "MCE_MAX": f"{cal['mce'].max():.3f}",
+            "ABL_K5_RECALL": f"{abl.loc[5, 'recall']:.3f}",
+            "ABL_FULL_RECALL": f"{abl.loc[28, 'recall']:.3f}",
+            "BV_GAP_T10": f"{bv.loc[10, 'gap_recall']:.3f}",
+            "BV_GAP_T100": f"{bv.loc[100, 'gap_recall']:.3f}",
+        }
+    )
     return s
 
 
@@ -104,9 +127,48 @@ def paper_tables() -> dict:
                 rec.loc[tp, ("point", cohort)],
                 rec.loc[tp, ("ci_lo", cohort)],
                 rec.loc[tp, ("ci_hi", cohort)],
+                pct="%",  # plain %, esc_tex escapes once inside the table
             )
         rows.append(r)
     t["dual_cohort_ci"] = pd.DataFrame(rows)
+    t["rule_baseline"] = pd.read_csv(TAB / "rule_baseline.csv")[
+        ["t_percent", "rule_recall", "rule_precision", "xgb_recall", "recall_gap"]
+    ].rename(
+        columns={
+            "t_percent": "t (%)",
+            "rule_recall": "Rule recall",
+            "rule_precision": "Rule precision",
+            "xgb_recall": "XGBoost recall",
+            "recall_gap": "Rule $-$ XGB",
+        }
+    )
+    t["calibration"] = pd.read_csv(TAB / "calibration_metrics.csv").rename(
+        columns={"t_percent": "t (%)", "ece": "ECE", "mce": "MCE"}
+    )
+    t["ablation"] = pd.read_csv(TAB / "ablation_results.csv")[
+        ["k", "recall", "f1", "pr_auc"]
+    ].rename(columns={"k": "Top-$k$ features", "recall": "Recall", "f1": "F1", "pr_auc": "PR-AUC"})
+    t["bias_variance"] = pd.read_csv(TAB / "bias_variance_gap.csv")[
+        ["t_percent", "train_recall", "test_recall", "gap_recall"]
+    ].rename(
+        columns={
+            "t_percent": "t (%)",
+            "train_recall": "Train recall",
+            "test_recall": "Test recall",
+            "gap_recall": "Gap",
+        }
+    )
+    if "fairness_gaps" in t:
+        t["fairness_gaps"] = t["fairness_gaps"].rename(
+            columns={
+                "attribute": "Attribute",
+                "n_levels": "Levels",
+                "recall_min": "Recall min",
+                "recall_max": "Recall max",
+                "recall_gap": "Recall gap",
+                "fpr_gap": "FPR gap",
+            }
+        )
     return t
 
 
@@ -121,11 +183,13 @@ def latex_table(df: pd.DataFrame, nd=4) -> str:
     body = "\n".join(
         " & ".join(fmt(v) for v in row) + r" \\" for row in df.itertuples(index=False)
     )
+    # Uniform \footnotesize (set by the table environment), natural width, NO
+    # resizebox. resizebox scales every table to a fixed width, which blows up
+    # few-column tables and shrinks many-column ones (inconsistent fonts). Wide
+    # tables instead span two columns via the table* environment in main.tex.in.
     return (
-        # \linewidth = \columnwidth in `table`, \textwidth in `table*` — fits both.
-        "\\resizebox{\\linewidth}{!}{%\n"
         f"\\begin{{tabular}}{{{colspec}}}\n\\toprule\n{head}\n\\midrule\n{body}\n"
-        "\\bottomrule\n\\end{tabular}}"
+        "\\bottomrule\n\\end{tabular}"
     )
 
 

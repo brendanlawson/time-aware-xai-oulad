@@ -33,6 +33,21 @@ TECTONIC_CANDIDATES = (
     r"C:\Users\phank\anaconda3\envs\tex\Library\bin\tectonic.exe",
 )
 
+# Segoe UI ships with Windows and covers Vietnamese fully; elsewhere fall back to
+# the first installed face that also does.  fontspec halts if the face is absent.
+FONT_CANDIDATES = ("Segoe UI", "Noto Sans", "DejaVu Sans", "Liberation Sans")
+
+
+def pick_font() -> str:
+    fc_list = shutil.which("fc-list")
+    if fc_list is None:  # no fontconfig (Windows) -> Segoe UI is present
+        return FONT_CANDIDATES[0]
+    installed = subprocess.run(
+        [fc_list, ":lang=vi", "family"], capture_output=True, text=True, check=False
+    ).stdout
+    return next((n for n in FONT_CANDIDATES if n in installed), FONT_CANDIDATES[0])
+
+
 NAMES = {
     "xgb": "XGBoost",
     "lgbm": "LightGBM",
@@ -59,6 +74,7 @@ def benchmark_rows() -> pd.DataFrame:
 
 
 def build_tex() -> str:
+    font = pick_font()
     bench = benchmark_rows()
     cv = pd.read_csv(TAB / "cv_summary.csv").sort_values("recall_mean", ascending=False)
     fried = pd.read_csv(TAB / "model_friedman.csv")
@@ -88,14 +104,14 @@ def build_tex() -> str:
 %  DSP391m - Nhóm 1 | Báo cáo tiến độ - Phase 2: Benchmarking
 %  Sinh tự động từ reports/tables/*.csv bởi tools/build_progress_deck.py
 %  KHÔNG sửa số liệu trong file này - chạy lại builder sau mỗi renumber.
-%  Compile: tectonic Progress_Report_Slides.tex   (XeTeX, font Segoe UI)
+%  Compile: tectonic Progress_Report_Slides.tex   (XeTeX, font {font})
 % ============================================================
 \documentclass[aspectratio=169,11pt]{{beamer}}
 \usetheme{{default}}
 \setbeamertemplate{{navigation symbols}}{{}}
 \usepackage{{fontspec}}
-\setmainfont{{Segoe UI}}
-\setsansfont{{Segoe UI}}
+\setmainfont{{{font}}}
+\setsansfont{{{font}}}
 \usepackage{{booktabs}}
 \usepackage{{graphicx}}
 \graphicspath{{{{../figures/}}}}

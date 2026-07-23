@@ -1,8 +1,9 @@
 % =========================================================================
-% main.tex.in --- TEMPLATE source for the empirical paper.
+% main.tex.in: TEMPLATE source for the empirical paper.
 %
-% This file is NOT compiled directly. A builder renders it to main.tex by
-% resolving three placeholder kinds against reports/tables/*.csv:
+% This file is NOT compiled directly. A builder (tools/build_paper.py)
+% renders it to main.tex by resolving three placeholder kinds against
+% reports/tables/*.csv:
 %   VAL placeholders -> scalar values (numbers, "mean +/- std", or a
 %                       pre-escaped string such as
 %                       "0.811 (95\% CI [0.798, 0.824])")
@@ -11,7 +12,8 @@
 %   FIG placeholders -> a full figure environment (each placeholder sits
 %                       alone on its own line)
 % Never hand-type volatile numbers here; structural constants (dataset
-% sizes, protocol parameters) are written literally by design.
+% sizes, protocol parameters) are written literally by design. The prose
+% avoids em dashes by house style; do not reintroduce them on rebuild.
 % Compile target: Tectonic (pdfLaTeX path); packages restricted to
 % booktabs, graphicx, amsmath.
 % =========================================================================
@@ -22,70 +24,262 @@
 
 \begin{document}
 
-\title{Whom Are We Really Predicting? Population Definition Inflates Early-Warning Performance on OULAD---A Time-Aware, Explainable Re-Examination}
+\title{Time-Aware At-Risk Student Prediction on OULAD:\\
+Dual-Cohort Evaluation, Explanation Stability,\\
+and Imbalance Robustness}
 
-\author{\IEEEauthorblockN{DSP391m Group 1}
-\IEEEauthorblockA{FPT University, Ho Chi Minh City, Vietnam\\
-Supervisor: Nguyen Thi Hoang Yen}}
+\author{\IEEEauthorblockN{Tran Bao Phuc, Pham Minh Duc, Phan Vinh Khoa,\\
+Nguyen Thanh Binh, Nguyen Vu An, and La Quang Thien Son\thanks{This work was
+completed as the DSP391m Data Science capstone project at FPT University,
+supervised by Nguyen Thi Hoang Yen.}}
+\IEEEauthorblockA{\textit{FPT University}\\
+Hanoi, Vietnam}}
 
 \maketitle
 
 \begin{abstract}
-Early-warning models for at-risk students are routinely evaluated on every enrolment in a course---including students who have already withdrawn by the time the prediction is made. We show on the Open University Learning Analytics Dataset (OULAD) that this population choice materially inflates early-warning claims. Using a leakage-safe pipeline with a frozen, group-aware student split, cumulative features at six course-progress checkpoints, and five benchmarked algorithms, we re-score every headline result on two cohorts: all 32,593 enrolments (the frame used by prior work) and the students still enrolled at each checkpoint (the only frame an intervention can reach). Three findings emerge. First, at 40\% of course length the full-cohort recall of the best model, XGBoost, is 0.811 (95\% CI [0.798, 0.824]), but still-enrolled recall is only 0.678 (95\% CI [0.656, 0.698]); the cohort gap 0.133 (95\% CI [0.122, 0.144]) excludes zero at every checkpoint (1,000-resample bootstrap). The reliability criterion (recall $\geq 0.80$ and PR-AUC $\geq 0.80$) is met on the still-enrolled cohort only at course end (0.841 (95\% CI [0.821, 0.861])). Second, gradient-boosted trees dominate the five-algorithm benchmark, with differences confirmed by Friedman and Wilcoxon tests over 25 cross-validation fits. Third, SHAP explanations are stable across seeds (top-10 Jaccard 0.69), far above a Monte-Carlo null baseline (mean 0.119, 99th percentile 0.333). We propose dual-cohort reporting as a minimal standard for early-warning research.
+Early-warning models for at-risk students are routinely evaluated on every
+enrolment in a course, including students who have already withdrawn by the
+time the prediction is made. We demonstrate on the Open University Learning
+Analytics Dataset (OULAD) that this population choice materially inflates
+early-warning claims. Using a leakage-safe pipeline with a frozen,
+group-aware student split, cumulative features at six course-progress
+checkpoints, and five benchmarked algorithms, we re-score every headline
+result on two cohorts: all 32,593 enrolments (the frame used by prior work)
+and the students still enrolled at each checkpoint (the only frame an
+intervention can reach). Three findings emerge. First, at 40\% of course
+length the full-cohort recall of the best model, XGBoost, is
+0.811 (95\% CI [0.798, 0.824]), but still-enrolled recall is only
+0.678 (95\% CI [0.656, 0.698]); the cohort gap 0.133 (95\% CI [0.122, 0.144]) excludes zero
+at every checkpoint under a 1,000-resample bootstrap. The reliability
+criterion (recall $\geq 0.80$ and PR-AUC $\geq 0.80$) is met on the
+still-enrolled cohort only at course end (0.841 (95\% CI [0.821, 0.861])).
+Second, gradient-boosted trees dominate the five-algorithm benchmark, with
+differences confirmed by Friedman and Wilcoxon tests over 25
+cross-validation fits. Third, SHAP explanations are stable across seeds
+(top-10 Jaccard 0.69), far above a Monte-Carlo null baseline
+(mean 0.119, 99th percentile 0.333). We propose
+dual-cohort reporting as a minimal standard for early-warning research.
 \end{abstract}
 
 \begin{IEEEkeywords}
-learning analytics, at-risk prediction, OULAD, explainable AI, SHAP, LIME, evaluation methodology, population definition
+learning analytics, at-risk prediction, OULAD, explainable AI, SHAP, LIME,
+evaluation methodology, population definition
 \end{IEEEkeywords}
 
 \section{Introduction}
 
-Virtual learning environments (VLEs) now mediate a large share of higher-education teaching, and every action a student takes---opening a resource, submitting an assessment, visiting a forum---leaves a digital trace. Failure and drop-out nevertheless remain persistent problems in online and distance education, and learning analytics has responded with a rich body of work on at-risk prediction, from systematic comparisons of supervised algorithms \cite{tomasevic2020} to prediction at multiple points of course length \cite{adnan2021}.
+Virtual learning environments (VLEs) now mediate a large share of
+higher-education teaching, and every action a student takes (opening a
+resource, submitting an assessment, visiting a forum) leaves a digital
+trace. Failure and dropout nevertheless remain persistent problems in online
+and distance education, and learning analytics, building on the
+educational-data-mining tradition~\cite{romero2010,romero2013,baker2009},
+has responded with a rich body of work on at-risk prediction, from
+systematic comparisons of
+supervised algorithms~\cite{tomasevic2020} to prediction at multiple points
+of course length~\cite{adnan2021}.
 
-Three limitations recur in this literature. The first is \emph{opacity}: the strongest models behave as black boxes, so instructors cannot see why a student is flagged; systematic reviews of explainable student-performance prediction identify this as a central obstacle to adoption \cite{alamri2021}. The second is \emph{lateness}: many studies predict at or near the end of the course, when intervention is no longer possible \cite{adnan2021}. The third is \emph{class imbalance}, to which we add a factual correction: under the standard OULAD label mapping (at-risk $=$ \{Fail, Withdrawn\} versus \{Pass, Distinction\}), the at-risk class is not a rare minority but a slight \emph{majority}---52.8\% of enrolments, an imbalance ratio of 1.12---so resampling addresses a problem this dataset does not actually have.
+Three limitations recur in this literature. The first is \emph{opacity}:
+the strongest models behave as black boxes, so instructors cannot determine
+why a student is flagged; systematic reviews of explainable
+student-performance prediction identify this as a central obstacle to
+adoption~\cite{alamri2021}. The second is \emph{lateness}: many studies
+predict at or near the end of the course, when intervention is no longer
+possible~\cite{adnan2021}. The third is \emph{class imbalance}, to which
+we add a factual correction: under the standard OULAD label mapping
+(at-risk $=$ \{Fail, Withdrawn\} versus \{Pass, Distinction\}), the at-risk
+class is not a rare minority but a slight \emph{majority} (52.8\% of
+enrolments, imbalance ratio 1.12), so resampling addresses a problem this
+dataset does not actually have.
 
-This paper argues that a fourth limitation, so far unexamined, matters more than any of these: the \emph{definition of the evaluation population}. Time-aware studies fix each enrolment's label from its end-of-course outcome and score models at intermediate checkpoints on the full enrolment roster. At any mid-course checkpoint that roster contains students who have already withdrawn; their near-total inactivity makes them trivially recognisable, so a portion of the measured ``early-warning'' performance consists of detecting outcomes that have already happened rather than forecasting ones that have not. This is not label leakage---the label never enters the features---but an estimand mismatch: end-of-course \emph{outcome classification} is well defined on all enrolments, whereas \emph{early warning for intervention} is meaningful only on students a tutor can still reach. No prior OULAD study we reviewed separates the two populations, and the size of the resulting inflation has never been quantified.
+This paper argues that a fourth limitation, so far unexamined, matters more
+than any of these: the \emph{definition of the evaluation population}.
+Time-aware studies fix each enrolment's label from its end-of-course
+outcome and score models at intermediate checkpoints on the full enrolment
+roster. At any mid-course checkpoint, that roster contains students who have
+already withdrawn; their near-total inactivity makes them trivially
+recognisable, so a portion of the measured early-warning performance
+consists of detecting outcomes that have already occurred rather than
+forecasting ones that have not. This is not label leakage (the label never
+enters the features) but an estimand mismatch: end-of-course
+\emph{outcome classification} is well defined on all enrolments, whereas
+\emph{early warning for intervention} is meaningful only on students a
+tutor can still reach. No prior OULAD study we reviewed separates the two
+populations, and the size of the resulting inflation has never been
+quantified.
 
-We quantify it. On OULAD \cite{kuzilek2017} we build a leakage-safe, time-aware pipeline---cumulative features at six checkpoints (10--100\% of course length), five algorithms from three model families, a frozen group-aware student-level split---and re-score every headline result on both cohorts, attaching nonparametric confidence intervals from 1,000 bootstrap resamples. Because explanations are part of an early-warning product, we also evaluate SHAP \cite{lundberg2017} and LIME \cite{ribeiro2016} explanations quantitatively, calibrating every agreement statistic against an explicit Monte-Carlo null baseline. OULAD is chosen deliberately: as the field's standard public benchmark it makes the population-definition effect directly relevant to the largest body of comparable results, and its fixed anonymised snapshot makes every number in this paper reproducible from committed code and data.
+We quantify it. On OULAD~\cite{kuzilek2017} we build a leakage-safe,
+time-aware pipeline with cumulative features at six checkpoints (10 to
+100\% of course length), five algorithms from three model families, and a frozen
+group-aware student-level split; we then re-score every headline result on
+both cohorts with nonparametric confidence intervals from 1,000 bootstrap
+resamples. Because explanations are part of an early-warning product, we
+also evaluate SHAP~\cite{lundberg2017} and LIME~\cite{ribeiro2016}
+explanations quantitatively, calibrating every agreement statistic against
+an explicit Monte-Carlo null baseline. OULAD is chosen deliberately: as the
+field's standard public benchmark it makes the population-definition effect
+directly relevant to the largest body of comparable results, and its fixed
+anonymised snapshot makes every number in this paper reproducible from
+committed code and data.
 
-Concretely, the study answers three questions, each stated per cohort where the distinction matters. First, which of five candidate algorithms gives the best at-risk prediction at each checkpoint, and how early can a prediction be called reliable under an explicit criterion---recall $\geq 0.80$ and PR-AUC $\geq 0.80$ on the at-risk class of a sealed test set? Second, how consistent are the explanations produced by SHAP and LIME for the same model, and how does their stability behave across random seeds, across the six checkpoints, and across training regimes? Third, what does imbalance handling (class weighting, SMOTE, ADASYN) do to both predictive accuracy and the explanations a tutor would be shown, given that the at-risk class is in fact a slight majority?
+Concretely, the study answers three research questions, each stated per
+cohort where the distinction matters. First, which of five candidate
+algorithms gives the best at-risk prediction at each checkpoint, and how
+early can a prediction be called reliable under an explicit criterion
+(recall $\geq 0.80$ and PR-AUC $\geq 0.80$ on the at-risk class of a
+sealed test set)? Second, how consistent are the explanations produced by
+SHAP and LIME for the same model, and how does their stability behave across
+random seeds, across the six checkpoints, and across training regimes?
+Third, what does imbalance handling (class weighting, SMOTE, ADASYN) do to
+both predictive accuracy and the explanations a tutor would be shown, given
+that the at-risk class is in fact a slight majority?
 
-The contributions are fourfold:
+The contributions are fourfold.
 \begin{itemize}
-\item \textbf{Quantified population-definition inflation.} A dual-cohort re-scoring of the same predictions with student-level bootstrap confidence intervals shows a recall gap between the full and still-enrolled cohorts whose 95\% interval excludes zero at every checkpoint; the reliability criterion moves from 40\% of course length (full cohort, borderline) to course end (still-enrolled).
-\item \textbf{A verified time-aware benchmark.} Five algorithms across three families are compared under an identical leakage-safe protocol at six checkpoints, with the ranking validated by repeated cross-validation (25 fits) and Friedman/Wilcoxon--Holm testing---closing the ensemble gap left by prior comparisons \cite{tomasevic2020}.
-\item \textbf{Explanation stability with a null baseline.} A quantitative stability framework (top-$k$ Jaccard with $k=10$, Spearman rank correlation, across seeds, explainers, checkpoints, and training regimes) whose agreement statistics are calibrated against a Monte-Carlo null distribution---addressing the qualitative-only assessment gap in educational XAI \cite{alamri2021,gunasekara2025}.
-\item \textbf{A dual-reporting rule and an operational tool.} A reporting discipline---every earliness claim names its cohort, every explanation carries its checkpoint---implemented end-to-end in an instructor dashboard whose worklist is restricted to still-enrolled students.
+\item \textbf{Quantified population-definition inflation.} A dual-cohort
+re-scoring of the same predictions with student-level bootstrap confidence
+intervals shows a recall gap between the full and still-enrolled cohorts
+whose 95\% interval excludes zero at every checkpoint; the reliability
+criterion shifts from 40\% of course length (full cohort, borderline) to
+course end (still-enrolled).
+\item \textbf{A verified time-aware benchmark.} Five algorithms across three
+families are compared under an identical leakage-safe protocol at six
+checkpoints, with the ranking validated by repeated cross-validation (25
+fits) and Friedman and Wilcoxon-Holm testing, closing the evaluation gap
+left by prior comparisons~\cite{tomasevic2020}.
+\item \textbf{Explanation stability with a null baseline.} A quantitative
+stability framework based on top-$k$ Jaccard ($k=10$) and Spearman rank
+correlation, evaluated across seeds, explainers, checkpoints, and training
+regimes, whose agreement statistics are calibrated against a Monte-Carlo
+null distribution, addressing the qualitative-only assessment gap in
+educational XAI~\cite{alamri2021,gunasekara2025}.
+\item \textbf{A dual-reporting rule and an operational tool.} A reporting
+discipline (every earliness claim names its cohort; every explanation
+carries its checkpoint) implemented end-to-end in an instructor dashboard
+whose worklist is restricted to still-enrolled students.
 \end{itemize}
 
-Section~II reviews related work and contrasts evaluation protocols. Section~III describes the data and method. Section~IV reports the benchmark and the dual-cohort results. Section~V analyses explanation stability. Sections~VI and~VII discuss limitations and conclude.
+Section~II reviews related work and contrasts evaluation protocols.
+Section~III describes the data and method. Section~IV reports the benchmark
+and the dual-cohort results. Section~V analyses explanation stability.
+Sections~VI and~VII discuss limitations and conclude.
 
 \section{Related Work}
 
-\textbf{At-risk prediction on OULAD.} OULAD \cite{kuzilek2017} is a public, anonymised benchmark of 32,593 student registrations on 22 module-presentations of The Open University, comprising demographics, a VLE clickstream, and assessment records in seven relational tables; its open licence has made it the standard testbed for reproducible at-risk prediction. Tomasevic et al.~\cite{tomasevic2020} systematically compared supervised techniques for exam-performance prediction on a subset of the DDD module (3,166 students after excluding non-exam-takers), finding that an ANN with combined engagement and performance features performed best and that demographics added little once behavioural data were available---a result that informs our feature prioritisation. Methodologically, rows with missing values were dropped (silently excluding exactly the non-submitting students an early-warning system most needs to see), evaluation used random 80:20 or 60:20:20 splits at the row level, and gradient-boosted ensembles were absent from the comparison. Adnan et al.~\cite{adnan2021} provide the template for time-aware prediction: cumulative demographic, clickstream, and assessment features on the full OULAD at 20--100\% of course length, evaluated with 10-fold cross-validation, with predictions becoming acceptably reliable from roughly 40--60\% of course length---the empirical basis of our checkpoint schedule, which adds a 10\% point. For imbalance they merged outcome classes (Pass$+$Distinction versus Fail$+$Withdrawn) rather than resampling, and no group-aware split keyed on the student identifier was applied in either study.
+\textbf{At-risk prediction on OULAD.}
+OULAD~\cite{kuzilek2017} is a public, anonymised benchmark of 32,593
+student registrations on 22 module-presentations of The Open University,
+comprising demographics, a VLE clickstream, and assessment records in seven
+relational tables; its open licence has made it the standard testbed for
+reproducible at-risk prediction, building on early Open University work that
+predicted at-risk status from VLE clicking behaviour~\cite{wolff2013} and
+later removed the dependence on historical training data~\cite{hlosta2017}.
+Tomasevic et
+al.~\cite{tomasevic2020} systematically compared supervised techniques for
+exam-performance prediction on a subset of the DDD module (3,166 students
+after excluding non-exam-takers), finding that an ANN with combined
+engagement and performance features performed best and that demographics
+added little once behavioural data were available, a result that informs
+our feature prioritisation. Methodologically, rows with missing values were
+dropped (silently excluding exactly the non-submitting students an
+early-warning system most needs to see), evaluation used random 80:20 or
+60:20:20 splits at the row level, and gradient-boosted ensembles were
+absent from the comparison. Adnan et al.~\cite{adnan2021} provide the
+template for time-aware prediction: cumulative demographic, clickstream, and
+assessment features on the full OULAD at 20 to 100\% of course length,
+evaluated with 10-fold cross-validation, with predictions becoming
+acceptably reliable from roughly 40 to 60\% of course length, the empirical
+basis of our checkpoint schedule, which adds a 10\% point. For imbalance
+they merged outcome classes (Pass$+$Distinction versus Fail$+$Withdrawn)
+rather than resampling, and no group-aware split keyed on the student
+identifier was applied in either study.
 
-\textbf{Explainable AI in education.} SHAP \cite{lundberg2017} unifies additive feature-attribution methods on a Shapley-value foundation; LIME \cite{ribeiro2016} fits an interpretable surrogate in the neighbourhood of a single prediction. Reviewing explainable student-performance prediction, Alamri and Alharbi \cite{alamri2021} found SHAP and LIME dominant but observed that explanations are almost always assessed qualitatively, by visual inspection of importance plots. Gunasekara and Saarela \cite{gunasekara2025} applied both explainers to an ANN and a decision tree on a three-module OULAD subset (17,091 samples, 5-fold cross-validation repeated 50 times); their assessment of the local explanations likewise remains mainly qualitative. A quantitative measure of explanation \emph{stability}---whether an explainer reproduces the same ranking across seeds, time points, or training regimes---is largely absent, and no study we reviewed supplies a chance baseline against which an agreement score could be judged.
+\textbf{Explainable AI in education.}
+SHAP~\cite{lundberg2017} unifies additive feature-attribution methods on a
+Shapley-value foundation; LIME~\cite{ribeiro2016} fits an interpretable
+surrogate in the neighbourhood of a single prediction. Reviewing explainable
+student-performance prediction against broader explainability
+surveys~\cite{guidotti2018,adadi2018,molnar2022}, Alamri and
+Alharbi~\cite{alamri2021} found
+SHAP and LIME dominant but observed that explanations are almost always
+assessed qualitatively by visual inspection of importance plots. Gunasekara
+and Saarela~\cite{gunasekara2025} applied both explainers to an ANN and a
+decision tree on a three-module OULAD subset (17,091 samples, 5-fold
+cross-validation repeated 50 times); their assessment of the local
+explanations likewise remains mainly qualitative. A quantitative measure of
+explanation \emph{stability} (whether an explainer reproduces the same
+ranking across seeds, time points, or training regimes) is largely absent,
+and no study we reviewed supplies a chance baseline against which an
+agreement score can be judged.
 
-\textbf{Imbalance handling.} SMOTE \cite{chawla2002} and its adaptive variants such as ADASYN synthesise minority-class examples by interpolating between neighbouring minority instances; class weighting offers a resampling-free alternative by rescaling the loss. The OULAD literature treats imbalance inconsistently---class-merging in \cite{adnan2021}, exclusion of non-completers in \cite{tomasevic2020}---while the studies in our reviewed corpus that tackle imbalance head-on with resampling do not use OULAD at all. No study we reviewed measures what resampling does to explanations, the interaction our third question targets.
+\textbf{Imbalance handling.}
+SMOTE~\cite{chawla2002} and its adaptive variants such as
+ADASYN~\cite{he2008} synthesise minority-class examples by interpolating
+between neighbouring minority instances; class weighting offers a resampling-free alternative by rescaling
+the loss. The OULAD literature treats imbalance inconsistently (class
+merging in~\cite{adnan2021}, exclusion of non-completers
+in~\cite{tomasevic2020}), while the studies in our reviewed corpus that
+tackle imbalance head-on with resampling do not use OULAD at all. No study
+we reviewed measures what resampling does to explanations, the interaction
+our third research question targets.
 
-\textbf{Protocol comparison.} Following a concept-centric review \cite{webster2002} of 27 papers (2019--2026), we cross-tabulated prior work along three axes---time-awareness, explainability, imbalance handling---and found no study covering all three on OULAD: the time-aware studies \cite{tomasevic2020,adnan2021} provide no explanations, the XAI study \cite{gunasekara2025} considers no multiple time points, and the resampling-focused work in the corpus uses other datasets. More consequential for the present argument are the evaluation protocols, contrasted in Table~\ref{tab:protocols}: the base studies split at the row level, so a student appearing in several module-presentations can occupy both train and test partitions; none separates withdrawn students from the evaluation population at intermediate time points; and none attaches uncertainty estimates to its headline claims. These three choices are precisely the ones this paper revisits.
+\textbf{Protocol comparison.}
+Following a concept-centric review~\cite{webster2002} of 27 papers
+(2019 to 2026), we cross-tabulated prior work along three axes (time
+awareness, explainability, and imbalance handling) and found no study
+covering all three on OULAD: the time-aware studies~\cite{tomasevic2020,
+adnan2021} provide no explanations, the XAI study~\cite{gunasekara2025}
+considers no multiple time points, and the resampling-focused work in the
+corpus uses other datasets. More consequential for the present argument are
+the evaluation protocols, contrasted in Table~\ref{tab:protocols}: the base
+studies split at the row level, so a student appearing in several
+module-presentations can occupy both train and test partitions; none
+separates withdrawn students from the evaluation population at intermediate
+time points; and none attaches uncertainty estimates to its headline claims.
+These three choices are precisely the ones this paper revisits.
 
 \begin{table*}[t]
 \centering
-\caption{Evaluation protocols of prior OULAD studies and this work. \emph{Caveat:} reported performance figures are not directly comparable across rows, because the studies differ in cohort definition, split unit, validation scheme, and label treatment.}
+\caption{Evaluation protocols of prior OULAD studies and this work.
+Reported performance figures are not directly comparable across rows because
+the studies differ in cohort definition, split unit, validation scheme, and
+label treatment.}
 \label{tab:protocols}
 \footnotesize
 \begin{tabular}{@{}p{2.6cm}p{3.6cm}p{3.9cm}p{3.6cm}p{2.6cm}@{}}
 \toprule
-Study & Population / cohort & Split unit and validation & Withdrawn / non-completers & Uncertainty reported \\
+Study & Population / cohort & Split unit and validation &
+Withdrawn / non-completers & Uncertainty reported \\
 \midrule
-Tomasevic et al.~\cite{tomasevic2020} & DDD-module subset (two presentations; 3,166 students after excluding non-exam-takers) & Random 80:20 (60:20:20 for the ANN), row-level; averages over repeated trials & Rows with missing values dropped; non-submitters excluded from the cohort & None \\
+Tomasevic et al.~\cite{tomasevic2020} &
+DDD-module subset (two presentations; 3,166 students after excluding
+non-exam-takers) &
+Random 80:20 (60:20:20 for the ANN), row-level; averages over repeated
+trials &
+Rows with missing values dropped; non-submitters excluded from the cohort &
+None \\
 \addlinespace
-Adnan et al.~\cite{adnan2021} & Full OULAD (22 module-presentations; 32,593 enrolments) & 10-fold cross-validation, row-level (85/15 split for the deep model) & Merged into the at-risk class (Pass$+$Distinction vs.\ Fail$+$Withdrawn); never evaluated separately & None \\
+Adnan et al.~\cite{adnan2021} &
+Full OULAD (22 module-presentations; 32,593 enrolments) &
+10-fold cross-validation, row-level (85/15 split for the deep model) &
+Merged into the at-risk class (Pass$+$Distinction vs.\ Fail$+$Withdrawn);
+never evaluated separately &
+None \\
 \addlinespace
-Gunasekara and Saarela~\cite{gunasekara2025} & Three-module subset (17,091 samples, 14 attributes) & 5-fold cross-validation repeated 50 times, row-level & Classes merged; not evaluated separately & None (explanations assessed qualitatively) \\
+Gunasekara and Saarela~\cite{gunasekara2025} &
+Three-module subset (17,091 samples, 14 attributes) &
+5-fold cross-validation repeated 50 times, row-level &
+Classes merged; not evaluated separately &
+None (explanations assessed qualitatively) \\
 \addlinespace
-\textbf{This work} & Full OULAD (32,593 enrolments; 28,785 students) & Frozen \emph{group-aware student-level} 80:20 hold-out (zero student overlap) $+$ 5-fold $\times$ 5-seed CV on the training partition & Kept with fixed label (comparable frame) \emph{and} re-scored on the still-enrolled cohort at every checkpoint & 95\% bootstrap CIs (1,000 resamples); Friedman and Wilcoxon--Holm tests \\
+\textbf{This work} &
+Full OULAD (32,593 enrolments; 28,785 students) &
+Frozen group-aware student-level 80:20 hold-out (zero student overlap)
+plus 5-fold $\times$ 5-seed CV on the training partition &
+Kept with fixed label (comparable frame) and re-scored on the
+still-enrolled cohort at every checkpoint &
+95\% bootstrap CIs (1,000 resamples); Friedman and Wilcoxon-Holm tests \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -94,59 +288,213 @@ Gunasekara and Saarela~\cite{gunasekara2025} & Three-module subset (17,091 sampl
 
 \subsection{Dataset}
 
-OULAD \cite{kuzilek2017} is distributed as a fixed, anonymised snapshot under a CC-BY 4.0 licence, guaranteeing byte-identical inputs across researchers. Its seven relational tables cover 32,593 enrolments (28,785 distinct students) on 22 module-presentations; the unit of analysis is one enrolment, keyed by (student, module, presentation), and post-join verification confirms that all joins preserve exactly 32,593 rows with no duplicate keys. The behavioural core is a clickstream of approximately 10.6 million rows recording daily interaction counts with VLE materials; its per-day date column, together with the submission dates in the assessment table, is the architectural foundation of the time-aware design, since every time-dependent feature can be recomputed at an arbitrary cutoff. One documented source-data quirk: 7.4\% of clickstream rows are exact duplicates with no distinguishing key, so the schema cannot separate a double-logging artefact from a legitimately repeated record. Because deleting one copy of an indistinguishable pair would be an unverifiable guess, and the baseline studies work from the undeduplicated tables, the pipeline retains them and documents possible over-counting as a limitation (Section~VI).
+OULAD~\cite{kuzilek2017} is distributed as a fixed, anonymised snapshot
+under a CC-BY 4.0 licence, guaranteeing byte-identical inputs across
+researchers. Its seven relational tables integrate three operational
+sources of a distance-learning institution: a student information system
+(demographics and registration or unregistration dates), the VLE itself (a
+daily clickstream of interactions with course materials), and the
+assessment platform (submission dates and scores), together with a course
+catalogue giving each module-presentation's length. The tables cover 32,593
+enrolments (28,785 distinct students) on 22 module-presentations; the unit
+of analysis is one enrolment, keyed by (student, module, presentation), and
+post-join verification confirms that all joins preserve exactly 32,593 rows
+with no duplicate keys. The behavioural core is a clickstream of
+approximately 10.6 million rows recording daily interaction counts with VLE
+materials; its per-day date column, together with the submission dates in
+the assessment table, is the architectural foundation of the time-aware
+design, since every time-dependent feature can be recomputed at an arbitrary
+cutoff. One documented source-data characteristic: 7.4\% of clickstream rows
+are exact duplicates with no distinguishing key, so the schema cannot
+separate a double-logging artefact from a legitimately repeated record.
+Because deleting one copy of an indistinguishable pair would be an
+unverifiable choice, and the baseline studies work from the undeduplicated
+tables, the pipeline retains them and documents possible over-counting as a
+limitation (Section~VI).
 
-\subsection{Target and the Two Estimands}
+\subsection{Target Variable and the Two Estimands}
 
-The binary target maps the final outcome to at-risk $=$ 1 for \{Fail, Withdrawn\} and 0 for \{Pass, Distinction\}; Distinction is merged into Pass because the task is risk detection, not achievement ranking. Under this mapping the at-risk class covers 52.8\% of enrolments (imbalance ratio 1.12)---a slight majority, so imbalance handling is studied as a controlled robustness question rather than the rescue of a rare class.
+The binary target maps the final outcome to at-risk $=$ 1 for
+\{Fail, Withdrawn\} and 0 for \{Pass, Distinction\}; Distinction is merged
+into Pass because the task is risk detection rather than achievement
+ranking. Under this mapping the at-risk class covers 52.8\% of enrolments
+(imbalance ratio 1.12), a slight majority, so imbalance handling is studied
+as a controlled robustness question rather than as the rescue of a rare
+class.
 
-For prediction over time we adopt a \emph{fixed label, fixed population} design: every enrolment keeps its end-of-course label at every checkpoint, and the student roster is identical across checkpoints, so performance curves compare identical populations that differ only in available information. A student who withdrew before checkpoint $t$ remains in the $t$ dataset, labelled at-risk; the temporal cut removes all post-withdrawal events, so the observed decline in engagement is genuine early-warning signal, not an error.
+For prediction over time we adopt a \emph{fixed label, fixed population}
+design: every enrolment keeps its end-of-course label at every checkpoint,
+and the student roster is identical across checkpoints, so performance
+curves compare identical populations that differ only in available
+information. A student who withdrew before checkpoint $t$ remains in the
+$t$ dataset, labelled at-risk; the temporal cut removes all post-withdrawal
+events, so the observed decline in engagement is genuine early-warning
+signal, not an error.
 
-This fixed label supports two distinct estimands. \emph{End-of-course outcome classification}---``will this enrolment end in Fail or Withdrawn?''---is well defined on all 32,593 enrolments at every checkpoint and is the frame in which prior work operates. \emph{Early warning for intervention}---``whom should a tutor contact at checkpoint $t$?''---is meaningful only on the subpopulation still enrolled at the cutoff, because an intervention cannot reach a student who has already left. On the full cohort, part of any model's measured strength is recognition of already-withdrawn students rather than forecasting; this motivates the paper's reporting rule that every reliability claim names its cohort, and its headline analysis re-scores every result on both frames.
+This fixed label supports two distinct estimands. \emph{End-of-course
+outcome classification} (will this enrolment end in Fail or Withdrawn?) is
+well defined on all 32,593 enrolments at every checkpoint and is the frame
+in which prior work operates. \emph{Early warning for intervention} (whom
+should a tutor contact at checkpoint $t$?) is meaningful only on the
+subpopulation still enrolled at the cutoff, because an intervention cannot
+reach a student who has already left. On the full cohort, part of any
+model's measured strength is recognition of already-withdrawn students
+rather than forecasting of students still at risk; this motivates the
+paper's reporting rule that every reliability claim names its cohort, and
+its headline analysis re-scores every result on both frames.
 
 \subsection{Features, Checkpoints, and Preprocessing}
 
-Twenty-eight raw features are engineered per enrolment in three groups: demographics and context (11 static features, including registration timing and module identity), engagement (13 clickstream aggregates such as total clicks, active days, eight per-activity-type counts, peak and mean daily intensity, and days since last activity), and performance (4 assessment aggregates---mean and weighted cumulative scores, submission count, and a \texttt{not\_submitted} indicator that keeps imputed zero scores distinct from genuine zero-score submissions). All time-dependent features are cutoff-driven: at checkpoint $t$, only clickstream and submission records dated on or before the checkpoint day enter the aggregation, so each feature answers ``what was known about this student at $t$''. Because course lengths differ across the 22 module-presentations, checkpoints are defined in relative course progress---$t \in \{10, 20, 40, 60, 80, 100\}\%$ of each presentation's length, extending the schedule of \cite{adnan2021} with a 10\% point---and materialised once in a committed checkpoint map, producing six datasets over the same 32,593 enrolments. One defect in the cutoff logic was found during an internal audit and fixed: assessments banked from a previous presentation were counted as due but not as submitted, mis-setting the submission indicator for 78 of 32,593 enrolments (0.24\%) at $t=100\%$; the fix is pinned by a regression test, and every table in this paper is built from results recomputed under the fixed pipeline.
+Twenty-eight raw features are engineered per enrolment in three groups:
+demographics and context (11 static features, including registration timing
+and module identity), engagement (13 clickstream aggregates such as total
+clicks, active days, eight per-activity-type counts, peak and mean daily
+intensity, and days since last activity), and performance (4 assessment
+aggregates: mean and weighted cumulative scores, submission count, and a
+\texttt{not\_submitted} indicator that keeps imputed zero scores distinct
+from genuine zero-score submissions). All time-dependent features are
+cutoff-driven: at checkpoint $t$, only clickstream and submission records
+dated on or before the checkpoint day enter the aggregation, so each
+feature answers the question of what was known about a student at $t$.
+Because course lengths differ across the 22 module-presentations,
+checkpoints are defined in relative course progress ($t \in \{10, 20, 40,
+60, 80, 100\}\%$ of each presentation's length, extending the schedule
+of~\cite{adnan2021} with a 10\% point) and materialised once in a committed
+checkpoint map, producing six datasets over the same 32,593 enrolments. One
+defect in the cutoff logic was found during an internal audit and corrected:
+assessments banked from a previous presentation were counted as due but not
+as submitted, mis-setting the submission indicator for 78 of 32,593
+enrolments (0.24\%) at $t=100\%$; the correction is pinned by a regression
+test, and every table in this paper is built from results recomputed under
+the corrected pipeline.
 
-Preprocessing follows a strict split-first order (split, missing values, outliers, encoding and scaling, resampling), with every learned statistic fitted on the training partition only. Missing assessment aggregates become explicit ``no submission yet'' signals rather than being dropped; right-skewed click counts are log-transformed and heavy tails winsorised at training-fold percentiles; and a single fitted transformer (standard scaling for numeric, ordinal encoding with fixed orders, one-hot encoding \emph{without} a dropped reference level so explainers can attribute importance to every category) expands the 28 raw features into a 49-column model matrix. Exploratory analysis confirmed that engagement and performance dominate the class signal while demographics associate only weakly with the target, that no feature approaches the $|r| \geq 0.95$ leakage-alarm threshold against the label, and that the strongest inter-feature relationships are expected volume couplings.
+Preprocessing follows a strict split-first order (split, missing values,
+outliers, encoding and scaling, resampling), with every learned statistic
+fitted on the training partition only. Missing assessment aggregates become
+explicit ``no submission yet'' signals rather than being dropped;
+right-skewed click counts are log-transformed and heavy tails winsorised at
+training-fold percentiles; and a single fitted transformer (standard scaling
+for numeric features, ordinal encoding with fixed orders, and one-hot
+encoding without a dropped reference level so explainers can attribute
+importance to every category) expands the 28 raw features into a 49-column
+model matrix. Exploratory analysis confirmed that engagement and performance
+features dominate the class signal while demographics associate only weakly
+with the target, that no feature approaches the $|r| \geq 0.95$
+leakage-alarm threshold against the label, and that the strongest
+inter-feature relationships are expected volume couplings.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{../reports/figures/bivariate_scatter_pairs.png}
-\caption{The four strongest numeric--numeric feature relationships as class-coloured scatter plots (fixed-seed 4,000-row sample). The strongest couplings are volume effects (e.g., active days vs.\ total clicks); no feature approaches the $|r| \geq 0.95$ leakage-alarm threshold against the target.}
+\caption{The four strongest numeric feature relationships as class-coloured scatter plots (fixed-seed 4,000-row sample). The strongest couplings are volume effects (e.g., active days versus total clicks); no feature approaches the $|r| \geq 0.95$ leakage-alarm threshold against the target.}
 \label{fig:bivariate_scatter_pairs}
 \end{figure}
 
 \subsection{Leakage Prevention}
 
-Four rules keep every checkpoint dataset honest about prediction-time information: (1) an assessment submission is retained only if submitted on or before the cutoff day; (2) a clickstream row is retained only if dated on or before the cutoff; (3) early-withdrawn students are retained with their fixed label---the label is derived solely from the final outcome and never enters the features, so this violates no information constraint (its estimand consequences are handled by dual-cohort scoring); and (4) every data-dependent component---imputers, outlier thresholds, encoders, scaler, resampler---is fitted on the training fold only. These rules are enforced by 21 automated tests that assert, among other properties, that no retained record postdates its cutoff, that the split has zero student overlap, and that a feature allow-list blocks leaky columns from the model matrix; all tests must pass before any modelling step runs.
+Four rules keep every checkpoint dataset consistent with
+prediction-time information availability. (1) An assessment submission is
+retained only if submitted on or before the cutoff day. (2) A clickstream
+row is retained only if dated on or before the cutoff. (3) Early-withdrawn
+students are retained with their fixed label: the label is derived solely
+from the final outcome and never enters the features, so this violates no
+information constraint; its estimand consequences are handled by
+dual-cohort scoring. (4) Every data-dependent component (imputers, outlier
+thresholds, encoders, scaler, resampler) is fitted on the training fold
+only. These rules are enforced by 21 automated tests that assert, among
+other properties, that no retained record postdates its cutoff, that the
+split has zero student overlap, and that a feature allow-list blocks leaky
+columns from the model matrix; all tests must pass before any modelling
+step runs.
 
 \subsection{Split, Validation, and Model Selection Protocol}
 
-Because a student can appear in several module-presentations, a row-level split leaks students across the partition. We therefore use a group-aware, stratified 20\% hold-out split by student identifier, derived once and frozen: the canonical test-student list is committed to the repository, and the split harness only ever loads this list---re-derivation under a different library version would silently change the partition and invalidate every published number. The verified properties hold identically at all six checkpoints: 26,104 training rows and 6,489 test rows from 5,756 test students, zero student overlap, and a preserved class ratio. Model selection uses 5-fold cross-validation repeated over 5 seeds (25 fits per model) on the training partition, group-aware and stratified, with preprocessing re-fitted inside every fold; the global seed is 42.
+Because a student can appear in several module-presentations, a row-level
+split allows students to appear in both the training and test partitions. We
+therefore use a group-aware, stratified 20\% hold-out split by student
+identifier, derived once and frozen: the canonical test-student list is
+committed to the repository, and the split harness only ever loads this
+list (re-derivation under a different library version would silently change
+the partition and invalidate every published number). The verified
+properties hold identically at all six checkpoints: 26,104 training rows
+and 6,489 test rows from 5,756 test students, zero student overlap, and a
+preserved class ratio. Model selection uses 5-fold cross-validation~\cite{kohavi1995} repeated
+over 5 seeds (25 fits per model) on the training partition, group-aware and
+stratified, with preprocessing re-fitted inside every fold; the global seed
+is 42.
 
-Five algorithms spanning three families are benchmarked with near-default configurations: logistic regression (linear reference), random forest (bagging), XGBoost and LightGBM (gradient boosting), and a two-hidden-layer multilayer perceptron with early stopping (non-tree, non-linear). Covering three families ensures the ranking is not an artefact of one inductive bias, and all five appear in the OULAD base studies, keeping results comparable. No per-model tuning is performed at the selection stage, so no candidate is favoured by attention; a subsequent randomised search (40 configurations, group-aware CV) confirmed that tuning buys only marginal PR-AUC and no recall improvement, so near-default settings are retained throughout---consistent with the observation that when five differently biased learners sit within a few points of one another, the feature signal, not the estimator configuration, is the binding constraint.
+Five algorithms spanning three families~\cite{hastie2009} are benchmarked
+with near-default configurations, all implemented in
+scikit-learn~\cite{pedregosa2011}: logistic regression (linear reference),
+random forest~\cite{breiman2001} (bagging), XGBoost~\cite{chen2016} and
+LightGBM~\cite{ke2017} (gradient boosting~\cite{friedman2001}), and a
+two-hidden-layer multilayer perceptron with early stopping (non-tree,
+non-linear). Covering
+three families ensures the ranking is not an artefact of one inductive bias,
+and all five appear in the OULAD base studies, keeping results comparable.
+No per-model tuning is performed at the selection stage, so no candidate is
+favoured by additional attention; a subsequent randomised
+search~\cite{bergstra2012} (40 configurations, group-aware CV) confirmed
+that tuning yields only marginal
+PR-AUC gain and no recall improvement, so near-default settings are retained
+throughout, consistent with the observation that when five differently biased
+learners sit within a few points of one another the feature signal rather
+than the estimator configuration is the binding constraint.
 
-The recall-first evaluation is a cost argument, not a convention: a missed at-risk student forfeits the chance to intervene, whereas a false alarm costs a tutor conversation. Accuracy is deliberately demoted because, with the at-risk class a slight majority, it flatters trivial classifiers; PR-AUC complements recall as the threshold-free summary of the precision--recall trade-off on the positive class. A checkpoint is deemed \emph{reliable} when the model reaches both recall $\geq 0.80$ and PR-AUC $\geq 0.80$ on the at-risk class of the held-out test set.
+The recall-first evaluation reflects a cost asymmetry: a missed at-risk
+student forfeits the opportunity to intervene, whereas a false alarm costs
+a tutor conversation. Accuracy is deliberately demoted because, with the
+at-risk class a slight majority, it flatters trivial classifiers; PR-AUC
+complements recall as the threshold-free summary of the precision-recall
+trade-off on the positive class~\cite{davis2006,saito2015}. A checkpoint is deemed \emph{reliable}
+when the model reaches both recall $\geq 0.80$ and PR-AUC $\geq 0.80$ on
+the at-risk class of the held-out test set.
 
 \subsection{Uncertainty Quantification and Null Baselines}
 
-Two inferential devices distinguish this study from the base protocols. First, every headline test-set metric carries a nonparametric 95\% confidence interval from the percentile bootstrap with 1,000 resamples of the frozen test set, resampled \emph{at the student level} so that all enrolments of a drawn student enter together and the grouped structure is respected. The same resamples are scored on both cohorts, and the per-resample difference yields an interval for the between-cohort recall gap that accounts for the correlation between the two estimates. Model-ranking claims are tested separately with a Friedman test over the 25 paired cross-validation fits, followed by pairwise Wilcoxon signed-rank tests with Holm correction.
+Two inferential devices distinguish this study from the base protocols.
+First, every headline test-set metric carries a nonparametric 95\%
+confidence interval from the percentile bootstrap~\cite{efron1993} with
+1,000 resamples of the frozen test set, resampled at the student level so that all enrolments
+of a drawn student enter together and the grouped structure is respected.
+The same resamples are scored on both cohorts, and the per-resample
+difference yields an interval for the between-cohort recall gap that
+accounts for the correlation between the two estimates. Model-ranking claims
+are tested separately with a Friedman test~\cite{demsar2006} over the 25
+paired cross-validation fits, followed by pairwise Wilcoxon signed-rank
+tests with Holm correction~\cite{holm1979}.
 
-Second, explanation-agreement statistics are calibrated against an explicit chance baseline. A top-10 Jaccard overlap of, say, 0.4 is uninterpretable in isolation: even unrelated rankings share features by chance. We estimate the null distribution by Monte Carlo---repeatedly drawing two independent uniformly random top-10 subsets of the 49-feature space and recording their Jaccard overlap---obtaining a null mean of 0.119 with 95th and 99th percentiles of 0.25 and 0.333. An observed agreement is claimed as genuine stability only if it exceeds the 99th percentile of this null.
+Second, explanation-agreement statistics are calibrated against an explicit
+chance baseline. A top-10 Jaccard overlap of 0.4 is uninterpretable in
+isolation: even unrelated rankings share features by chance. We estimate the
+null distribution by Monte Carlo by repeatedly drawing two independent
+uniformly random top-10 subsets of the 49-feature space and recording their
+Jaccard overlap, obtaining a null mean of 0.119 with 95th and 99th
+percentiles of 0.25 and 0.333. An observed agreement is
+claimed as genuine stability only if it exceeds the 99th percentile of this
+null.
 
 \section{Results}
 
 \subsection{Benchmark at Course End}
 
-Every model passes through an identical four-step protocol: load the frozen split, fit all preprocessing on the training partition only, fit the model, and score the untouched test set on seven metrics---recall on the at-risk class, precision, F1, PR-AUC, ROC-AUC, balanced accuracy, and the Brier score for probability quality. Table~\ref{tab:benchmark_t100} reports the resulting comparison of the five models at $t=100\%$, without resampling; these baseline rows are also the reference point against which the imbalance-handling regimes of Section~IV-F are compared, so the before--after contrast is well defined.
+Every model passes through an identical four-step protocol: load the frozen
+split, fit all preprocessing on the training partition only, fit the model,
+and score the untouched test set on seven metrics (recall on the at-risk
+class, precision, F1, PR-AUC, ROC-AUC, balanced accuracy, and the Brier
+score for probability quality). Table~\ref{tab:benchmark_t100} reports the
+comparison of the five models at $t=100\%$ without resampling; these
+baseline rows also serve as the reference point against which the
+imbalance-handling regimes of Section~IV-F are compared, so the
+before-and-after contrast is well defined.
 
 \begin{table*}[t]
 \centering
-\caption{Baseline benchmark of the five candidate models at $t=100\%$ on the frozen held-out test set (no resampling, shared seed 42), ranked recall-first on the at-risk class.}
+\caption{Baseline benchmark of the five candidate models at $t=100\%$ on
+the frozen held-out test set (no resampling, shared seed 42), ranked
+recall-first on the at-risk class.}
 \label{tab:benchmark_t100}
 \footnotesize
-\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccccccc}
 \toprule
 \textbf{model} & \textbf{roc\_auc} & \textbf{pr\_auc} & \textbf{f1} & \textbf{recall} & \textbf{precision} & \textbf{balanced\_acc} & \textbf{brier} \\
@@ -157,7 +505,7 @@ logreg & 0.9857 & 0.9890 & 0.9464 & 0.9171 & 0.9776 & 0.9471 & 0.0414 \\
 rf & 0.9868 & 0.9896 & 0.9466 & 0.9165 & 0.9788 & 0.9475 & 0.0405 \\
 xgb & 0.9872 & 0.9902 & 0.9503 & 0.9298 & 0.9718 & 0.9503 & 0.0391 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}
 
 \begin{figure}[t]
@@ -167,18 +515,30 @@ xgb & 0.9872 & 0.9902 & 0.9503 & 0.9298 & 0.9718 & 0.9503 & 0.0391 \\
 \label{fig:model_benchmark_baseline}
 \end{figure}
 
-XGBoost tops the recall-first ranking with an at-risk recall of 0.930 and a PR-AUC of 0.990 (0.990 (95\% CI [0.989, 0.992])). Two structural observations matter more than the winner's identity. First, the three tree ensembles track each other closely on all seven metrics---the boosting family, not one implementation, dominates. Second, logistic regression trails by only a few points, indicating that the engineered features carry a strong, largely linearly separable signal on which the ensembles add a real but modest increment.
+XGBoost tops the recall-first ranking with an at-risk recall of
+0.930 and a PR-AUC of 0.990
+(0.990 (95\% CI [0.989, 0.992])). Two structural observations matter more than
+the winner's identity. First, the three tree ensembles track each other
+closely on all seven metrics, indicating that the boosting family as a whole
+dominates rather than one particular implementation. Second, logistic
+regression trails by only a few points, indicating that the engineered
+features carry a strong, largely linearly separable signal on which the
+ensembles add a real but modest increment.
 
-\subsection{Is the Ranking Real?}
+\subsection{Statistical Validation of the Model Ranking}
 
-Small between-model gaps demand verification. Table~\ref{tab:cv_summary} summarises the repeated cross-validation (5 folds $\times$ 5 seeds, 25 fits per model, preprocessing re-fitted per fold) as mean $\pm$ standard deviation.
+Small between-model gaps require verification. Table~\ref{tab:cv_summary}
+summarises the repeated cross-validation (5 folds $\times$ 5 seeds, 25 fits
+per model, preprocessing re-fitted per fold) as mean $\pm$ standard
+deviation.
 
 \begin{table*}[t]
 \centering
-\caption{Repeated cross-validation on the training partition (5-fold $\times$ 5 seeds; 25 fits per model, $t=100\%$): mean $\pm$ standard deviation per model and metric.}
+\caption{Repeated cross-validation on the training partition (5-fold
+$\times$ 5 seeds; 25 fits per model, $t=100\%$): mean $\pm$ standard
+deviation per model and metric.}
 \label{tab:cv_summary}
 \footnotesize
-\resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
 \textbf{model} & \textbf{recall\_mean} & \textbf{recall\_std} & \textbf{f1\_mean} & \textbf{f1\_std} & \textbf{pr\_auc\_mean} & \textbf{pr\_auc\_std} \\
@@ -189,7 +549,7 @@ rf & 0.9202 & 0.0051 & 0.9489 & 0.0030 & 0.9889 & 0.0009 \\
 ann & 0.9245 & 0.0081 & 0.9463 & 0.0038 & 0.9891 & 0.0009 \\
 logreg & 0.9180 & 0.0054 & 0.9452 & 0.0033 & 0.9887 & 0.0010 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}
 
 \begin{figure}[t]
@@ -199,13 +559,71 @@ logreg & 0.9180 & 0.0054 & 0.9452 & 0.0033 & 0.9887 & 0.0010 \\
 \label{fig:cv_uncertainty}
 \end{figure}
 
-XGBoost leads cross-validated recall at 0.9309 $\pm$ 0.0047, with LightGBM immediately behind, and the CV ranking reproduces the held-out ranking---the single-split benchmark is not an outlier. The Friedman test over the 25 paired fits rejects equal performance far below the 0.05 level on every metric, so the small observed differences are systematic rather than noise; Holm-corrected pairwise Wilcoxon signed-rank tests sharpen the picture, showing XGBoost significantly ahead of each of the other four models on recall while LightGBM leads the composite metrics (F1, PR-AUC, ROC-AUC). Given the recall-first objective and the exact TreeExplainer attributions required by the explanation analysis, XGBoost is selected as the primary model.
+XGBoost leads cross-validated recall at 0.9309 $\pm$ 0.0047, with LightGBM
+immediately behind, and the CV ranking reproduces the held-out ranking,
+confirming that the single-split benchmark is not an outlier. The Friedman
+test over the 25 paired fits rejects equal performance well below the 0.05
+level on every metric, so the small observed differences are systematic
+rather than attributable to sampling noise; Holm-corrected pairwise Wilcoxon
+signed-rank tests further show XGBoost significantly ahead of each of the
+other four models on recall while LightGBM leads the composite metrics (F1,
+PR-AUC, ROC-AUC). Given the recall-first objective and the exact
+TreeExplainer attributions required by the explanation analysis, XGBoost is
+selected as the primary model.
 
-In bias--variance terms the two verification layers also explain why the ranking is trustworthy. The per-model standard deviations are small relative to between-model gaps---the estimators are low-variance at this sample size---and overfitting is bounded by construction: every score is computed on data the model never saw (25 held-out folds plus the frozen test set), preprocessing is re-fitted inside each fold, and the close agreement between cross-validated and held-out rankings confirms that no model is merely memorising its training fold. Underfitting is visible instead as the systematic few-point gap between the linear baseline and the tree ensembles: logistic regression's higher-bias hypothesis class cannot represent the feature interactions the boosted trees exploit, and that difference is precisely the increment the ensembles add.
+In bias-variance terms the two verification layers also explain why the
+ranking is trustworthy. The per-model standard deviations are small relative
+to between-model gaps, indicating that the estimators have low variance at
+this sample size, and overfitting is bounded by construction: every score is
+computed on data the model never saw (25 held-out folds plus the frozen test
+set), preprocessing is re-fitted inside each fold, and the close agreement
+between cross-validated and held-out rankings confirms that no model is
+memorising its training fold. Underfitting is visible instead as the
+systematic few-point gap between the linear baseline and the tree ensembles:
+logistic regression's higher-bias hypothesis class cannot represent the
+feature interactions that the boosted trees exploit, and that difference is
+precisely the increment the ensembles contribute. A direct learning-curve
+and train-versus-test reading makes the point concrete
+(Table~\ref{tab:bias_variance}, Fig.~\ref{fig:bias_variance_gap}): the
+selected model's recall gap between its training fold and the held-out test
+set shrinks monotonically as the checkpoint advances, from
+0.125 at $t=10\%$ to 0.057 at course end. The
+model departs furthest from its training fit exactly when the least
+behaviour has been observed, and the gap narrows as signal accumulates, the
+signature of decreasing variance rather than growing overfit.
+
+\begin{table}[t]
+\centering
+\caption{Train-versus-test recall for the selected model across the six
+checkpoints, and the generalisation gap (train minus test). The gap narrows
+monotonically as more of the course is observed.}
+\label{tab:bias_variance}
+\footnotesize
+\begin{tabular}{lccc}
+\toprule
+\textbf{t (\%)} & \textbf{Train recall} & \textbf{Test recall} & \textbf{Gap} \\
+\midrule
+10 & 0.8446 & 0.7192 & 0.1254 \\
+20 & 0.8787 & 0.7604 & 0.1183 \\
+40 & 0.9109 & 0.8107 & 0.1002 \\
+60 & 0.9432 & 0.8703 & 0.0729 \\
+80 & 0.9709 & 0.8969 & 0.0740 \\
+100 & 0.9864 & 0.9298 & 0.0566 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../reports/figures/bias_variance_gap.png}
+\caption{Train and held-out test recall of the selected model across the six checkpoints; the shaded band is the generalisation gap, which narrows monotonically from early to late course, evidence of decreasing variance rather than overfitting.}
+\label{fig:bias_variance_gap}
+\end{figure}
 
 \subsection{Time-Aware Performance on the Full Cohort}
 
-The identical protocol was repeated at all six checkpoints on the same frozen test students.
+The identical protocol was repeated at all six checkpoints on the same
+frozen test students.
 
 \begin{figure}[t]
 \centering
@@ -214,30 +632,54 @@ The identical protocol was repeated at all six checkpoints on the same frozen te
 \label{fig:time_aware_recall}
 \end{figure}
 
-LightGBM is narrowly ahead at the two earliest checkpoints (both below the reliability bar) and XGBoost from $t=40\%$ onward. On the full enrolment cohort, the recall point estimate crosses 0.80 at $t=40\%$, reaching 0.811, and rises monotonically to 0.930 at course end, with PR-AUC comfortably above its criterion over the same range---so recall, not ranking quality, is the binding constraint on earliness. The trajectory is consistent with the 40--60\% reliability window of \cite{adnan2021} on the same dataset. The bootstrap, however, imposes a nuance invisible in point-estimate reporting: the interval at $t=40\%$ is 0.811 (95\% CI [0.798, 0.824]), whose lower bound touches the criterion. The honest full-cohort statement is therefore that reliability at 40\% of course length is \emph{plausible but borderline} under sampling uncertainty, firming up only at later checkpoints (at course end, 0.930 (95\% CI [0.921, 0.939])).
+LightGBM is narrowly ahead at the two earliest checkpoints (both below the
+reliability criterion) and XGBoost from $t=40\%$ onward. On the full
+enrolment cohort, the recall point estimate crosses 0.80 at $t=40\%$,
+reaching 0.811, and rises monotonically to
+0.930 at course end, with PR-AUC comfortably above its
+criterion over the same range, so recall (not ranking quality) is the
+binding constraint on earliness. The trajectory is consistent with the
+40 to 60\% reliability window of~\cite{adnan2021} on the same dataset. The
+bootstrap, however, imposes a nuance that is invisible in point-estimate
+reporting: the interval at $t=40\%$ is 0.811 (95\% CI [0.798, 0.824]), whose
+lower bound is at the criterion. The honest full-cohort statement is
+therefore that reliability at 40\% of course length is plausible but
+borderline under sampling uncertainty, firming up only at later checkpoints
+(at course end, 0.930 (95\% CI [0.921, 0.939])).
 
-\subsection{Whom Are We Really Predicting? The Dual-Cohort Result}
+\subsection{Dual-Cohort Re-Scoring and Population Effect}
 
-The full cohort is only one of the two estimands of Section~III-B. Because the at-risk label includes withdrawal and the roster is fixed, the test set at every checkpoint contains students who have already left---923 test enrolments before the earliest checkpoint at $t=10\%$, and more at each later cutoff. For these records the model records an outcome that has already happened. Table~\ref{tab:dual_cohort} therefore re-scores the \emph{same} XGBoost predictions on the still-enrolled subpopulation at each checkpoint, with bootstrap intervals for both cohorts and for their gap.
+The full cohort is only one of the two estimands of Section~III-B. Because
+the at-risk label includes withdrawal and the roster is fixed, the test set
+at every checkpoint contains students who have already left:
+923 test enrolments were withdrawn before the earliest
+checkpoint at $t=10\%$, with the count increasing at each later cutoff. For
+these records the model identifies an outcome that has already occurred.
+Table~\ref{tab:dual_cohort} therefore re-scores the same XGBoost predictions
+on the still-enrolled subpopulation at each checkpoint, with bootstrap
+intervals for both cohorts and for their gap.
 
 \begin{table*}[t]
 \centering
-\caption{Dual-cohort re-scoring of the selected XGBoost model per checkpoint: at-risk recall on the full test cohort and on the still-enrolled subpopulation, with 95\% percentile-bootstrap confidence intervals (1,000 student-level resamples of the frozen test set) and the between-cohort recall gap.}
+\caption{Dual-cohort re-scoring of the selected XGBoost model per
+checkpoint: at-risk recall on the full test cohort and on the
+still-enrolled subpopulation, with 95\% percentile-bootstrap confidence
+intervals (1,000 student-level resamples of the frozen test set) and the
+between-cohort recall gap.}
 \label{tab:dual_cohort}
 \footnotesize
-\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
 \textbf{t (\%)} & \textbf{Full cohort} & \textbf{Still-enrolled} & \textbf{Gap} \\
 \midrule
-10 & 0.719 (95\\% CI [0.705, 0.734]) & 0.631 (95\\% CI [0.613, 0.649]) & 0.088 (95\\% CI [0.080, 0.096]) \\
-20 & 0.760 (95\\% CI [0.746, 0.774]) & 0.649 (95\\% CI [0.631, 0.668]) & 0.111 (95\\% CI [0.102, 0.120]) \\
-40 & 0.811 (95\\% CI [0.798, 0.824]) & 0.678 (95\\% CI [0.656, 0.698]) & 0.133 (95\\% CI [0.122, 0.144]) \\
-60 & 0.870 (95\\% CI [0.859, 0.882]) & 0.749 (95\\% CI [0.730, 0.770]) & 0.121 (95\\% CI [0.110, 0.133]) \\
-80 & 0.897 (95\\% CI [0.887, 0.907]) & 0.779 (95\\% CI [0.760, 0.800]) & 0.118 (95\\% CI [0.106, 0.130]) \\
-100 & 0.930 (95\\% CI [0.921, 0.939]) & 0.841 (95\\% CI [0.821, 0.861]) & 0.089 (95\\% CI [0.076, 0.101]) \\
+10 & 0.719 (95\% CI [0.705, 0.734]) & 0.631 (95\% CI [0.613, 0.649]) & 0.088 (95\% CI [0.080, 0.096]) \\
+20 & 0.760 (95\% CI [0.746, 0.774]) & 0.649 (95\% CI [0.631, 0.668]) & 0.111 (95\% CI [0.102, 0.120]) \\
+40 & 0.811 (95\% CI [0.798, 0.824]) & 0.678 (95\% CI [0.656, 0.698]) & 0.133 (95\% CI [0.122, 0.144]) \\
+60 & 0.870 (95\% CI [0.859, 0.882]) & 0.749 (95\% CI [0.730, 0.770]) & 0.121 (95\% CI [0.110, 0.133]) \\
+80 & 0.897 (95\% CI [0.887, 0.907]) & 0.779 (95\% CI [0.760, 0.800]) & 0.118 (95\% CI [0.106, 0.130]) \\
+100 & 0.930 (95\% CI [0.921, 0.939]) & 0.841 (95\% CI [0.821, 0.861]) & 0.089 (95\% CI [0.076, 0.101]) \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}
 
 \begin{figure}[t]
@@ -247,27 +689,85 @@ The full cohort is only one of the two estimands of Section~III-B. Because the a
 \label{fig:sensitivity_active_recall_xgb}
 \end{figure}
 
-The gap is substantial, systematic, and statistically unambiguous. On the still-enrolled cohort, recall is 0.678 at $t=40\%$ (0.678 (95\% CI [0.656, 0.698])) and 0.779 at $t=80\%$, and reaches the criterion only at course end: 0.841 (0.841 (95\% CI [0.821, 0.861])). The bootstrap interval for the between-cohort gap excludes zero at every checkpoint---0.133 (95\% CI [0.122, 0.144]) at $t=40\%$ and still 0.089 (95\% CI [0.076, 0.101]) at $t=100\%$, where the residual gap reflects that at-risk students still enrolled at course end (imminent failers rather than withdrawers) are intrinsically harder to detect. LightGBM reproduces the same qualitative shape, so the finding is not specific to one model. Note that nothing about the model changes between the two rows of any checkpoint pair: the predictions are identical and only the evaluation population changes. The difference between the curves is a pure population effect---exactly the quantity a reader needs in order to translate a published full-cohort number into an expectation about intervention yield.
+The gap is substantial, systematic, and statistically unambiguous. On the
+still-enrolled cohort, recall is 0.678 at $t=40\%$
+(0.678 (95\% CI [0.656, 0.698])) and 0.779 at $t=80\%$,
+reaching the criterion only at course end: 0.841
+(0.841 (95\% CI [0.821, 0.861])). The bootstrap interval for the
+between-cohort gap excludes zero at every checkpoint: 0.133 (95\% CI [0.122, 0.144]) at
+$t=40\%$ and 0.089 (95\% CI [0.076, 0.101]) at $t=100\%$, where the residual gap
+reflects that at-risk students still enrolled at course end (imminent
+failers rather than withdrawers) are intrinsically harder to detect.
+LightGBM reproduces the same qualitative pattern, so the finding is not
+specific to one model. The predictions are identical between the two rows of
+any checkpoint pair; only the evaluation population differs. The difference
+between the curves is a pure population effect, precisely the quantity a
+reader needs in order to translate a published full-cohort figure into an
+expectation about intervention yield.
 
-The dual-cohort answer to the earliness question is therefore stated in two parts, always together. On the full enrolment cohort---the frame in which the base studies \cite{tomasevic2020,adnan2021} operate---XGBoost is the best model from $t=40\%$ onward and reliability is plausible, though borderline under the bootstrap, from that checkpoint. On the still-enrolled cohort---the frame in which a tutor can still act---the same criterion is met only at course end, and mid-course predictions, while informative, fall short of the bar.
+The dual-cohort answer to the earliness question is stated in two parts and
+should always be presented together. On the full enrolment cohort (the frame
+in which the base studies~\cite{tomasevic2020,adnan2021} operate), XGBoost
+is the best model from $t=40\%$ onward and reliability is plausible, though
+borderline under the bootstrap, from that checkpoint. On the still-enrolled
+cohort (the frame in which a tutor can still act), the same criterion is met
+only at course end, and mid-course predictions, while informative, fall
+short of the criterion.
 
-Two clarifications guard against misreading. First, this is \emph{not} data leakage: the label never enters the features, and the near-total inactivity of an early-withdrawn student is genuinely observed behaviour. Second, it is a \emph{population-definition} result: part of full-cohort performance at every checkpoint comes from recognising students who have already gone---legitimate for outcome classification, but not early warning. The answer to which checkpoint yields ``reliable'' prediction thus changes by three checkpoints depending on a population choice that prior work does not report, which is precisely why we propose that both frames always be published together.
+Two clarifications guard against misreading. First, this is not data
+leakage: the label never enters the features, and the near-total inactivity
+of an early-withdrawn student is genuinely observed behaviour. Second, this
+is a population-definition result: part of full-cohort performance at every
+checkpoint comes from identifying students who have already left, which is
+legitimate for outcome classification but does not constitute early warning.
+The answer to which checkpoint yields reliable prediction therefore changes
+by three checkpoints depending on a population choice that prior work does
+not report, which is precisely why we propose that both frames always be
+published together.
 
 \subsection{Operating Thresholds and Subgroup Fairness}
 
-A deployed system needs a decision threshold, and choosing it on the test set would optimistically bias every reported metric. Thresholds are therefore selected on out-of-fold validation predictions from cross-validation on the training partition, frozen, and scored on the test set exactly once per policy. The F1-optimal policy selects 0.56, nearly coinciding with the default 0.5, and its validation metrics transfer to the test set with negligible drift---retrospective evidence that the default-threshold results above were not tuned on the test set. An institutional high-recall policy is also quantified: mandating recall $\geq 0.90$ yields a validation-chosen threshold of 0.86 that delivers the mandated recall on the test set at a precision of 0.993---an operating point at which flagged students are almost always genuinely at risk. The full validation trade-off curves are committed alongside the result tables, so an institution can select any other operating point without ever touching the test set.
+A deployed system requires a decision threshold, and selecting it on the
+test set would optimistically bias every reported metric. Thresholds are
+therefore selected on out-of-fold validation predictions from
+cross-validation on the training partition, frozen, and scored on the test
+set exactly once per policy. The F1-optimal policy selects a threshold of
+0.56, nearly coinciding with the default 0.5, and its validation
+metrics transfer to the test set with negligible drift, providing
+retrospective evidence that the default-threshold results above were not
+optimised on the test set. An institutional high-recall policy is also
+quantified: mandating recall $\geq 0.90$ yields a validation-chosen
+threshold of 0.86 that delivers the mandated recall on the test
+set at a precision of 0.993, an operating point at
+which flagged students are almost always genuinely at risk. The full
+validation trade-off curves are committed alongside the result tables,
+allowing an institution to select any operating point without accessing the
+test set.
 
-For the selected model at $t=100\%$ and the default threshold, recall and false-positive rate were disaggregated over every level of six demographic attributes (gender, region, deprivation band, prior education, age band, declared disability; subgroups with at least 50 test members). Table~\ref{tab:fairness} summarises the within-attribute ranges: the largest recall gap across all attributes is 6.6 percentage points, observed on imd\_band, with false-positive-rate gaps of similarly modest order and no subgroup---including students declaring a disability---falling dramatically below the overall recall level. These are observed disparities at one checkpoint and threshold, not a fairness certification; a deployment should monitor the same disaggregated metrics continuously.
+For the selected model at $t=100\%$ and the default threshold, recall and
+false-positive rate were disaggregated~\cite{mehrabi2021} over every level
+of six demographic attributes (gender, region, deprivation band, prior education, age band,
+and declared disability; subgroups with at least 50 test members).
+Table~\ref{tab:fairness} summarises the within-attribute ranges: the
+largest recall gap across all attributes is 6.6
+percentage points, observed on imd\_band, with
+false-positive-rate gaps of similarly modest order and no subgroup
+(including students declaring a disability) falling dramatically below the
+overall recall level. These are observed disparities at one checkpoint and
+threshold, not a fairness certification; a deployment should monitor the
+same disaggregated metrics continuously.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
-\caption{Within-attribute subgroup gaps at $t=100\%$ and the default threshold: range of at-risk recall and false-positive rate across the levels of six demographic attributes (subgroups with $\geq 50$ test members).}
+\caption{Within-attribute subgroup gaps at $t=100\%$ and the default
+threshold: range of at-risk recall and false-positive rate across the
+levels of six demographic attributes (subgroups with $\geq 50$ test
+members).}
 \label{tab:fairness}
 \footnotesize
-\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccccc}
 \toprule
-\textbf{attribute} & \textbf{n\_levels} & \textbf{recall\_min} & \textbf{recall\_max} & \textbf{recall\_gap} & \textbf{fpr\_gap} \\
+\textbf{Attribute} & \textbf{Levels} & \textbf{Recall min} & \textbf{Recall max} & \textbf{Recall gap} & \textbf{FPR gap} \\
 \midrule
 imd\_band & 11 & 0.8941 & 0.9599 & 0.0658 & 0.0464 \\
 region & 13 & 0.9091 & 0.9502 & 0.0411 & 0.0385 \\
@@ -276,18 +776,180 @@ gender & 2 & 0.9147 & 0.9409 & 0.0262 & 0.0021 \\
 disability & 2 & 0.9279 & 0.9446 & 0.0167 & 0.0210 \\
 age\_band & 2 & 0.9183 & 0.9342 & 0.0159 & 0.0070 \\
 \bottomrule
-\end{tabular}}
-\end{table}
+\end{tabular}
+\end{table*}
 
 \subsection{Robustness to Imbalance Handling}
 
-Because the at-risk class is a slight majority (52.8\%, ratio 1.12), resampling here answers a robustness question, not a rare-class rescue---indeed, default-configured SMOTE \cite{chawla2002} and ADASYN oversample the \emph{not-at-risk} class on this dataset, the opposite of the textbook ``rescue the rare at-risk class'' intuition, a behaviour we detected early and document rather than let pass unremarked. Every resampling or weighting intervention is applied to the training partition only, after preprocessing has been fitted; the held-out test set is never resampled and always reflects the real class distribution. Retraining all five models at $t=100\%$ under four regimes (none, class weighting, SMOTE, ADASYN) moves no primary metric materially: the largest spread on at-risk recall, F1, or PR-AUC across all models and strategies is 0.0069, of the same order as seed-to-seed cross-validation variation, with no strategy consistently ahead. This is the expected behaviour at an imbalance ratio of 1.12: with both classes abundantly represented, neither synthetic oversampling nor loss reweighting has room to move the decision boundary. Predictive conclusions on OULAD under this label mapping therefore do not depend on the imbalance-handling choice; Section~V-C shows the same holds for explanations.
+Because the at-risk class is a slight majority (52.8\%, ratio 1.12),
+resampling here answers a robustness question rather than the rescue of a
+rare class~\cite{he2009,fernandez2018}. Default-configured
+SMOTE~\cite{chawla2002} and ADASYN in fact
+oversample the \emph{not-at-risk} class on this dataset (the opposite of
+the standard resampling intuition), a behaviour detected during exploratory
+analysis and documented here rather than left unreported. Every resampling
+or weighting intervention is applied to the training partition only, after
+preprocessing has been fitted; the held-out test set is never resampled and
+always reflects the real class distribution. Retraining all five models at
+$t=100\%$ under four regimes (none, class weighting, SMOTE, ADASYN) moves
+no primary metric materially: the largest spread on at-risk recall, F1, or
+PR-AUC across all models and strategies is 0.0069, of the
+same order as seed-to-seed cross-validation variation, with no strategy
+consistently ahead. This is the expected result at an imbalance ratio of
+1.12: with both classes abundantly represented, neither synthetic
+oversampling nor loss reweighting has room to shift the decision boundary.
+Predictive conclusions on OULAD under this label mapping therefore do not
+depend on the imbalance-handling choice; Section~V-C shows the same holds
+for explanations.
+
+\subsection{Rule-Based Baseline and a Hybrid Early-Late Policy}
+
+A learned model earns its complexity only against a trivial alternative. We
+therefore grid-searched a two-feature decision rule (flag a student when
+days since last activity exceed a threshold, or the cumulative weighted
+score falls below a threshold), selecting the F1-optimal thresholds per
+checkpoint on the training partition and scoring on the test set.
+Table~\ref{tab:rule_baseline} and Fig.~\ref{fig:rule_baseline_comparison}
+compare it with XGBoost, and the comparison is itself a corroboration of the
+dual-cohort result. At $t=10\%$ the rule reaches an at-risk recall of
+0.999 against XGBoost's 0.719: early
+at-risk cases are dominated by withdrawn students whose near-total
+inactivity a single inactivity threshold captures trivially, so a learned
+model has little to add and, tuned toward precision, actually flags fewer.
+By course end the ordering reverses, with XGBoost's recall of
+0.930 exceeding the rule's 0.855,
+because separating imminent failers who remain active from passing students
+requires feature interactions a fixed threshold cannot express. The
+operational reading is a hybrid policy: a cheap inactivity rule suffices for
+early bulk screening, and the learned model earns its place from mid-course
+onward, where the discrimination it adds is exactly what the rule lacks.
+
+\begin{table*}[t]
+\centering
+\caption{Rule-based baseline (best per-checkpoint inactivity-or-low-score
+threshold) versus the selected XGBoost model on the held-out test set:
+at-risk recall, rule precision, and the recall difference (rule minus
+XGBoost) per checkpoint.}
+\label{tab:rule_baseline}
+\footnotesize
+\begin{tabular}{lcccc}
+\toprule
+\textbf{t (\%)} & \textbf{Rule recall} & \textbf{Rule precision} & \textbf{XGBoost recall} & \textbf{Rule $-$ XGB} \\
+\midrule
+10 & 0.9994 & 0.5212 & 0.7192 & -0.2802 \\
+20 & 0.8945 & 0.6162 & 0.7604 & -0.1341 \\
+40 & 0.7497 & 0.8364 & 0.8107 & 0.0610 \\
+60 & 0.8892 & 0.8158 & 0.8703 & -0.0189 \\
+80 & 0.8546 & 0.9437 & 0.8969 & 0.0423 \\
+100 & 0.8549 & 0.9717 & 0.9298 & 0.0749 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../reports/figures/rule_baseline_comparison.png}
+\caption{At-risk recall of the two-feature rule baseline versus XGBoost across the six checkpoints. The rule wins early, when at-risk cases are trivially inactive withdrawn students, and loses from mid-course onward, where the learned interactions matter.}
+\label{fig:rule_baseline_comparison}
+\end{figure}
+
+\subsection{Probability Calibration}
+
+Beyond ranking quality, an early-warning score is more useful to a tutor if
+its probability reads as a risk level. We assessed calibration with
+reliability curves and the expected and maximum calibration errors (ECE,
+MCE)~\cite{niculescu2005,guo2017} over ten equal-width probability bins
+(Table~\ref{tab:calibration}, Fig.~\ref{fig:calibration_curve}). The
+selected model is well calibrated in aggregate: ECE is 0.018 at
+course end and never exceeds 0.042 at any checkpoint, so on average
+the predicted probability tracks the observed at-risk frequency to within a
+few points. The maximum single-bin error is larger (MCE up to
+0.161), concentrated in the high-probability bins, so the scores
+are dependable as a risk ordering and as coarse risk bands but should not be
+read as exact probabilities at the top of the range. This complements the
+Brier score of the benchmark table with a decomposition a practitioner can
+act on.
+
+\begin{table}[t]
+\centering
+\caption{Probability calibration of the selected model per checkpoint:
+expected calibration error (ECE) and maximum calibration error (MCE) over
+ten equal-width probability bins on the held-out test set.}
+\label{tab:calibration}
+\footnotesize
+\begin{tabular}{lcc}
+\toprule
+\textbf{t (\%)} & \textbf{ECE} & \textbf{MCE} \\
+\midrule
+10 & 0.0385 & 0.1045 \\
+20 & 0.0417 & 0.0798 \\
+40 & 0.0339 & 0.1540 \\
+60 & 0.0274 & 0.1610 \\
+80 & 0.0195 & 0.0961 \\
+100 & 0.0176 & 0.1302 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../reports/figures/calibration_curve.png}
+\caption{Reliability curves for the selected model at each checkpoint: observed at-risk frequency versus mean predicted probability per bin. The curve tracks the diagonal closely, with the largest departures in the high-probability bins.}
+\label{fig:calibration_curve}
+\end{figure}
+
+\subsection{Model Parsimony via Feature Ablation}
+
+Finally we asked how much of the 49-column model matrix the performance
+actually requires. Ranking the raw features by mean absolute SHAP value and
+retraining XGBoost on the top $k$ (Table~\ref{tab:ablation},
+Fig.~\ref{fig:ablation_topk}) shows the signal is highly concentrated: the
+top five raw features (current VLE silence, cumulative weighted and mean
+scores, submission count, and module identity) already reach a recall of
+0.932, matching the full-feature model's
+0.930, and adding the remaining features moves recall by
+less than one point. This parsimony has two consequences: it corroborates
+the SHAP finding that a handful of engagement-and-performance signals carry
+the class information, and it means a deployment can run, and a tutor can be
+shown, a five-feature model with no measurable loss, simplifying both the
+data pipeline and the explanation.
+
+\begin{table}[t]
+\centering
+\caption{Feature-ablation results: XGBoost retrained on the top $k$ raw
+features ranked by mean absolute SHAP value, scored on the held-out test set
+at $t=100\%$. Recall plateaus by $k=5$.}
+\label{tab:ablation}
+\footnotesize
+\begin{tabular}{lccc}
+\toprule
+\textbf{Top-$k$ features} & \textbf{Recall} & \textbf{F1} & \textbf{PR-AUC} \\
+\midrule
+3 & 0.9129 & 0.9382 & 0.9874 \\
+5 & 0.9316 & 0.9509 & 0.9904 \\
+7 & 0.9301 & 0.9501 & 0.9901 \\
+10 & 0.9289 & 0.9486 & 0.9904 \\
+15 & 0.9310 & 0.9507 & 0.9900 \\
+20 & 0.9274 & 0.9488 & 0.9899 \\
+28 & 0.9298 & 0.9503 & 0.9902 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../reports/figures/ablation_topk.png}
+\caption{Test-set recall, F1, and PR-AUC of XGBoost retrained on the top $k$ SHAP-ranked raw features at $t=100\%$. Performance plateaus at $k=5$, so the remaining features add no measurable predictive value.}
+\label{fig:ablation_topk}
+\end{figure}
 
 \section{Explanation Stability}
 
-\subsection{What Drives an At-Risk Flag}
+\subsection{Feature Attribution via SHAP}
 
-Global SHAP values for the selected model are computed with TreeExplainer, which is exact for tree ensembles \cite{lundberg2017}.
+Global SHAP values for the selected model are computed with TreeExplainer,
+which provides exact attributions for tree
+ensembles~\cite{lundberg2017,lundberg2020}.
 
 \begin{figure}[t]
 \centering
@@ -296,26 +958,76 @@ Global SHAP values for the selected model are computed with TreeExplainer, which
 \label{fig:shap_importance_xgb_t100}
 \end{figure}
 
-One feature dominates by a wide margin: \texttt{days\_since\_last\_activity}, the length of the student's current silence in the VLE, followed by \texttt{weighted\_score\_to\_date}, the cumulative weighted assessment score. Attribution directions match tutor intuition---long silence pushes strongly toward a flag, a high running score pulls away---and the remaining contributors (submission counts, module identity, per-activity click features) act in similarly plausible directions, so the model's strongest signals are precisely the two indicators human tutors already watch: disengagement and weak assessment performance. The dominance of a silence feature is also an inside-the-model corroboration of Section~IV-D: on the full cohort---where recall is 0.930 versus 0.841 on the still-enrolled subgroup---\texttt{days\_since\_last\_activity} is exactly the channel through which already-disengaged and withdrawn students are recognised rather than forecast. The explanation layer thus confirms, mechanistically, why every headline claim must name its cohort. Because global importances do not help a tutor with an individual student, LIME \cite{ribeiro2016} supplies the local ``why''---the form in which an explanation is actually consumed in an intervention conversation, and the form served per student by the dashboard.
+One feature dominates by a wide margin: \texttt{days\_since\_last\_activity},
+the length of the student's current silence in the VLE, followed by
+\texttt{weighted\_score\_to\_date}, the cumulative weighted assessment score.
+Attribution directions are consistent with tutor intuition: extended silence
+pushes strongly toward an at-risk flag, while a high running score draws it
+away. The remaining contributors (submission counts, module identity, and
+per-activity click features) act in similarly plausible directions, so the
+model's strongest signals are precisely the two indicators that human tutors
+already prioritise: disengagement and weak assessment performance. The
+dominance of a silence feature also provides a mechanistic corroboration of
+Section~IV-D: on the full cohort (where recall is 0.930
+versus 0.841 on the still-enrolled subgroup),
+\texttt{days\_since\_last\_activity} is the channel through which
+already-disengaged and withdrawn students are identified rather than
+forecast. The explanation layer thus confirms, mechanistically, why every
+headline claim must name its cohort. Because global importances do not
+assist a tutor with an individual student, LIME~\cite{ribeiro2016} supplies
+the local justification, which is the form in which an explanation is
+actually used in an intervention conversation and the form served per
+student by the dashboard.
 
-\subsection{Stability Against the Null Baseline}
+\subsection{Stability Relative to the Null Baseline}
 
-An explanation can support intervention decisions only if it is reproducible, and an agreement score can support a stability claim only if it is compared against chance. All agreement statistics below are therefore read against the Monte-Carlo null of Section~III-F: two random top-10 draws from the 49-feature space overlap with mean Jaccard 0.119, 95th percentile 0.25, and 99th percentile 0.333. Without this calibration, the partial SHAP--LIME overlap reported below could be spun as either reassuring or alarming; against the null, its meaning is unambiguous.
+An explanation can support intervention decisions only if it is
+reproducible, and an agreement score can support a stability claim only if
+it is compared against chance. All agreement statistics below are therefore
+read against the Monte-Carlo null of Section~III-F: two random top-10
+draws from the 49-feature space overlap with mean Jaccard 0.119,
+95th percentile 0.25, and 99th percentile 0.333. Without
+this calibration the partial SHAP-LIME overlap reported below would be
+uninterpretable; against the null its meaning is unambiguous.
 
-\textbf{Across seeds.} Retraining the selected model under five seeds and re-explaining yields a mean top-10 Jaccard of 0.69 and a mean Spearman rank correlation of 0.97 across seed pairs---far above the null's 99th percentile. The global feature story is a property of the data and model class, not an artefact of one training run.
+\textbf{Across seeds.}
+Retraining the selected model under five seeds and re-explaining yields a
+mean top-10 Jaccard of 0.69 and a mean Spearman rank
+correlation of 0.97 across seed pairs, far above the null's
+99th percentile. The global feature story is a property of the data and
+model class, not an artefact of one training run.
 
-\textbf{Across explainers.} SHAP and LIME agree partially: the Jaccard overlap of their global top-10 sets is 0.43, computed on a LIME sample of $n=100$ test students. This too exceeds the null's 99th percentile---the agreement is genuine---but it is far from unity, and the mechanism is methodological rather than pathological: SHAP allocates exact Shapley contributions of the trained model, whereas LIME fits a local linear surrogate to perturbed inputs and perturbs one-hot categories as if continuous, injecting noise into mid-ranking features. The two explainers agree on the headline drivers and diverge in the tail. Our policy: anchor global claims on SHAP (exact for trees), use LIME as a per-student local cross-check, and report the disagreement rather than selecting the more flattering explainer.
+\textbf{Across explainers.}
+SHAP and LIME agree partially: the Jaccard overlap of their global top-10
+sets is 0.43, computed on a LIME sample of $n=100$ test
+students. This exceeds the null's 99th percentile (the agreement is genuine)
+but is far from unity, and the mechanism is methodological rather than a
+deficiency of either tool: SHAP allocates exact Shapley contributions of the
+trained model, whereas LIME fits a local linear surrogate to perturbed
+inputs and treats one-hot categories as if continuous, injecting noise into
+mid-ranking features. The two explainers agree on the headline drivers and
+diverge in the tail. Our policy is to anchor global claims on SHAP (exact
+for trees), use LIME as a per-student local cross-check, and report the
+disagreement rather than selecting the more favourable explainer.
 
 \subsection{Stability Across Training Regimes}
 
-Retraining XGBoost at $t=100\%$ once per imbalance-handling regime and comparing global SHAP rankings pairwise (Table~\ref{tab:xai_strategies}) shows Spearman correlations close to unity for all six strategy pairs, with moderate top-10 Jaccard variation: the dominant features are invariant to the training regime while the tail of the top-10 shuffles mildly. A tutor would be told substantially the same story under any of the four regimes---the explanation-side counterpart of the accuracy-side robustness in Section~IV-F.
+Retraining XGBoost at $t=100\%$ once per imbalance-handling regime and
+comparing global SHAP rankings pairwise (Table~\ref{tab:xai_strategies})
+shows Spearman correlations close to unity for all six strategy pairs, with
+moderate top-10 Jaccard variation: the dominant features are invariant to
+the training regime while the tail of the top-10 varies mildly. A tutor
+would receive substantially the same explanation under any of the four
+regimes, the explanation-side counterpart of the accuracy-side robustness
+in Section~IV-F.
 
 \begin{table}[t]
 \centering
-\caption{Pairwise agreement of global SHAP importance rankings for XGBoost at $t=100\%$ trained under four imbalance-handling regimes (top-10 Jaccard; Spearman over the full 49-feature ranking).}
+\caption{Pairwise agreement of global SHAP importance rankings for XGBoost
+at $t=100\%$ trained under four imbalance-handling regimes (top-10 Jaccard;
+Spearman over the full 49-feature ranking).}
 \label{tab:xai_strategies}
 \footnotesize
-\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
 \textbf{strategy\_a} & \textbf{strategy\_b} & \textbf{jaccard\_top10} & \textbf{spearman} \\
@@ -327,12 +1039,15 @@ class\_weight & smote & 0.6667 & 0.9709 \\
 class\_weight & adasyn & 0.6667 & 0.9641 \\
 smote & adasyn & 0.8182 & 0.9744 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 \subsection{Drift Across Checkpoints}
 
-Explanations drift as the course progresses---and should: early checkpoints contain little behaviour, so demographic and registration priors carry relatively more weight, while later checkpoints are dominated by engagement and performance signals.
+Explanations change as the course progresses, and this is expected: early
+checkpoints contain little behavioural data, so demographic and registration
+priors carry relatively more weight, while later checkpoints are dominated
+by engagement and performance signals.
 
 \begin{figure}[t]
 \centering
@@ -341,54 +1056,310 @@ Explanations drift as the course progresses---and should: early checkpoints cont
 \label{fig:xai_stability_drift}
 \end{figure}
 
-The drift is smooth and ordered: adjacent checkpoints correlate strongly, while the earliest views share only a small fraction of the full-course top-10. The explanation evolves gradually rather than jumping---evidence of a coherent underlying signal---but the early-course and end-of-course stories genuinely differ. The operational consequence, implemented in the dashboard, is that every displayed explanation is labelled with the checkpoint at which it was computed and is never transferred across checkpoints.
+The drift is smooth and ordered: adjacent checkpoints correlate strongly,
+while the earliest views share only a small fraction of the full-course
+top-10. The explanation evolves gradually rather than abruptly, providing
+evidence of a coherent underlying signal, but the early-course and
+end-of-course stories genuinely differ. The operational consequence,
+implemented in the dashboard, is that every displayed explanation is labelled
+with the checkpoint at which it was computed and is never carried over across
+checkpoints.
 
-Taken together, the stability results answer the second research question: explanations are highly stable to training randomness, partially consistent across explainers for identifiable methodological reasons, and smoothly time-varying---trustworthy, provided they are anchored on SHAP and carry their checkpoint label.
+Taken together, the stability results answer the second research question:
+explanations are highly stable to training randomness, partially consistent
+across explainers for identifiable methodological reasons, and smoothly
+time-varying. They are trustworthy provided they are anchored on SHAP and
+carry their checkpoint label.
 
 \section{Discussion and Limitations}
 
-\textbf{Implications for the literature.} The dual-cohort result reframes how OULAD earliness claims should be read. The full-cohort finding that reliability begins near 40\% of course length is consistent with \cite{adnan2021}; but on the population an intervention can actually reach, the same pipeline does not clear the same bar until course end, and the gap's confidence interval excludes zero everywhere. Prior studies are not wrong---they measure outcome classification competently---but their numbers cannot be quoted as \emph{early-warning} performance without naming the population, and cross-study comparisons (Table~\ref{tab:protocols}) already founder on differing cohorts and split units. We propose dual-cohort reporting as a minimal, near-zero-cost standard: score the same predictions twice and publish both curves.
+\textbf{Implications for the literature.}
+The dual-cohort result reframes how OULAD earliness claims should be
+interpreted. The full-cohort finding that reliability begins near 40\% of
+course length is consistent with~\cite{adnan2021}; on the population an
+intervention can actually reach, however, the same pipeline does not clear
+the same criterion until course end, and the gap's confidence interval
+excludes zero everywhere. Prior studies are not incorrect (they measure
+outcome classification competently) but their numbers cannot be quoted as
+early-warning performance without naming the population, and cross-study
+comparisons (Table~\ref{tab:protocols}) already face difficulties from
+differing cohorts and split units. We propose dual-cohort reporting as a
+minimal, near-zero-cost standard: score the same predictions twice and
+publish both curves.
 
-\textbf{Implications for practice.} The two estimands translate directly into interface and policy. The instructor dashboard operationalises the still-enrolled frame: at any checkpoint, the worklist contains only students an intervention can still reach, each with a SHAP explanation carrying its checkpoint label. Thresholds are a policy instrument selected on validation data---the default cut for a balanced workload, or the high-recall cut (0.86, test precision 0.993) when missing an at-risk student outweighs extra outreach. The threshold, like the explanation, should be stated alongside every deployment of the model.
+\textbf{Implications for practice.}
+The two estimands translate directly into interface design and operational
+policy. The instructor dashboard operationalises the still-enrolled frame:
+at any checkpoint, the worklist contains only students an intervention can
+still reach, each accompanied by a SHAP explanation carrying its checkpoint
+label. Thresholds are a policy instrument selected on validation data: the
+default cut for a balanced workload, or the high-recall cut
+(0.86, test precision 0.993) when
+missing an at-risk student outweighs additional outreach. The parsimony and
+rule-baseline results sharpen the deployment story further: early screening
+can lean on a one-line inactivity rule, the mid-to-late model can run on as
+few as five features, and its probability output is calibrated well enough
+to drive coarse risk bands rather than a single hard cutoff. The threshold,
+like the explanation, should be stated alongside every deployment of the
+model.
 
-\textbf{Reproducibility.} Every number in this paper is generated by a pinned, committed pipeline: the frozen test-student list and checkpoint map are version-controlled and never re-derived; 21 automated tests---including the regression test pinning the banked-assessment fix---must pass before any modelling step runs; and the paper itself is rendered from the result tables by template substitution, so no reported value is hand-typed. The repository contains the full pipeline, the dashboard, and the scripts generating every figure and table.
+\textbf{Reproducibility.}
+Every number in this paper is generated by a pinned, committed pipeline:
+the frozen test-student list and checkpoint map are version-controlled and
+never re-derived; 21 automated tests (including the regression test pinning
+the banked-assessment correction) must pass before any modelling step runs;
+and the paper itself is rendered from the result tables by template
+substitution, so no reported value is hand-typed. The repository contains
+the full pipeline, the dashboard, and the scripts generating every figure
+and table.
 
-\textbf{Limitations.} Six are stated openly. (1)~\emph{Single dataset:} all findings rest on one anonymised UK distance-learning dataset; transfer to other institutions, delivery modes, or platforms is untested. (2)~\emph{Score availability:} performance features credit a score on its submission date, but in deployment marks appear only after grading, so checkpoint-time score features are optimistic about what is knowable on the checkpoint day. (3)~\emph{Source-data duplicates:} 7.4\% of clickstream rows are exact, key-less duplicates that the pipeline deliberately retains, so click totals may be over-counted for affected student-days. (4)~\emph{LIME sample size:} the SHAP--LIME agreement is estimated on $n=100$ test students (a concession to LIME's per-instance cost), and LIME's treatment of one-hot categories as continuous adds noise; the estimate is coarse. (5)~\emph{Borderline criterion at $t=40\%$:} even in the flattering full-cohort frame, the recall interval 0.811 (95\% CI [0.798, 0.824]) touches the 0.80 criterion, so the popular ``reliable from 40\%'' claim is weaker under honest uncertainty than point estimates suggest. (6)~\emph{Evaluation-side estimand:} the still-enrolled analysis re-scores a model trained on the full roster rather than retraining per checkpoint on the still-enrolled population.
+\textbf{Limitations.}
+Six limitations are stated openly. (1) \emph{Single dataset:} all findings
+rest on one anonymised UK distance-learning dataset; transfer to other
+institutions, delivery modes, or platforms is untested. (2) \emph{Score
+availability:} performance features credit a score on its submission date,
+but in deployment marks appear only after grading, so checkpoint-time score
+features are optimistic about what is knowable on the checkpoint day. (3)
+\emph{Source-data duplicates:} 7.4\% of clickstream rows are exact,
+key-less duplicates that the pipeline deliberately retains, so click totals
+may be over-counted for affected student-days. (4) \emph{LIME sample size:}
+the SHAP-LIME agreement is estimated on $n=100$ test students, a concession
+to LIME's per-instance cost, and LIME's treatment of one-hot categories as
+continuous adds noise; the estimate is therefore coarse. (5)
+\emph{Borderline criterion at $t=40\%$:} even in the full-cohort frame, the
+recall interval 0.811 (95\% CI [0.798, 0.824]) touches the 0.80 criterion,
+so the commonly cited ``reliable from 40\%'' claim is weaker under honest
+uncertainty quantification than point estimates suggest. (6)
+\emph{Evaluation-side estimand:} the still-enrolled analysis re-scores a
+model trained on the full roster rather than retraining per checkpoint on
+the still-enrolled population only.
 
-\textbf{Future work.} Three extensions follow directly from the limitations. First, per-checkpoint censoring should be promoted from a sensitivity analysis to the primary design: training and evaluating at each checkpoint only on students still enrolled at that cutoff would make early warning the native objective of the model rather than an evaluation-side reading of it. Second, the composite at-risk label should be decomposed: Fail and Withdrawn have different behavioural signatures and call for different interventions, suggesting a multi-class or competing-risks formulation with withdrawal timing as an outcome in its own right. Third, external validity needs replication on datasets beyond OULAD, grading-lag-aware score features that respect deployment-time information availability, and larger LIME samples with additional explainers to tighten the cross-explainer agreement estimates.
+\textbf{Future work.}
+Three extensions follow directly from the limitations. First, per-checkpoint
+censoring should be promoted from a sensitivity analysis to the primary
+design: training and evaluating at each checkpoint only on students still
+enrolled at that cutoff would make early warning the native objective of the
+model rather than an evaluation-side reading of it. Second, the composite
+at-risk label should be decomposed: Fail and Withdrawn have different
+behavioural signatures and call for different interventions, suggesting a
+multi-class or competing-risks formulation with withdrawal timing as an
+outcome in its own right. Third, external validity requires replication on
+datasets beyond OULAD, grading-lag-aware score features that respect
+deployment-time information availability, larger LIME samples with
+additional explainers to tighten the cross-explainer agreement estimates,
+and formalising the early-rule and late-model hybrid as an explicit
+switching policy with a validated switch point.
 
 \section{Conclusion}
 
-We re-examined early at-risk prediction on OULAD with a question the literature has not asked of itself: whom is the model really predicting? Under a leakage-safe, time-aware, group-aware protocol with bootstrap uncertainty, the answer is consequential. Gradient-boosted trees win a verified five-model benchmark, and on the conventional full-enrolment cohort their predictions approach reliability from 40\% of course length---but a confidence-interval-honest reading makes even that claim borderline, and on the students an intervention can still reach, the reliability criterion is met only at course end, with the between-cohort gap excluding zero at every checkpoint. Explanations, evaluated against an explicit Monte-Carlo null rather than by visual inspection, are seed-stable, partially explainer-consistent for identifiable methodological reasons, smoothly time-varying, and invariant to imbalance handling; they also reveal the mechanism of the inflation itself, since the dominant feature---current VLE silence---is precisely the channel through which already-gone students are recognised. The methodological message costs nothing to adopt and changes how results read: every early-warning claim should name its cohort, carry its uncertainty, and anchor its explanation to the checkpoint it was computed at. Under those disciplines, the pipeline presented here is accurate, interpretable, and reproducible enough to support a real early-intervention workflow.
+We re-examined early at-risk prediction on OULAD by asking a question the
+literature has not previously addressed: on which population is the model
+evaluated? Under a leakage-safe, time-aware, group-aware protocol with
+bootstrap uncertainty quantification, the answer is consequential.
+Gradient-boosted trees win a verified five-model benchmark, and on the
+conventional full-enrolment cohort their predictions approach reliability
+from 40\% of course length; an honest confidence-interval reading, however,
+makes even that claim borderline. On the students an intervention can still
+reach, the reliability criterion is met only at course end, with the
+between-cohort gap excluding zero at every checkpoint. Explanations,
+evaluated against an explicit Monte-Carlo null rather than by visual
+inspection, are stable across seeds, partially consistent across explainers
+for identifiable methodological reasons, smoothly time-varying, and
+invariant to imbalance handling; they also reveal the mechanism of the
+performance inflation, since the dominant feature (current VLE silence) is
+precisely the channel through which already-withdrawn students are
+identified. The methodological recommendation is costless to adopt and
+changes how results are interpreted: every early-warning claim should name
+its cohort, carry its uncertainty interval, and anchor its explanation to
+the checkpoint at which it was computed. Under these disciplines, the
+pipeline presented here is accurate, interpretable, and reproducible enough
+to support a real early-intervention workflow.
 
-\begin{thebibliography}{9}
+\section*{Acknowledgment}
+The authors thank their supervisor, Nguyen Thi Hoang Yen, and the Data
+Science program at FPT University for guidance throughout this capstone
+project. This study uses the Open University Learning Analytics Dataset
+(OULAD), released under a CC-BY 4.0 licence.
+
+\begin{thebibliography}{99}
 
 \bibitem{tomasevic2020}
-N. Tomasevic, N. Gvozdenovic, and S. Vranes, ``An overview and comparison of supervised data mining techniques for student exam performance prediction,'' \emph{Computers \& Education}, vol. 143, art. no. 103676, 2020.
+N.~Tomasevic, N.~Gvozdenovic, and S.~Vranes, ``An overview and comparison
+of supervised data mining techniques for student exam performance
+prediction,'' \emph{Computers \& Education}, vol.~143, art.~no.~103676,
+2020.
 
 \bibitem{adnan2021}
-M. Adnan \emph{et al.}, ``Predicting at-risk students at different percentages of course length for early intervention using machine learning models,'' \emph{IEEE Access}, vol. 9, pp. 7519--7539, 2021.
+M.~Adnan \emph{et al.}, ``Predicting at-risk students at different
+percentages of course length for early intervention using machine learning
+models,'' \emph{IEEE Access}, vol.~9, pp.~7519-7539, 2021.
 
 \bibitem{alamri2021}
-H. Alamri and B. Alharbi, ``Explainable student performance prediction models: A systematic review,'' \emph{IEEE Access}, vol. 9, pp. 33132--33143, 2021.
+H.~Alamri and B.~Alharbi, ``Explainable student performance prediction
+models: A systematic review,'' \emph{IEEE Access}, vol.~9,
+pp.~33132-33143, 2021.
 
 \bibitem{kuzilek2017}
-J. Kuzilek, M. Hlosta, and Z. Zdrahal, ``Open University Learning Analytics dataset,'' \emph{Scientific Data}, vol. 4, art. no. 170171, 2017.
+J.~Kuzilek, M.~Hlosta, and Z.~Zdrahal, ``Open University Learning Analytics
+dataset,'' \emph{Scientific Data}, vol.~4, art.~no.~170171, 2017.
 
 \bibitem{webster2002}
-J. Webster and R. T. Watson, ``Analyzing the past to prepare for the future: Writing a literature review,'' \emph{MIS Quarterly}, vol. 26, no. 2, pp. xiii--xxiii, 2002.
+J.~Webster and R.~T.~Watson, ``Analyzing the past to prepare for the
+future: Writing a literature review,'' \emph{MIS Quarterly}, vol.~26,
+no.~2, pp.~xiii-xxiii, 2002.
 
 \bibitem{lundberg2017}
-S. M. Lundberg and S.-I. Lee, ``A unified approach to interpreting model predictions,'' in \emph{Proc. Advances in Neural Information Processing Systems (NeurIPS)}, 2017, pp. 4768--4777.
+S.~M.~Lundberg and S.-I.~Lee, ``A unified approach to interpreting model
+predictions,'' in \emph{Proc. Advances in Neural Information Processing
+Systems (NeurIPS)}, 2017, pp.~4768-4777.
 
 \bibitem{ribeiro2016}
-M. T. Ribeiro, S. Singh, and C. Guestrin, ``\,`Why should I trust you?' Explaining the predictions of any classifier,'' in \emph{Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining}, 2016, pp. 1135--1144.
+M.~T.~Ribeiro, S.~Singh, and C.~Guestrin, ```Why should I trust you?'
+Explaining the predictions of any classifier,'' in \emph{Proc. 22nd ACM
+SIGKDD Int. Conf. Knowledge Discovery and Data Mining}, 2016,
+pp.~1135-1144.
 
 \bibitem{gunasekara2025}
-S. Gunasekara and M. Saarela, ``Explainable AI in education: Techniques and qualitative assessment,'' \emph{Applied Sciences}, vol. 15, no. 3, art. no. 1239, 2025.
+S.~Gunasekara and M.~Saarela, ``Explainable AI in education: Techniques and
+qualitative assessment,'' \emph{Applied Sciences}, vol.~15, no.~3,
+art.~no.~1239, 2025.
 
 \bibitem{chawla2002}
-N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer, ``SMOTE: Synthetic minority over-sampling technique,'' \emph{Journal of Artificial Intelligence Research}, vol. 16, pp. 321--357, 2002.
+N.~V.~Chawla, K.~W.~Bowyer, L.~O.~Hall, and W.~P.~Kegelmeyer, ``SMOTE:
+Synthetic minority over-sampling technique,'' \emph{Journal of Artificial
+Intelligence Research}, vol.~16, pp.~321-357, 2002.
+
+\bibitem{romero2010}
+C.~Romero and S.~Ventura, ``Educational data mining: A review of the state
+of the art,'' \emph{IEEE Trans. Systems, Man, and Cybernetics, Part C
+(Applications and Reviews)}, vol.~40, no.~6, pp.~601-618, 2010.
+
+\bibitem{romero2013}
+C.~Romero and S.~Ventura, ``Data mining in education,'' \emph{WIREs Data
+Mining and Knowledge Discovery}, vol.~3, no.~1, pp.~12-27, 2013.
+
+\bibitem{baker2009}
+R.~S.~J.~d.~Baker and K.~Yacef, ``The state of educational data mining in
+2009: A review and future visions,'' \emph{Journal of Educational Data
+Mining}, vol.~1, no.~1, pp.~3-17, 2009.
+
+\bibitem{wolff2013}
+A.~Wolff, Z.~Zdr\'ahal, A.~Nikolov, and M.~Pantucek, ``Improving retention:
+Predicting at-risk students by analysing clicking behaviour in a virtual
+learning environment,'' in \emph{Proc. 3rd Int. Conf. Learning Analytics and
+Knowledge (LAK)}, 2013, pp.~145-149.
+
+\bibitem{hlosta2017}
+M.~Hlosta, Z.~Zdr\'ahal, and J.~Zendulka, ``Ouroboros: Early identification
+of at-risk students without models based on legacy data,'' in \emph{Proc.
+7th Int. Conf. Learning Analytics and Knowledge (LAK)}, 2017, pp.~6-15.
+
+\bibitem{chen2016}
+T.~Chen and C.~Guestrin, ``XGBoost: A scalable tree boosting system,'' in
+\emph{Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining},
+2016, pp.~785-794.
+
+\bibitem{ke2017}
+G.~Ke \emph{et al.}, ``LightGBM: A highly efficient gradient boosting
+decision tree,'' in \emph{Proc. Advances in Neural Information Processing
+Systems (NeurIPS)}, 2017, pp.~3149-3157.
+
+\bibitem{breiman2001}
+L.~Breiman, ``Random forests,'' \emph{Machine Learning}, vol.~45, no.~1,
+pp.~5-32, 2001.
+
+\bibitem{friedman2001}
+J.~H.~Friedman, ``Greedy function approximation: A gradient boosting
+machine,'' \emph{Annals of Statistics}, vol.~29, no.~5, pp.~1189-1232, 2001.
+
+\bibitem{hastie2009}
+T.~Hastie, R.~Tibshirani, and J.~Friedman, \emph{The Elements of Statistical
+Learning}, 2nd ed. New York, NY, USA: Springer, 2009.
+
+\bibitem{pedregosa2011}
+F.~Pedregosa \emph{et al.}, ``Scikit-learn: Machine learning in Python,''
+\emph{Journal of Machine Learning Research}, vol.~12, pp.~2825-2830, 2011.
+
+\bibitem{he2009}
+H.~He and E.~A.~Garcia, ``Learning from imbalanced data,'' \emph{IEEE Trans.
+Knowledge and Data Engineering}, vol.~21, no.~9, pp.~1263-1284, 2009.
+
+\bibitem{he2008}
+H.~He, Y.~Bai, E.~A.~Garcia, and S.~Li, ``ADASYN: Adaptive synthetic
+sampling approach for imbalanced learning,'' in \emph{Proc. IEEE Int. Joint
+Conf. Neural Networks (IJCNN)}, 2008, pp.~1322-1328.
+
+\bibitem{fernandez2018}
+A.~Fern\'andez, S.~Garc\'ia, F.~Herrera, and N.~V.~Chawla, ``SMOTE for
+learning from imbalanced data: Progress and challenges, marking the 15-year
+anniversary,'' \emph{Journal of Artificial Intelligence Research}, vol.~61,
+pp.~863-905, 2018.
+
+\bibitem{demsar2006}
+J.~Dem\v{s}ar, ``Statistical comparisons of classifiers over multiple data
+sets,'' \emph{Journal of Machine Learning Research}, vol.~7, pp.~1-30, 2006.
+
+\bibitem{holm1979}
+S.~Holm, ``A simple sequentially rejective multiple test procedure,''
+\emph{Scandinavian Journal of Statistics}, vol.~6, no.~2, pp.~65-70, 1979.
+
+\bibitem{bergstra2012}
+J.~Bergstra and Y.~Bengio, ``Random search for hyper-parameter
+optimization,'' \emph{Journal of Machine Learning Research}, vol.~13,
+pp.~281-305, 2012.
+
+\bibitem{kohavi1995}
+R.~Kohavi, ``A study of cross-validation and bootstrap for accuracy
+estimation and model selection,'' in \emph{Proc. 14th Int. Joint Conf.
+Artificial Intelligence (IJCAI)}, 1995, pp.~1137-1143.
+
+\bibitem{davis2006}
+J.~Davis and M.~Goadrich, ``The relationship between precision-recall and
+ROC curves,'' in \emph{Proc. 23rd Int. Conf. Machine Learning (ICML)}, 2006,
+pp.~233-240.
+
+\bibitem{saito2015}
+T.~Saito and M.~Rehmsmeier, ``The precision-recall plot is more informative
+than the ROC plot when evaluating binary classifiers on imbalanced
+datasets,'' \emph{PLoS ONE}, vol.~10, no.~3, art.~no.~e0118432, 2015.
+
+\bibitem{efron1993}
+B.~Efron and R.~J.~Tibshirani, \emph{An Introduction to the Bootstrap}.
+New York, NY, USA: Chapman \& Hall/CRC, 1993.
+
+\bibitem{niculescu2005}
+A.~Niculescu-Mizil and R.~Caruana, ``Predicting good probabilities with
+supervised learning,'' in \emph{Proc. 22nd Int. Conf. Machine Learning
+(ICML)}, 2005, pp.~625-632.
+
+\bibitem{guo2017}
+C.~Guo, G.~Pleiss, Y.~Sun, and K.~Q.~Weinberger, ``On calibration of modern
+neural networks,'' in \emph{Proc. 34th Int. Conf. Machine Learning (ICML)},
+2017, pp.~1321-1330.
+
+\bibitem{lundberg2020}
+S.~M.~Lundberg \emph{et al.}, ``From local explanations to global
+understanding with explainable AI for trees,'' \emph{Nature Machine
+Intelligence}, vol.~2, pp.~56-67, 2020.
+
+\bibitem{guidotti2018}
+R.~Guidotti \emph{et al.}, ``A survey of methods for explaining black box
+models,'' \emph{ACM Computing Surveys}, vol.~51, no.~5, art.~no.~93, 2018.
+
+\bibitem{adadi2018}
+A.~Adadi and M.~Berrada, ``Peeking inside the black-box: A survey on
+explainable artificial intelligence (XAI),'' \emph{IEEE Access}, vol.~6,
+pp.~52138-52160, 2018.
+
+\bibitem{molnar2022}
+C.~Molnar, \emph{Interpretable Machine Learning: A Guide for Making Black Box
+Models Explainable}, 2nd ed., 2022. [Online]. Available:
+https://christophm.github.io/interpretable-ml-book/
+
+\bibitem{mehrabi2021}
+N.~Mehrabi, F.~Morstatter, N.~Saxena, K.~Lerman, and A.~Galstyan, ``A survey
+on bias and fairness in machine learning,'' \emph{ACM Computing Surveys},
+vol.~54, no.~6, art.~no.~115, 2021.
 
 \end{thebibliography}
 

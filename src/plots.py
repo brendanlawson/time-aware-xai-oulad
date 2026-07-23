@@ -24,20 +24,32 @@ from src.eda.plot_style import CLASS_COLOURS, CLASS_LABELS, apply_style, savefig
 
 
 def metric_vs_checkpoint(
-    metrics: pd.DataFrame, metric: str = "roc_auc", name: str = "metric_vs_checkpoint"
+    metrics: pd.DataFrame,
+    metric: str = "roc_auc",
+    name: str = "metric_vs_checkpoint",
+    criterion: float | None = None,
 ) -> Path:
     """Line plot: x=t_percent, y=metric, one line per model.
 
     The headline figure for RQ1 — "how early can we predict at-risk students
     reliably?". ``metrics`` is the tidy table written by
     :func:`src.modeling.train.train_all` (columns: ``model``, ``t_percent`` and one
-    column per metric).
+    column per metric). ``criterion`` draws the reliability bar the report
+    caption refers to (e.g. 0.80 for recall).
     """
     apply_style()
     fig, ax = plt.subplots(figsize=(8, 5))
     for model, grp in metrics.groupby("model"):
         grp = grp.sort_values("t_percent")
         ax.plot(grp["t_percent"], grp[metric], marker="o", label=model)
+    if criterion is not None:
+        ax.axhline(
+            criterion,
+            ls="--",
+            lw=1,
+            color="dimgray",
+            label=f"Reliability bar ({metric.replace('_', ' ')} = {criterion:.2f})",
+        )
     ticks = sorted(metrics["t_percent"].unique())
     ax.set_xticks(ticks)
     ax.set_xlabel("Course progress (%)")
